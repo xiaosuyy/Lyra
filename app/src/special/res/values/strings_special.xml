@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  特别版文案覆盖：首页标题在这几个字符串之间随机取一个，
+  这里统一成同一个名字，首页就固定显示「晚秋&冬至」。
+-->
+<resources>
+    <string name="app_name">晚秋&amp;冬至</string>
+    <string name="home_title_brand_loud">晚秋&amp;冬至</string>
+    <string name="home_title_brand_wave">晚秋&amp;冬至</string>
+    <string name="home_title_brand_call">晚秋&amp;冬至</string>
+</resources>
