@@ -143,7 +143,6 @@ import com.lyra.player.ui.effect.glass.AdvancedGlassOverscrollFactory
 import com.lyra.player.ui.feedback.AppFeedback
 import com.lyra.player.ui.util.ClipboardCopyResult
 import com.lyra.player.ui.util.copyPlainTextSafely
-import com.lyra.player.ui.onboarding.StartupOnboardingScreen
 import com.lyra.player.ui.screen.safemode.SafeModeScreen
 import com.lyra.player.ui.theme.rememberActualSystemDarkTheme
 import com.lyra.player.util.crash.CrashReportStore
@@ -372,8 +371,6 @@ class MainActivity : ComponentActivity() {
             )
             val disclaimerAccepted by settingsRepository.disclaimerAcceptedFlow
                 .collectAsStateWithLifecycle(initialValue = null)
-            val startupOnboardingCompleted by settingsRepository.startupOnboardingCompletedFlow
-                .collectAsStateWithLifecycle(initialValue = null)
             var pendingDisclaimerAccepted by rememberSaveable {
                 mutableStateOf(false)
             }
@@ -461,24 +458,11 @@ class MainActivity : ComponentActivity() {
                 var playedEntrance by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(Unit) { playedEntrance = true }
 
-                val stage = remember(
-                    disclaimerAccepted,
-                    startupOnboardingCompleted,
-                    pendingDisclaimerAccepted
-                ) {
+                val stage = remember(disclaimerAccepted, pendingDisclaimerAccepted) {
                     StartupStageResolver.resolve(
                         disclaimerAccepted = disclaimerAccepted,
-                        startupOnboardingCompleted = startupOnboardingCompleted,
                         pendingDisclaimerAccepted = pendingDisclaimerAccepted
                     )
-                }
-                var hasDisplayedDisclaimer by rememberSaveable { mutableStateOf(false) }
-                var previousStartupStage by remember { mutableStateOf<StartupStage?>(null) }
-                LaunchedEffect(stage) {
-                    if (stage == StartupStage.Disclaimer) {
-                        hasDisplayedDisclaimer = true
-                    }
-                    previousStartupStage = stage
                 }
                 val pendingMobileDataDownloadInterruptionRequest by
                     GlobalDownloadManager.mobileDataDownloadInterruptionRequest.collectAsStateWithLifecycle()
@@ -546,11 +530,6 @@ class MainActivity : ComponentActivity() {
                     },
                     label = "AppStageTransition"
                 ) { current ->
-                    StartupStageContentGate(
-                        stage = current,
-                        previousStage = previousStartupStage,
-                        disclaimerWasShown = hasDisplayedDisclaimer || pendingDisclaimerAccepted
-                    ) {
                     when (current) {
                         StartupStage.Loading -> {
                             Box(
@@ -578,11 +557,6 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 }
-                            )
-                        }
-                        StartupStage.Onboarding -> {
-                            StartupOnboardingScreen(
-                                onLanguageChanged = { selectedAppLanguage = it }
                             )
                         }
                         StartupStage.Main -> {
@@ -769,7 +743,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                    }
                     }
                 }
 

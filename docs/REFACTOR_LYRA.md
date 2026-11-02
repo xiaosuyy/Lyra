@@ -48,7 +48,17 @@ Do not change them without a designed data migration.
 - CI 中一起听 Worker 的 npm 检查步骤。
 - README / CONTRIBUTING（中英共 4 份）中的一起听章节。
 
-## 4. 主要符号重命名 / Key Symbol Renames
+## 4. 移除首次启动引导 / Removed First-Launch Onboarding
+
+- 删除 `ui/onboarding/`（9 步向导）、`StartupStage.Onboarding`、`StartupStageFlow`、
+  启动转场占位符与 `startup_onboarding_completed` 设置项；启动流程简化为
+  `Loading -> Disclaimer -> Main`。
+- 免责声明保留，其 48 条文案从原 `strings_onboarding.xml` 迁到
+  `strings_disclaimer.xml`。
+- 引导页原本是 `POST_NOTIFICATIONS` 的唯一运行时申请点，删除后在设置页「通用」
+  新增 `NotificationPermissionSetting` 手动申请入口；本地媒体权限仍由本地扫描按需申请。
+
+## 5. 主要符号重命名 / Key Symbol Renames
 
 | 旧符号 / Old | 新符号 / New |
 | --- | --- |
@@ -63,7 +73,7 @@ Do not change them without a designed data migration.
 测试同步重命名，例如 `LyraAppMainTabTransitionPolicyTest`、
 `LyraAppNavigationIsolationPolicyTest`、`LyraAppPlaybackTransitionPolicyTest`。
 
-## 5. 图标替换 / Icon Replacement
+## 6. 图标替换 / Icon Replacement
 
 - 源图：[`icon/lyra.png`](../icon/lyra.png)（用户提供，1254×1254，黑底圆角方块 + 白色
   Lyra 字标）。
@@ -71,7 +81,7 @@ Do not change them without a designed data migration.
   monochrome 图层、通知小图标与启动画面 `ic_lyra_splash.xml`。
 - 旧的 `icon/` 下 NeriPlayer SVG/XML 图标源文件已全部删除。
 
-## 6. 提交清单 / Commit List
+## 7. 提交清单 / Commit List
 
 | 提交 / Commit | 内容 / Content |
 | --- | --- |
@@ -84,7 +94,7 @@ Do not change them without a designed data migration.
 文档重写（README、CONTRIBUTING 中英 4 份）与本说明文件在后续提交中完成。
 The documentation rewrite and this note land in a follow-up commit.
 
-## 7. 授权与出处 / License and Attribution
+## 8. 授权与出处 / License and Attribution
 
 - 本仓库沿用 GPLv3；`app/src/main/cpp/` 下原 NeriPlayer 自有 Native 源码的替代授权
   范围保持不变，见 `app/src/main/cpp/README.md`。

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- First-launch disclaimer -->
+    <string name="disclaimer_title">Usage &amp; Privacy</string>
+    <string name="disclaimer_intro">Please review how the app connects to services, stores data, and requests permissions.</string>
+    <string name="disclaimer_last_updated">Updated August 8, 2026</string>
+    <string name="disclaimer_summary_content_title">Content comes from third parties</string>
+    <string name="disclaimer_summary_content_body">Lyra plays content from platforms you choose to access. It does not host media files.</string>
+    <string name="disclaimer_summary_data_title">Data stays on your device by default</string>
+    <string name="disclaimer_summary_data_body">Settings, history, download records, and local diagnostics stay on-device and are not used for advertising or profiling.</string>
+    <string name="disclaimer_summary_sync_title">Sync is your choice</string>
+    <string name="disclaimer_summary_sync_body">Selected data is sent only after you enable GitHub, WebDAV, or a self-hosted service.</string>
+    <string name="disclaimer_show_details">Read full details</string>
+    <string name="disclaimer_hide_details">Hide full details</string>
+    <string name="disclaimer_section1_title">App and content scope</string>
+    <string name="disclaimer_section2_title">Copyright and lawful use</string>
+    <string name="disclaimer_section3_title">Third-party platforms and accounts</string>
+    <string name="disclaimer_section4_title">Local data, diagnostics, and sync</string>
+    <string name="disclaimer_section5_title">Permissions and device features</string>
+    <string name="disclaimer_section6_title">Disclaimer and limitation of liability</string>
+    <string name="disclaimer_section7_title">Regions and service terms</string>
+    <string name="disclaimer_section8_title">Updates to this notice</string>
+    <string name="disclaimer_section9_title">Confirmation</string>
+    <string name="disclaimer_agree_countdown">I have read and agree</string>
+    <string name="disclaimer_read_countdown">Please read (%d s)</string>
+    <string name="disclaimer_section1_body">Lyra is a local-first audio and video player for collecting and playing third-party content you choose to access. The app does not host, upload, or distribute media files. Online playback, search, sign-in, and downloads connect directly to the relevant platform or service you select.</string>
+    <string name="disclaimer_section2_bullet1">Copyright and related rights in playable content belong to the original creators, rightsholders, or platforms.</string>
+    <string name="disclaimer_section2_bullet2">You are responsible for confirming that content you access, download, share, or use has a lawful source and the necessary permissions.</string>
+    <string name="disclaimer_section2_bullet3">Do not use the app to infringe third-party content, trademarks, privacy, or other lawful rights.</string>
+    <string name="disclaimer_section2_bullet4">Risks arising from your access, download, sharing, or distribution are your responsibility under applicable law.</string>
+    <string name="disclaimer_section3_bullet1">Platform sign-in, Cookies, playback URLs, and metadata are subject to the terms and privacy policies of the relevant third-party platforms.</string>
+    <string name="disclaimer_section3_bullet2">Third-party availability, content, APIs, and regional restrictions can change at any time and are not guaranteed by the app.</string>
+    <string name="disclaimer_section3_bullet3">Before enabling a third-party account or self-hosted service, review and accept its terms and privacy policy yourself.</string>
+    <string name="disclaimer_section4_bullet1">Playback history, favorites, settings, download tasks, and local diagnostics are stored on your device by default.</string>
+    <string name="disclaimer_section4_bullet2">Local diagnostics are not uploaded automatically. Relevant data leaves the device only when you export, share, or configure sync yourself.</string>
+    <string name="disclaimer_section4_bullet3">GitHub, WebDAV, and self-hosted Listen Together services are optional. After you enable them, selected sync data is sent to the service you configure.</string>
+    <string name="disclaimer_section5_bullet1">Notification permission shows playback status and media controls. Most playback features still work if you decline it.</string>
+    <string name="disclaimer_section5_bullet2">Local music permission is used only to scan and play audio files on your device. Online playback and downloads do not require it.</string>
+    <string name="disclaimer_section5_bullet3">Permissions or system settings for floating lyrics, Bluetooth, and background playback are requested only when you enable the corresponding feature.</string>
+    <string name="disclaimer_section5_bullet4">You can skip non-essential permissions and change them later from the related feature or system settings.</string>
+    <string name="disclaimer_section5_bullet5">This version does not include third-party advertising, behavioral analytics, or profiling SDKs.</string>
+    <string name="disclaimer_section5_bullet6">Third-party platforms and sync services you configure may process access logs or account data under their own policies.</string>
+    <string name="disclaimer_section5_bullet7">Downloads are stored in the local location you choose. The app does not upload them to developer-controlled content servers.</string>
+    <string name="disclaimer_section5_bullet8">Actions involving accounts, credentials, or private data are initiated by you. Keep your device and sync-service accounts secure.</string>
+    <string name="disclaimer_section5_bullet9">The update date is shown at the top of this page and this notice may change with app features or data handling.</string>
+    <string name="disclaimer_section6_bullet1">The app is provided on an &quot;as is&quot; and &quot;as available&quot; basis, with no promise of uninterrupted, error-free, or purpose-specific operation.</string>
+    <string name="disclaimer_section6_bullet2">To the extent permitted by applicable law, the developer is not liable for direct or indirect losses arising from the app, third-party services, or downloaded content.</string>
+    <string name="disclaimer_section6_bullet3">These limitations do not affect rights that applicable law does not allow to be excluded or limited.</string>
+    <string name="disclaimer_section7_body">You must comply with the laws of your location and the terms of services you use. Content, platforms, and features may be unavailable because of region, network, account status, or platform policy.</string>
+    <string name="disclaimer_section8_body">This notice may be updated for feature, data-handling, or legal changes. The revised version will appear in the app; please read it again before continuing to use it.</string>
+    <string name="disclaimer_section9_body">By continuing, you confirm that you have read and understood this notice. If you do not agree, stop using the app and its related features.</string>
+</resources>

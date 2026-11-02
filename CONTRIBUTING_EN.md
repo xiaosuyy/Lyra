@@ -126,9 +126,9 @@ for the new behavior.
    ```bash
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
-4. First launch enters the disclaimer and startup onboarding flow. Notification and
-   local-music permissions are explained first and requested only after the user
-   chooses them; either can be skipped.
+4. First launch only shows the disclaimer. The playback notification permission is
+   granted manually from Settings -> General, and local-music access is requested
+   when a local scan runs.
 5. For debugging access, tap the **version number** 7 times in Settings. A
    standalone `Debug` tab will appear in the bottom navigation bar.
 
@@ -206,7 +206,7 @@ Security reminders:
 
 - `app/src/main/java/com/lyra/player/activity/`
   - `MainActivity.kt`: the only external entry point. Handles safe mode, startup, disclaimer,
-    onboarding, external audio imports, and the top-level Compose host.
+    external audio imports, and the top-level Compose host.
   - Platform login activities live under `activity/auth/` and run in dedicated
     secondary processes. `activity/sync/` stores Activity-side sync warning state.
   - `UsbDeviceAttachHandling.kt` enables or disables the USB attach Activity alias
@@ -255,10 +255,6 @@ Security reminders:
 
 - `app/src/main/java/com/lyra/player/ui/viewmodel/artist/`
   - NetEase artist summaries, JSON parsing, and detail-screen state management.
-
-- `app/src/main/java/com/lyra/player/ui/onboarding/`
-  - First-run onboarding for language, platform accounts, permission guidance,
-    playback controls, GitHub sync, and personalization.
 
 - `app/src/main/java/com/lyra/player/core/api/`
   - `netease/`: NetEase endpoints, crypto, and account capabilities.

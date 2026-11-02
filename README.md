@@ -85,7 +85,7 @@ Lyra 是一个基于 **Jetpack Compose + Media3** 的原生 Android
 - **单 Activity + Compose 架构**：`MainActivity` 是唯一对外入口，
   UI 由 Compose `NavHost`、动态底栏、Mini Player 与 Now Playing 覆盖层组织。
 - **启动与恢复链路**：正常启动流程为
-  `Loading -> Disclaimer -> Onboarding -> Main`；
+  `Loading -> Disclaimer -> Main`；
   如果上次启动发生崩溃或系统 ANR，会先进入 `Safe Mode`。
 - **测试护栏**：下载存储、同步合并、YouTube 播放兼容、歌词解析、
   播放策略、配置备份与安全模式等关键链路都有对应单元测试或设备测试。
@@ -238,8 +238,8 @@ Lyra 是一个基于 **Jetpack Compose + Media3** 的原生 Android
    ```bash
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
-5. 首次启动时先阅读免责声明并完成启动引导；引导页会说明通知与本地音乐权限，
-   仅在你主动点按后申请，跳过不影响继续使用。
+5. 首次启动只需阅读免责声明；播放通知权限可在设置页「通用」里手动开启，
+   本地音乐权限在你扫描本地文件时按需申请。
 6. 如需调试工具，在设置页连续点击 **版本号** 7 次启用开发者模式，
    底栏会出现独立 `Debug` 页面。
 

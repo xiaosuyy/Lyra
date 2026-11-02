@@ -91,7 +91,6 @@ class MiniPlayerPlaybackTransitionTest {
         val settingsRepository = SettingsRepository(composeRule.activity.applicationContext)
         runBlocking {
             settingsRepository.setDisclaimerAccepted(true)
-            settingsRepository.setStartupOnboardingCompleted(true)
         }
         composeRule.waitForIdle()
     }

@@ -1,32 +1,21 @@
 package com.lyra.player.core.startup
 
 internal object StartupStageResolver {
-    fun resolve(
-        disclaimerAccepted: Boolean?,
-        startupOnboardingCompleted: Boolean?
-    ): StartupStage {
+    fun resolve(disclaimerAccepted: Boolean?): StartupStage {
         return when (disclaimerAccepted) {
             null -> StartupStage.Loading
             false -> StartupStage.Disclaimer
-            true -> when (startupOnboardingCompleted) {
-                null -> StartupStage.Loading
-                false -> StartupStage.Onboarding
-                true -> StartupStage.Main
-            }
+            true -> StartupStage.Main
         }
     }
 
     fun resolve(
         disclaimerAccepted: Boolean?,
-        startupOnboardingCompleted: Boolean?,
         pendingDisclaimerAccepted: Boolean
     ): StartupStage {
         if (!pendingDisclaimerAccepted) {
-            return resolve(disclaimerAccepted, startupOnboardingCompleted)
+            return resolve(disclaimerAccepted)
         }
-        return resolve(
-            disclaimerAccepted = true,
-            startupOnboardingCompleted = startupOnboardingCompleted ?: false
-        )
+        return resolve(disclaimerAccepted = true)
     }
 }

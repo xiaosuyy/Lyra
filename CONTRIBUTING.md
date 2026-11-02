@@ -112,8 +112,8 @@
    ```bash
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
-4. 首次启动会进入免责声明与启动引导；通知和本地音乐权限会先说明用途，
-   仅在用户主动点按后请求，也可以跳过。
+4. 首次启动只需阅读免责声明；播放通知权限改到设置页「通用」手动开启，
+   本地音乐权限在扫描本地文件时按需申请。
 5. 如需调试入口，在设置页连续点击**版本号** 7 次，底栏会出现独立 `Debug` 页。
 
 ---
@@ -187,7 +187,7 @@
 
 - `app/src/main/java/com/lyra/player/activity/`
   - `MainActivity.kt` 是唯一对外入口，负责安全模式、启动流程、免责声明、
-    启动引导、外部音频导入和顶层 Compose 宿主。
+    外部音频导入和顶层 Compose 宿主。
   - 平台登录 Activity 位于 `activity/auth/`，并在独立次进程中运行；
     `activity/sync/` 保存 Activity 侧的同步告警状态。
   - `UsbDeviceAttachHandling.kt` 负责按设置启停 USB 设备插入 Activity alias，
@@ -231,9 +231,6 @@
 
 - `app/src/main/java/com/lyra/player/ui/viewmodel/artist/`
   - 网易云艺术家摘要、JSON 解析和详情页状态管理。
-
-- `app/src/main/java/com/lyra/player/ui/onboarding/`
-  - 首次启动引导，覆盖语言、平台账号、权限说明、播放控件、GitHub 同步和个性化设置。
 
 - `app/src/main/java/com/lyra/player/core/api/`
   - `netease/`：网易云接口、加密和账号能力。
@@ -355,7 +352,7 @@
 - Lyricon/SuperLyric 的位置 feed 独立按 200 ms 推送并使用 elapsed realtime 锚点；
   修改播放器进度刷新间隔时，必须同时检查前后台歌词时序和 SuperLyric 对齐。
 - 网易云播放会在当前音质不可用时自动尝试更低音质；
-  Bilibili 和本地音频兜底默认关闭，只有用户在引导或设置中主动开启后，才会在无权限、无可用播放结果或仅返回试听片段时尝试。
+  Bilibili 和本地音频兜底默认关闭，只有用户在设置中主动开启后，才会在无权限、无可用播放结果或仅返回试听片段时尝试。
 - 网易云歌单详情缓存只服务歌单详情页快速展示和失败回退；
   专辑详情仍保持实时刷新，避免和歌单缓存混用。
 - 本地「我喜欢的音乐」支持将可识别的网易云歌曲同步到网易云我喜欢的音乐；

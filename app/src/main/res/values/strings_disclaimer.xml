@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 首次启动免责声明 -->
+    <string name="disclaimer_title">使用说明与隐私</string>
+    <string name="disclaimer_intro">请确认应用如何连接第三方服务、保存数据与请求权限</string>
+    <string name="disclaimer_last_updated">更新于 2026 年 8 月 8 日</string>
+    <string name="disclaimer_summary_content_title">内容来自第三方</string>
+    <string name="disclaimer_summary_content_body">Lyra 用于浏览和播放你主动访问的平台内容，不托管音视频文件。</string>
+    <string name="disclaimer_summary_data_title">数据默认留在设备</string>
+    <string name="disclaimer_summary_data_body">设置、历史、下载记录和本地诊断默认保存在设备中，不用于广告或行为画像。</string>
+    <string name="disclaimer_summary_sync_title">同步由你决定</string>
+    <string name="disclaimer_summary_sync_body">只有启用 GitHub、WebDAV 或自建服务后，选中的数据才会发送到对应服务。</string>
+    <string name="disclaimer_show_details">查看完整说明</string>
+    <string name="disclaimer_hide_details">收起完整说明</string>
+    <string name="disclaimer_section1_title">软件与内容范围</string>
+    <string name="disclaimer_section2_title">版权与合法使用</string>
+    <string name="disclaimer_section3_title">第三方平台与账号</string>
+    <string name="disclaimer_section4_title">本地数据、诊断与同步</string>
+    <string name="disclaimer_section5_title">权限与设备功能</string>
+    <string name="disclaimer_section6_title">免责声明与责任限制</string>
+    <string name="disclaimer_section7_title">地区和服务条款</string>
+    <string name="disclaimer_section8_title">说明更新</string>
+    <string name="disclaimer_section9_title">确认使用</string>
+    <string name="disclaimer_agree_countdown">我已阅读并同意</string>
+    <string name="disclaimer_read_countdown">请阅读（%d 秒）</string>
+    <string name="disclaimer_section1_body">Lyra 是本地优先的音视频播放器，用于整合和播放你主动访问的第三方内容。应用不会托管、上传或分发音视频文件；在线播放、搜索、登录和下载会直接连接相应平台或你选择的服务。</string>
+    <string name="disclaimer_section2_bullet1">可播放内容的版权及相关权益归原作者、权利人或对应平台所有。</string>
+    <string name="disclaimer_section2_bullet2">你应确认访问、下载、分享或使用内容的来源合法，并具备必要的使用权限。</string>
+    <string name="disclaimer_section2_bullet3">请勿利用本应用侵犯第三方内容、商标、隐私或其他合法权益。</string>
+    <string name="disclaimer_section2_bullet4">因你的访问、下载、分享或传播行为产生的风险，应由你依适用法律自行承担。</string>
+    <string name="disclaimer_section3_bullet1">平台登录、Cookie、播放地址和内容元数据受对应第三方平台的条款与隐私政策约束。</string>
+    <string name="disclaimer_section3_bullet2">第三方服务的可用性、内容、接口和地区限制可能随时变化，应用不对此作出保证。</string>
+    <string name="disclaimer_section3_bullet3">启用第三方账号或自建服务前，请自行阅读并确认其服务条款与隐私政策。</string>
+    <string name="disclaimer_section4_bullet1">播放历史、收藏、设置、下载任务和本地诊断默认保存在你的设备中。</string>
+    <string name="disclaimer_section4_bullet2">应用不会将本地诊断自动上传；只有你主动导出、分享或配置同步时，相关数据才会离开设备。</string>
+    <string name="disclaimer_section4_bullet3">GitHub、WebDAV 和自建 Listen Together 服务均为可选功能；启用后，选中的同步数据会发送至你配置的服务。</string>
+    <string name="disclaimer_section5_bullet1">通知权限用于显示播放状态和媒体控制；拒绝后仍可使用大多数播放功能。</string>
+    <string name="disclaimer_section5_bullet2">本地音乐权限仅用于扫描和播放设备中的音频文件；在线播放和下载不依赖该权限。</string>
+    <string name="disclaimer_section5_bullet3">悬浮歌词、蓝牙和后台播放等权限或系统设置，只会在你开启相应功能时按需请求。</string>
+    <string name="disclaimer_section5_bullet4">你可以跳过非必要权限，并在之后通过功能入口或系统设置修改授权。</string>
+    <string name="disclaimer_section5_bullet5">本版本未接入第三方广告、行为分析或用户画像 SDK。</string>
+    <string name="disclaimer_section5_bullet6">第三方平台和你配置的同步服务可能按照各自政策处理访问日志或账户数据。</string>
+    <string name="disclaimer_section5_bullet7">下载文件保存在你选择的本地位置，应用不会将它们上传到开发者控制的内容服务器。</string>
+    <string name="disclaimer_section5_bullet8">涉及账号、凭据或私有数据的操作由你主动发起；请妥善保护设备与同步服务账户。</string>
+    <string name="disclaimer_section5_bullet9">本说明的更新时间见页面顶部，并会随功能与数据处理方式变化而修订。</string>
+    <string name="disclaimer_section6_bullet1">应用按“现状”和“可用”状态提供，不承诺不中断、无错误或适用于特定目的。</string>
+    <string name="disclaimer_section6_bullet2">在适用法律允许的范围内，开发者不对使用应用、第三方服务或下载内容造成的直接或间接损失承担责任。</string>
+    <string name="disclaimer_section6_bullet3">上述限制不影响适用法律不得排除或限制的权利。</string>
+    <string name="disclaimer_section7_body">你应遵守所在地法律及所使用平台的服务条款。部分内容、平台或功能可能因地区、网络、账户状态或平台策略不可用。</string>
+    <string name="disclaimer_section8_body">本说明可能随功能、数据处理方式或法律要求更新。更新版本会在应用中展示，继续使用前请重新阅读。</string>
+    <string name="disclaimer_section9_body">继续使用即表示你已阅读并理解本说明。若不同意，请停止使用应用和相关功能。</string>
+</resources>

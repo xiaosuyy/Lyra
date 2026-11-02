@@ -94,7 +94,7 @@ Current positioning:
   The UI is organized by Compose `NavHost`, a dynamic bottom bar, Mini Player,
   and the Now Playing overlay.
 - **Startup and recovery flow**: the normal startup path is
-  `Loading -> Disclaimer -> Onboarding -> Main`. If the previous launch ended in
+  `Loading -> Disclaimer -> Main`. If the previous launch ended in
   a crash or system ANR, the app enters `Safe Mode` first.
 - **Test guardrails**: download storage, sync merging, YouTube playback compatibility,
   lyrics, playback policies, config backup, and safe mode all
@@ -290,8 +290,8 @@ Current positioning:
    ```bash
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
-5. On first launch, read the disclaimer and complete onboarding. The flow explains
-   notification and local-music permissions, and requests them only after you choose
+5. On first launch, read the disclaimer. The playback notification permission can be
+   granted later from Settings -> General, and local-music access is requested when
    to allow them; either can be skipped.
 6. For debugging tools, tap the **version number** 7 times in Settings. A
    standalone `Debug` tab will appear in the bottom bar.

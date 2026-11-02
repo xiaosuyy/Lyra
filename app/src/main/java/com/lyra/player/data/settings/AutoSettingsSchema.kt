@@ -170,15 +170,6 @@ object AutoSettingsSchema {
         val disclaimerAcceptedV2 = Unit
 
         @AutoSetting(
-            key = "startup_onboarding_completed",
-            type = SettingValueType.Boolean,
-            defaultBoolean = false,
-            order = 80,
-            access = SettingAccessMode.KeyOnly
-        )
-        val startupOnboardingCompleted = Unit
-
-        @AutoSetting(
             key = "internationalization_enabled",
             type = SettingValueType.Boolean,
             defaultBoolean = false,
