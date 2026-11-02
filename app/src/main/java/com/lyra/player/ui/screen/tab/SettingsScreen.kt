@@ -169,6 +169,7 @@ import com.lyra.player.ui.screen.tab.settings.auth.SettingsNeteaseAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsYouTubeAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.component.LazyAnimatedVisibility
 import com.lyra.player.ui.screen.tab.settings.component.PlaybackServiceIdleShutdownSetting
+import com.lyra.player.ui.screen.tab.settings.component.NotificationPermissionSetting
 import com.lyra.player.ui.screen.tab.settings.component.SettingsAudioQualitySection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsBackupRestoreSection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsDownloadSection
@@ -1301,6 +1302,14 @@ fun SettingsScreen(
                             highlightTargetId = settingsHighlightTargetId,
                             highlightPulse = settingsHighlightPulse,
                             onHighlightFinished = onSettingsHighlightFinished
+                        )
+                        NotificationPermissionSetting(
+                            modifier = Modifier.settingsHighlightTarget(
+                                targetId = "manual:notification_permission",
+                                highlightTargetId = settingsHighlightTargetId,
+                                highlightPulse = settingsHighlightPulse,
+                                onHighlightFinished = onSettingsHighlightFinished
+                            )
                         )
                         LanguageSettingItem(
                             modifier = Modifier.settingsHighlightTarget(

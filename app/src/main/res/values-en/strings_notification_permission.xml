@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Playback notification permission -->
+    <string name="settings_notification_permission_title">Playback notification</string>
+    <string name="settings_notification_permission_granted">Enabled. Tap to open system notification settings.</string>
+    <string name="settings_notification_permission_denied">Off. Android 13 and above need this permission to show the playback notification.</string>
+    <string name="settings_notification_permission_not_required">This system needs no runtime grant; manage it in system settings.</string>
+    <string name="settings_notification_permission_denied_hint">Notifications are still off. Allow them in app info if needed.</string>
+    <string name="settings_notification_permission_unavailable">Cannot open system notification settings</string>
+</resources>

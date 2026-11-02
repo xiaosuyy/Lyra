@@ -435,6 +435,21 @@ internal fun manualSettingsSearchEntries(context: Context): List<SettingsSearchE
             order = 4
         ),
         entry(
+            page = SettingsPage.General,
+            titleRes = R.string.settings_notification_permission_title,
+            descriptionRes = R.string.settings_notification_permission_denied,
+            id = "notification_permission",
+            aliases = listOf(
+                "通知",
+                "播放通知",
+                "notification",
+                "notifications",
+                "permission",
+                "tongzhi",
+                "quanxian"
+            )
+        ),
+        entry(
             page = SettingsPage.Theme,
             titleRes = R.string.settings_theme_mode,
             descriptionRes = R.string.settings_theme_mode_desc,

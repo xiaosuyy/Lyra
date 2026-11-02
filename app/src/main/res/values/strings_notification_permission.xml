@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 播放通知权限 -->
+    <string name="settings_notification_permission_title">播放通知权限</string>
+    <string name="settings_notification_permission_granted">已开启，点按可进入系统通知设置调整</string>
+    <string name="settings_notification_permission_denied">未开启，Android 13 及以上需要授权后才能显示播放通知</string>
+    <string name="settings_notification_permission_not_required">当前系统无需单独授权，可在系统设置中管理</string>
+    <string name="settings_notification_permission_denied_hint">通知仍未开启，可在应用信息页手动允许</string>
+    <string name="settings_notification_permission_unavailable">无法打开系统通知设置</string>
+</resources>
