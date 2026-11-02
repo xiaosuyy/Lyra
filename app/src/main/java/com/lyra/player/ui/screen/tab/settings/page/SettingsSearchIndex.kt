@@ -41,7 +41,7 @@ internal fun buildSettingsSearchEntries(context: Context): List<SettingsSearchEn
     }
 
     val settingEntries = AutoSettingsMetadata.settings
-        // YouTube 渠道已从 BlueBlue 移除，相关设置不再出现在搜索结果里
+        // YouTube 渠道已从 Lyra 移除，相关设置不再出现在搜索结果里
         .filter { it.ui != SettingUiType.None && it.titleRes != 0 && !it.isRemovedYouTubeSetting() }
         .mapNotNull { setting ->
             val page = setting.settingsPage() ?: return@mapNotNull null
@@ -88,7 +88,7 @@ internal fun searchSettingsEntries(
         .take(limit)
 }
 
-/** 已从 BlueBlue 移除的 YouTube 设置，不再参与设置搜索。 */
+/** 已从 Lyra 移除的 YouTube 设置，不再参与设置搜索。 */
 internal fun AutoSettingInfo.isRemovedYouTubeSetting(): Boolean =
     keyName.contains("youtube", ignoreCase = true)
 

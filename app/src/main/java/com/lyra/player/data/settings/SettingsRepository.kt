@@ -588,7 +588,7 @@ class SettingsRepository(private val context: Context) {
     val internationalizationEnabledFlow: Flow<Boolean> =
         dataStoreSettingFlow { it[SettingsKeys.INTERNATIONALIZATION_ENABLED] ?: defaultInternationalization }
 
-    // YouTube 渠道已从 BlueBlue 中移除：这里恒定返回关闭，历史设置值不再生效
+    // YouTube 渠道已从 Lyra 中移除：这里恒定返回关闭，历史设置值不再生效
     val youtubeEnabledFlow: Flow<Boolean> = flowOf(false)
 
     suspend fun setDynamicColor(value: Boolean) {

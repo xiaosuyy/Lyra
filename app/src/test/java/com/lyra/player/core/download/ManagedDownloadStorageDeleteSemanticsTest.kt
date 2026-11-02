@@ -179,13 +179,13 @@ class ManagedDownloadStorageDeleteSemanticsTest {
     @Test
     fun `saf delete guard rejects cross authority and outside tree documents`() {
         val managedTree =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FNeriPlayer"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra"
         val managedChild =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FNeriPlayer%2FCovers%2Fsong.jpg"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FLyra%2FCovers%2Fsong.jpg"
         val outsideTreeChild =
             "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FOther%2Fsong.jpg"
         val crossAuthorityChild =
-            "content://com.example.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FNeriPlayer%2FCovers%2Fsong.jpg"
+            "content://com.example.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FLyra%2FCovers%2Fsong.jpg"
 
         assertTrue(
             ManagedDownloadStorage.isReferenceAllowedForManagedDelete(

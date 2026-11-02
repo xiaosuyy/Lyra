@@ -680,7 +680,7 @@ class AutoSettingsGeneratedTest {
         val setting = AutoSettingsSchema.general.youtubeEnabled
 
         assertEquals("youtube_enabled", setting.key)
-        // YouTube 渠道已从 BlueBlue 移除：默认关闭
+        // YouTube 渠道已从 Lyra 移除：默认关闭
         assertEquals(false, setting.defaultValue)
     }
 

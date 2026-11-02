@@ -22,7 +22,7 @@ class LauncherLocaleResourceTest {
         }
         val resources = baseContext.createConfigurationContext(configuration).resources
 
-        assertEquals("BlueBlue", resources.getString(R.string.app_name))
+        assertEquals("Lyra", resources.getString(R.string.app_name))
         assertEquals(
             "继续播放",
             resources.getString(R.string.launcher_shortcut_continue_short)
