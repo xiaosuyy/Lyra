@@ -1,5 +1,5 @@
 name: Suggestion Submission / 提交建议
-description: 提交对 NeriPlayer 的优化建议，助力产品体验提升 / Submit optimization suggestions for NeriPlayer to enhance user experience
+description: 提交对 Lyra 的优化建议，助力产品体验提升 / Submit optimization suggestions for Lyra to enhance user experience
 title: "[Suggestion] "
 labels: ["enhancement"]
 
@@ -7,10 +7,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        非常感谢您为 NeriPlayer 提出优化建议！您的想法对产品改进至关重要。
+        非常感谢您为 Lyra 提出优化建议！您的想法对产品改进至关重要。
         为了让开发者更清晰地理解您的建议，请按以下模板填写信息。
         
-        Thank you very much for submitting optimization suggestions for NeriPlayer! Your ideas are crucial to product improvement.
+        Thank you very much for submitting optimization suggestions for Lyra! Your ideas are crucial to product improvement.
         To help developers better understand your suggestion, please fill in the information according to the following template.
 
   - type: textarea
