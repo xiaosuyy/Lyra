@@ -638,37 +638,6 @@ internal fun manualSettingsSearchEntries(context: Context): List<SettingsSearchE
             order = SettingsPage.Backup.ordinal * 100 + 76
         ),
         entry(
-            page = SettingsPage.ListenTogether,
-            titleRes = R.string.listen_together_join_room,
-            descriptionRes = R.string.settings_listen_together_join_room_desc,
-            id = "listen_together_join_room",
-            aliases = listOf(
-                "listen together",
-                "lt",
-                "join",
-                "invite",
-                "room",
-                "link",
-                "jiaru",
-                "yaoqing",
-                "yiqiting"
-            )
-        ),
-        entry(
-            page = SettingsPage.ListenTogether,
-            titleRes = R.string.settings_listen_together_server_title,
-            descriptionRes = R.string.settings_listen_together_expand,
-            id = "listen_together_server",
-            aliases = listOf("listen together", "lt", "worker", "room", "server", "url", "yiqiting")
-        ),
-        entry(
-            page = SettingsPage.ListenTogether,
-            titleRes = R.string.settings_listen_together_default_nickname_title,
-            descriptionRes = R.string.listen_together_nickname,
-            id = "listen_together_nickname",
-            aliases = listOf("nickname", "name", "uuid", "shenfen", "nicheng", "yiqiting")
-        ),
-        entry(
             page = SettingsPage.Storage,
             titleRes = R.string.settings_clear_cache,
             descriptionRes = R.string.settings_clear_cache_desc,
@@ -737,7 +706,6 @@ private val PageSearchAliases = mapOf(
     SettingsPage.TrafficManagement to listOf("traffic", "mobile", "roaming", "data", "liuliang"),
     SettingsPage.Downloads to listOf("download", "downloads", "threads", "parallel", "concurrency", "xiazai"),
     SettingsPage.Backup to listOf("backup", "sync", "github", "webdav", "import", "export", "beifen"),
-    SettingsPage.ListenTogether to listOf("listen together", "room", "worker", "server", "yiqiting"),
     SettingsPage.About to listOf("about", "version", "debug", "guanyu")
 )
 

@@ -19,15 +19,6 @@ class AppConfigBackupCodecTest {
                 longs = linkedMapOf("cloud_music_lyric_default_offset_ms" to -1000L),
                 strings = linkedMapOf("audio_quality" to "lossless")
             ),
-            listenTogether = ListenTogetherConfigSnapshot(
-                workerBaseUrl = "https://worker.example",
-                workerBaseUrlInput = "worker.example",
-                userUuid = "uuid-1",
-                nickname = "Neri",
-                allowMemberControl = false,
-                autoPauseOnMemberChange = false,
-                shareAudioLinks = false
-            ),
             language = LanguageConfigSnapshot(code = "en"),
             neteaseAuth = SavedCookieConfigSnapshot(
                 cookies = linkedMapOf("MUSIC_U" to "cookie"),
@@ -123,7 +114,6 @@ class AppConfigBackupCodecTest {
         )
 
         assertTrue(decoded.sections.settings)
-        assertFalse(decoded.sections.listenTogether)
         assertFalse(decoded.sections.neteaseAuth)
         assertEquals(false, decoded.payload.settings.booleans["dynamic_color"])
     }
@@ -133,15 +123,6 @@ class AppConfigBackupCodecTest {
         val payload = AppConfigBackup(
             formatVersion = 1,
             exportedAt = 1_717_171_717L,
-            listenTogether = ListenTogetherConfigSnapshot(
-                workerBaseUrl = "https://worker.example",
-                workerBaseUrlInput = "worker.example",
-                userUuid = "uuid-1",
-                nickname = "Neri",
-                allowMemberControl = false,
-                autoPauseOnMemberChange = false,
-                shareAudioLinks = false
-            ),
             neteaseAuth = SavedCookieConfigSnapshot(cookies = linkedMapOf("MUSIC_U" to "cookie")),
             biliAuth = SavedCookieConfigSnapshot(cookies = linkedMapOf("SESSDATA" to "cookie")),
             youTubeAuth = YouTubeAuthConfigSnapshot(cookieHeader = "SID=1")

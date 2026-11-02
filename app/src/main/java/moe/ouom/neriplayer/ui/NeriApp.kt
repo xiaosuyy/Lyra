@@ -221,7 +221,6 @@ import moe.ouom.neriplayer.ui.screen.debug.BiliApiProbeScreen
 import moe.ouom.neriplayer.ui.screen.debug.CrashLogListScreen
 import moe.ouom.neriplayer.ui.screen.debug.DebugCrashTestType
 import moe.ouom.neriplayer.ui.screen.debug.DebugHomeScreen
-import moe.ouom.neriplayer.ui.screen.debug.ListenTogetherDebugScreen
 import moe.ouom.neriplayer.ui.screen.debug.LogListScreen
 import moe.ouom.neriplayer.ui.screen.debug.NeteaseApiProbeScreen
 import moe.ouom.neriplayer.ui.screen.debug.SearchApiProbeScreen
@@ -303,7 +302,6 @@ private val TRANSPARENT_MAIN_TAB_DETAIL_ROUTES = setOf(
 )
 private val DEBUG_NAVIGATION_DEPTH_BY_ROUTE = mapOf(
     Destinations.Debug.route to 0,
-    Destinations.DebugListenTogether.route to 1,
     Destinations.DebugUsbExclusive.route to 1,
     Destinations.DebugYouTube.route to 1,
     Destinations.DebugBili.route to 1,
@@ -3231,9 +3229,6 @@ private fun NeriAppContent(
                             onAlwaysRecordLogsChange = { enabled ->
                                 scope.launch { repo.setAlwaysRecordLogsEnabled(enabled) }
                             },
-                            onOpenListenTogetherDebug = {
-                                navController.navigate(Destinations.DebugListenTogether.route)
-                            },
                             onOpenUsbExclusiveDebug = {
                                 navController.navigate(Destinations.DebugUsbExclusive.route)
                             },
@@ -4047,25 +4042,6 @@ private fun NeriAppContent(
                                         mainTabExitTransition(coherentFeedbackEnabled)
                                     }
                                 ) {}
-                                composable(
-                                    route = Destinations.DebugListenTogether.route,
-                                    enterTransition = {
-                                        debugNavigationEnterTransition(coherentFeedbackEnabled)
-                                    },
-                                    exitTransition = {
-                                        debugNavigationExitTransition(coherentFeedbackEnabled)
-                                    },
-                                    popEnterTransition = {
-                                        debugNavigationEnterTransition(coherentFeedbackEnabled)
-                                    },
-                                    popExitTransition = {
-                                        debugNavigationExitTransition(coherentFeedbackEnabled)
-                                    }
-                                ) {
-                                    RenderNavHostScene(Destinations.DebugListenTogether.route) {
-                                        ListenTogetherDebugScreen()
-                                    }
-                                }
                                 composable(
                                     route = Destinations.DebugUsbExclusive.route,
                                     enterTransition = {

@@ -143,8 +143,6 @@
     <string name="onboarding_learning_download_desc">下载任务、文件位置和本地导入都在相关设置中管理，权限只在需要时申请</string>
     <string name="onboarding_learning_backup_title">备份与恢复</string>
     <string name="onboarding_learning_backup_desc">GitHub 和 WebDAV 可以分别配置，自动同步开关互不影响</string>
-    <string name="onboarding_learning_listen_together_title">一起听</string>
-    <string name="onboarding_learning_listen_together_desc">在播放页或设置中创建房间，与朋友同步歌曲、进度和播放模式</string>
     <string name="onboarding_learning_queue_title">播放队列</string>
     <string name="onboarding_learning_queue_desc">在正在播放页打开队列可以查看、拖动调整顺序，并使用播放模式和定时停止</string>
     <string name="onboarding_learning_enter_app">进入 BlueBlue</string>

@@ -11,9 +11,6 @@ import moe.ouom.neriplayer.activity.shouldProcessUsbDeviceAttachedAction
 import moe.ouom.neriplayer.activity.usbDeviceAttachAliasComponentState
 import moe.ouom.neriplayer.core.player.audio.focus.shouldPauseUsbExclusiveForFocusChange
 import moe.ouom.neriplayer.core.player.audio.focus.shouldSuppressUsbExclusiveForFocusChange
-import moe.ouom.neriplayer.listentogether.protocol.ListenTogetherPlaybackState
-import moe.ouom.neriplayer.listentogether.protocol.ListenTogetherRoomState
-import moe.ouom.neriplayer.listentogether.protocol.ListenTogetherTrack
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -27,23 +24,7 @@ class AudioPlayerServicePolicyTest {
         val action = resolveTaskRemovedPlaybackAction(
             hasPlaybackSurfaceContent = true,
             playerTransportActive = true,
-            listenTogetherRemotePlaying = false,
             hasItems = true,
-        )
-
-        assertTrue(action.stopPlaybackImmediately)
-        assertTrue(action.persistPlaybackState)
-        assertTrue(action.stopServiceAfterPersist)
-        assertFalse(action.updateNotificationAfterPersist)
-    }
-
-    @Test
-    fun `listen together transport is persisted before service stops when task is removed`() {
-        val action = resolveTaskRemovedPlaybackAction(
-            hasPlaybackSurfaceContent = true,
-            playerTransportActive = false,
-            listenTogetherRemotePlaying = true,
-            hasItems = false,
         )
 
         assertTrue(action.stopPlaybackImmediately)
@@ -57,7 +38,6 @@ class AudioPlayerServicePolicyTest {
         val action = resolveTaskRemovedPlaybackAction(
             hasPlaybackSurfaceContent = true,
             playerTransportActive = false,
-            listenTogetherRemotePlaying = false,
             hasItems = true,
         )
 
@@ -72,7 +52,6 @@ class AudioPlayerServicePolicyTest {
         val action = resolveTaskRemovedPlaybackAction(
             hasPlaybackSurfaceContent = false,
             playerTransportActive = true,
-            listenTogetherRemotePlaying = true,
             hasItems = false,
         )
 
@@ -90,8 +69,7 @@ class AudioPlayerServicePolicyTest {
             action = resolveTaskRemovedPlaybackAction(
                 hasPlaybackSurfaceContent = true,
                 playerTransportActive = true,
-                listenTogetherRemotePlaying = false,
-                hasItems = true,
+                    hasItems = true,
             ),
             callbacks = taskRemovedCallbacks(calls)
         )
@@ -115,8 +93,7 @@ class AudioPlayerServicePolicyTest {
             action = resolveTaskRemovedPlaybackAction(
                 hasPlaybackSurfaceContent = true,
                 playerTransportActive = true,
-                listenTogetherRemotePlaying = false,
-                hasItems = true,
+                    hasItems = true,
             ),
             callbacks = taskRemovedCallbacks(
                 calls = calls,
@@ -147,8 +124,7 @@ class AudioPlayerServicePolicyTest {
             action = resolveTaskRemovedPlaybackAction(
                 hasPlaybackSurfaceContent = true,
                 playerTransportActive = false,
-                listenTogetherRemotePlaying = false,
-                hasItems = true,
+                    hasItems = true,
             ),
             callbacks = taskRemovedCallbacks(calls)
         )
@@ -170,8 +146,7 @@ class AudioPlayerServicePolicyTest {
             action = resolveTaskRemovedPlaybackAction(
                 hasPlaybackSurfaceContent = false,
                 playerTransportActive = true,
-                listenTogetherRemotePlaying = true,
-                hasItems = false,
+                    hasItems = false,
             ),
             callbacks = taskRemovedCallbacks(calls)
         )
@@ -202,24 +177,6 @@ class AudioPlayerServicePolicyTest {
     }
 
     @Test
-    fun `remote listen together playback counts as active task removal transport`() {
-        assertTrue(
-            resolveTaskRemovedTransportActive(
-                playerTransportActive = false,
-                listenTogetherRemotePlaying = true,
-            )
-        )
-        assertTrue(
-            resolveTaskRemovedPlaybackAction(
-                hasPlaybackSurfaceContent = true,
-                playerTransportActive = false,
-                listenTogetherRemotePlaying = true,
-                hasItems = false,
-            ).stopPlaybackImmediately
-        )
-    }
-
-    @Test
     fun `active task removal keeps service when persistence fails`() = runTest {
         val calls = mutableListOf<String>()
 
@@ -227,8 +184,7 @@ class AudioPlayerServicePolicyTest {
             action = resolveTaskRemovedPlaybackAction(
                 hasPlaybackSurfaceContent = true,
                 playerTransportActive = true,
-                listenTogetherRemotePlaying = false,
-                hasItems = true,
+                    hasItems = true,
             ),
             callbacks = taskRemovedCallbacks(
                 calls = calls,
@@ -310,33 +266,6 @@ class AudioPlayerServicePolicyTest {
         assertTrue(actions and PlaybackState.ACTION_SKIP_TO_NEXT != 0L)
         assertTrue(actions and PlaybackState.ACTION_SKIP_TO_PREVIOUS != 0L)
         assertTrue(actions and PlaybackState.ACTION_SEEK_TO != 0L)
-    }
-
-    @Test
-    fun `media session fallback wraps a single repeat room position`() {
-        val roomState = ListenTogetherRoomState(
-            roomId = "room-1",
-            version = 1L,
-            track = ListenTogetherTrack(
-                stableKey = "netease:1",
-                channelId = "netease",
-                audioId = "1",
-                name = "track",
-                artist = "artist",
-                durationMs = 60_000L
-            ),
-            playback = ListenTogetherPlaybackState(
-                state = "playing",
-                basePositionMs = 58_000L,
-                baseTimestampMs = 1_000L,
-                repeatMode = 1
-            )
-        )
-
-        assertEquals(
-            3_000L,
-            resolveListenTogetherMediaSessionPosition(roomState, nowMs = 6_000L)
-        )
     }
 
     @Test

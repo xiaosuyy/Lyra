@@ -45,12 +45,9 @@ import moe.ouom.neriplayer.core.player.model.toPlaybackState
 import moe.ouom.neriplayer.core.player.model.withPlaybackState
 import moe.ouom.neriplayer.core.player.playback.BiliVideoSkipPlaybackController
 import moe.ouom.neriplayer.core.player.playback.playAtIndex
-import moe.ouom.neriplayer.core.player.url.isCurrentListenTogetherFallbackMediaUrl
 import moe.ouom.neriplayer.core.player.playlist.PlayerFavoritesController
 import moe.ouom.neriplayer.core.player.policy.command.PlaybackCommandSource
 import moe.ouom.neriplayer.core.player.source.toSongItem
-import moe.ouom.neriplayer.listentogether.playback.ListenTogetherRestoredPlaybackAction
-import moe.ouom.neriplayer.listentogether.playback.resolveListenTogetherRestoredPlaybackAction
 import moe.ouom.neriplayer.data.local.media.LocalMediaMetadataWriteOutcome
 import moe.ouom.neriplayer.data.local.media.LocalMediaSupport
 import moe.ouom.neriplayer.data.local.media.LocalSongSupport
@@ -747,7 +744,6 @@ internal suspend fun PlayerManager.persistStateImpl(
     val playlistReference = currentPlaylist
     val currentIndexSnapshot = currentIndex
     val mediaUrlSnapshot = _currentMediaUrl.value
-        .takeUnless { isCurrentListenTogetherFallbackMediaUrl() }
     val persistedShouldResumePlayback =
         shouldResumePlayback && !suppressAutoResumeForCurrentSession
     val persistedPositionMs = if (keepLastPlaybackProgressEnabled) {
@@ -1446,30 +1442,6 @@ internal fun PlayerManager.resumeRestoredPlaybackIfNeededImpl(): Long? {
     if (!restoredShouldResumePlayback) {
         NPLogger.d("NERI-PlayerManager", "resumeRestoredPlaybackIfNeeded(): skipped, restoredShouldResumePlayback=false")
         return null
-    }
-    when (
-        resolveListenTogetherRestoredPlaybackAction(
-            restoredPlaybackRequested = restoredShouldResumePlayback,
-            listenTogetherSessionActive = isListenTogetherActive(),
-            currentUserIsController = isCurrentUserControllerInListenTogether()
-        )
-    ) {
-        ListenTogetherRestoredPlaybackAction.SKIP -> return null
-        ListenTogetherRestoredPlaybackAction.RESUME_LOCAL_PLAYBACK -> Unit
-        ListenTogetherRestoredPlaybackAction.WAIT_FOR_AUTHORITATIVE_ROOM_STATE -> {
-            NPLogger.d(
-                "NERI-PlayerManager",
-                "resumeRestoredPlaybackIfNeeded(): defer active Listen Together listener until room state is authoritative"
-            )
-            restoredShouldResumePlayback = false
-            restoredResumePositionMs = 0L
-            scheduleStatePersist(
-                positionMs = _playbackPositionMs.value.coerceAtLeast(0L),
-                shouldResumePlayback = false,
-                debounceMs = 0L
-            )
-            return null
-        }
     }
     if (currentPlaylist.isEmpty() || currentIndex !in currentPlaylist.indices) {
         NPLogger.w(
@@ -2314,7 +2286,7 @@ private suspend fun PlayerManager.updateSongInAllPlaces(
 
     if (isCurrentSong(originalSong)) {
         setCurrentSongForPlayback(updatedSong)
-        if (isBiliTrack(updatedSong) && !isListenTogetherActive()) {
+        if (isBiliTrack(updatedSong)) {
             BiliVideoSkipPlaybackController.prepareActiveBiliTrackTarget(
                 song = updatedSong,
                 requestToken = playbackRequestToken,

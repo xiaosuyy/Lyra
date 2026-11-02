@@ -22,7 +22,6 @@ class PlaybackAudioOffloadPolicyTest {
         assertTrue(resolveRequiresPcmAudioProcessing(volumeNormalizationEnabled = true))
         assertTrue(resolveRequiresPcmAudioProcessing(highResolutionOutputEnabled = true))
         assertTrue(resolveRequiresPcmAudioProcessing(audioReactiveActive = true))
-        assertTrue(resolveRequiresPcmAudioProcessing(listenTogetherPlaybackRate = 1.02f))
     }
 
     @Test
@@ -82,7 +81,6 @@ class PlaybackAudioOffloadPolicyTest {
         highResolutionOutputEnabled: Boolean = false,
         audioReactiveActive: Boolean = false,
         audioSource: PlaybackAudioSource? = null,
-        listenTogetherPlaybackRate: Float = 1f,
     ): Boolean {
         return requiresPcmAudioProcessing(
             usbExclusivePlaybackEnabled = usbExclusivePlaybackEnabled,
@@ -95,7 +93,6 @@ class PlaybackAudioOffloadPolicyTest {
             highResolutionOutputEnabled = highResolutionOutputEnabled,
             audioReactiveActive = audioReactiveActive,
             audioSource = audioSource,
-            listenTogetherPlaybackRate = listenTogetherPlaybackRate,
         )
     }
 }

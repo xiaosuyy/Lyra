@@ -16,9 +16,8 @@ class PlaybackServiceRestartPolicyTest {
     }
 
     @Test
-    fun `foreground playback and listen together remain sticky`() {
+    fun `foreground playback remains sticky`() {
         assertTrue(resolveShouldKeepSticky(foregroundPlaybackRequired = true))
-        assertTrue(resolveShouldKeepSticky(listenTogetherSessionActive = true))
     }
 
     @Test
@@ -76,14 +75,12 @@ class PlaybackServiceRestartPolicyTest {
         hasPlaybackSurfaceContent: Boolean = true,
         hasResumableQueue: Boolean = false,
         foregroundPlaybackRequired: Boolean = false,
-        listenTogetherSessionActive: Boolean = false,
     ): Boolean {
         return shouldKeepPlaybackServiceSticky(
             playerRuntimeReady = playerRuntimeReady,
             hasPlaybackSurfaceContent = hasPlaybackSurfaceContent,
             hasResumableQueue = hasResumableQueue,
             foregroundPlaybackRequired = foregroundPlaybackRequired,
-            listenTogetherSessionActive = listenTogetherSessionActive,
         )
     }
 }

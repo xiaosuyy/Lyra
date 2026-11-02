@@ -973,7 +973,7 @@ class NeriAppNavigationTransitionTest {
     fun drawerDebugChildKeepsTheSinkingDebugHomeLayerVisibleWhileOpening() {
         assertExternalBackgroundLayerBehavior(
             mainRoute = Destinations.Debug.route,
-            childRoute = Destinations.DebugListenTogether.route,
+            childRoute = Destinations.DebugBili.route,
             coherentFeedbackEnabled = false,
             debugRoute = true,
             durationMillis = DRAWER_DETAIL_OPEN_DURATION_MS,

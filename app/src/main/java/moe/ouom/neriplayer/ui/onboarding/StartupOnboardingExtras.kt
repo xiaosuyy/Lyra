@@ -339,11 +339,6 @@ internal fun StartupLearningGuideContent() {
             body = stringResource(R.string.onboarding_learning_backup_desc)
         )
         LearningGuideItem(
-            icon = Icons.Filled.SpeakerGroup,
-            title = stringResource(R.string.onboarding_learning_listen_together_title),
-            body = stringResource(R.string.onboarding_learning_listen_together_desc)
-        )
-        LearningGuideItem(
             icon = Icons.Outlined.Tune,
             title = stringResource(R.string.onboarding_learning_queue_title),
             body = stringResource(R.string.onboarding_learning_queue_desc)

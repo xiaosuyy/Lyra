@@ -283,16 +283,6 @@ internal fun shouldClearResumePlaybackRequestOnPlayWhenReadyPause(
     }
 }
 
-internal fun shouldResumeSilentlyForListenTogetherNoisyPause(
-    playWhenReady: Boolean,
-    playWhenReadyChangeReason: Int,
-    muteListenTogetherListenerForAudioRouteLoss: Boolean
-): Boolean {
-    return !playWhenReady &&
-        muteListenTogetherListenerForAudioRouteLoss &&
-        playWhenReadyChangeReason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY
-}
-
 internal fun shouldPausePlaybackWhenToggling(
     resumePlaybackRequested: Boolean,
     pendingPauseJobActive: Boolean,
@@ -379,7 +369,6 @@ internal fun resolveYouTubeImmediatePlaybackWarmupTargets(
 
 internal fun resolvePlaybackSoundConfigForEngine(
     baseConfig: PlaybackSoundConfig,
-    listenTogetherSyncPlaybackRate: Float,
     usbExclusivePlaybackEnabled: Boolean = false
 ): PlaybackSoundConfig {
     val normalizedBaseConfig = baseConfig.copy(
@@ -398,8 +387,5 @@ internal fun resolvePlaybackSoundConfigForEngine(
             equalizerEnabled = false
         )
     }
-    val resolvedSyncRate = listenTogetherSyncPlaybackRate.coerceIn(0.95f, 1.05f)
-    return normalizedBaseConfig.copy(
-        speed = normalizePlaybackSpeed(normalizedBaseConfig.speed * resolvedSyncRate)
-    )
+    return normalizedBaseConfig
 }

@@ -41,7 +41,6 @@ class NeriAppNavigationIsolationTest {
     fun everyDebugHierarchyTransitionKeepsScenesDisjoint() {
         lateinit var navController: NavHostController
         val firstLevelRoutes = listOf(
-            Destinations.DebugListenTogether.route,
             Destinations.DebugUsbExclusive.route,
             Destinations.DebugYouTube.route,
             Destinations.DebugBili.route,

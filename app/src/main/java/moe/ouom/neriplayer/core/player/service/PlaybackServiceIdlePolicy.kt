@@ -5,7 +5,6 @@ internal fun shouldSchedulePlaybackServiceIdleShutdown(
     hasPlaybackSurfaceContent: Boolean,
     transportActive: Boolean,
     transportBuffering: Boolean,
-    listenTogetherSessionActive: Boolean,
     usbSessionActiveOrTransitioning: Boolean,
     sleepTimerActive: Boolean,
 ): Boolean {
@@ -13,7 +12,6 @@ internal fun shouldSchedulePlaybackServiceIdleShutdown(
         hasPlaybackSurfaceContent &&
         !transportActive &&
         !transportBuffering &&
-        !listenTogetherSessionActive &&
         !usbSessionActiveOrTransitioning &&
         !sleepTimerActive
 }

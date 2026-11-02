@@ -36,27 +36,6 @@ data class TypedPreferenceSnapshot(
 }
 
 @Serializable
-data class ListenTogetherConfigSnapshot(
-    val workerBaseUrl: String = "",
-    val workerBaseUrlInput: String = "",
-    val userUuid: String = "",
-    val nickname: String = "",
-    val allowMemberControl: Boolean = true,
-    val autoPauseOnMemberChange: Boolean = true,
-    val shareAudioLinks: Boolean = true
-) {
-    fun entryCount(): Int {
-        var count = 0
-        if (workerBaseUrl.isNotBlank()) count++
-        if (workerBaseUrlInput.isNotBlank()) count++
-        if (userUuid.isNotBlank()) count++
-        if (nickname.isNotBlank()) count++
-        count += 3
-        return count
-    }
-}
-
-@Serializable
 data class LanguageConfigSnapshot(
     val code: String = ""
 ) {
@@ -142,7 +121,6 @@ data class AppConfigBackup(
     val formatVersion: Int = CONFIG_FORMAT_VERSION,
     val exportedAt: Long = 0L,
     val settings: TypedPreferenceSnapshot = TypedPreferenceSnapshot(),
-    val listenTogether: ListenTogetherConfigSnapshot = ListenTogetherConfigSnapshot(),
     val language: LanguageConfigSnapshot = LanguageConfigSnapshot(),
     val neteaseAuth: SavedCookieConfigSnapshot = SavedCookieConfigSnapshot(),
     val biliAuth: SavedCookieConfigSnapshot = SavedCookieConfigSnapshot(),
@@ -153,7 +131,6 @@ data class AppConfigBackup(
 ) {
     fun hasRestorableContent(): Boolean {
         return settings.entryCount() > 0 ||
-            listenTogether.entryCount() > 0 ||
             language.hasValue() ||
             neteaseAuth.hasData() ||
             biliAuth.hasData() ||
@@ -166,7 +143,6 @@ data class AppConfigBackup(
 
 data class AppConfigImportResult(
     val restoredSettingsCount: Int,
-    val restoredListenTogetherCount: Int,
     val restoredAuthCount: Int,
     val restoredSyncCount: Int,
     val warnings: List<String> = emptyList(),
@@ -175,7 +151,6 @@ data class AppConfigImportResult(
 
 internal data class AppConfigBackupSections(
     val settings: Boolean,
-    val listenTogether: Boolean,
     val language: Boolean,
     val neteaseAuth: Boolean,
     val biliAuth: Boolean,
@@ -189,7 +164,6 @@ internal data class AppConfigBackupSections(
 
     fun hasAnySection(): Boolean {
         return settings ||
-            listenTogether ||
             language ||
             neteaseAuth ||
             biliAuth ||
@@ -243,7 +217,6 @@ object AppConfigBackupCodec {
     private fun JsonObject.detectSections(): AppConfigBackupSections {
         return AppConfigBackupSections(
             settings = "settings" in this,
-            listenTogether = "listenTogether" in this,
             language = "language" in this,
             neteaseAuth = "neteaseAuth" in this,
             biliAuth = "biliAuth" in this,

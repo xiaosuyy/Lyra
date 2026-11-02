@@ -241,15 +241,4 @@ class PendingMediaLoadPolicyTest {
 
         assertEquals(0L, position)
     }
-
-    @Test
-    fun `listen together pending local track load uses gated position`() {
-        val position = resolvePendingMediaLoadPosition(
-            pendingLoadActive = true,
-            requestedPositionMs = 0L,
-            livePlayerPositionMs = 45_000L
-        )
-
-        assertEquals(0L, position)
-    }
 }

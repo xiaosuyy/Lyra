@@ -15,7 +15,6 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FormatSize
-import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.MusicNote
@@ -103,7 +102,6 @@ internal fun MoreOptionsMainContent(
     onOpenLyricBehavior: () -> Unit,
     onOpenFontSize: () -> Unit,
     onOpenBiliVideoSkip: () -> Unit,
-    onOpenListenTogether: () -> Unit,
     onShowSongDetails: () -> Unit,
     onShowQualitySwitch: () -> Unit,
     onEnterAlbum: (AlbumSummary) -> Unit,
@@ -153,11 +151,6 @@ internal fun MoreOptionsMainContent(
             onDismissSheet = onDismissSheet
         )
         PlaybackStatsAction(originalSong)
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.listen_together_title)) },
-            leadingContent = { Icon(Icons.Outlined.Headphones, null) },
-            modifier = Modifier.clickable(onClick = onOpenListenTogether)
-        )
     }
 }
 

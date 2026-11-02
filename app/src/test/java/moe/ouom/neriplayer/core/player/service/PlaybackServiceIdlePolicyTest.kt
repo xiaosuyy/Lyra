@@ -14,7 +14,6 @@ class PlaybackServiceIdlePolicyTest {
     fun `active playback surfaces keep service alive`() {
         assertFalse(resolveShouldScheduleIdleShutdown(transportActive = true))
         assertFalse(resolveShouldScheduleIdleShutdown(transportBuffering = true))
-        assertFalse(resolveShouldScheduleIdleShutdown(listenTogetherSessionActive = true))
         assertFalse(resolveShouldScheduleIdleShutdown(usbSessionActiveOrTransitioning = true))
         assertFalse(resolveShouldScheduleIdleShutdown(sleepTimerActive = true))
     }
@@ -30,7 +29,6 @@ class PlaybackServiceIdlePolicyTest {
         hasPlaybackSurfaceContent: Boolean = true,
         transportActive: Boolean = false,
         transportBuffering: Boolean = false,
-        listenTogetherSessionActive: Boolean = false,
         usbSessionActiveOrTransitioning: Boolean = false,
         sleepTimerActive: Boolean = false,
     ): Boolean {
@@ -39,7 +37,6 @@ class PlaybackServiceIdlePolicyTest {
             hasPlaybackSurfaceContent = hasPlaybackSurfaceContent,
             transportActive = transportActive,
             transportBuffering = transportBuffering,
-            listenTogetherSessionActive = listenTogetherSessionActive,
             usbSessionActiveOrTransitioning = usbSessionActiveOrTransitioning,
             sleepTimerActive = sleepTimerActive,
         )

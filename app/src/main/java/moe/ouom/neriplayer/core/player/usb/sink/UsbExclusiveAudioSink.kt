@@ -1046,15 +1046,13 @@ internal class UsbExclusiveAudioSink(
         }
         val soundConfig = resolvePlaybackSoundConfigForEngine(
             baseConfig = PlayerManager.playbackSoundConfig,
-            listenTogetherSyncPlaybackRate = PlayerManager.listenTogetherSyncPlaybackRate,
             usbExclusivePlaybackEnabled = true
         )
         if (soundConfig.equalizerEnabled) return "equalizer_requires_system_audio_session"
         if (soundConfig.loudnessGainMb > 0) return "loudness_requires_system_audio_session"
         if (
             abs(soundConfig.speed - 1f) > PARAMETER_EPSILON ||
-            abs(soundConfig.pitch - 1f) > PARAMETER_EPSILON ||
-            abs(PlayerManager.listenTogetherSyncPlaybackRate - 1f) > PARAMETER_EPSILON
+            abs(soundConfig.pitch - 1f) > PARAMETER_EPSILON
         ) {
             return "playback_parameters_require_system_processor"
         }

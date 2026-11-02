@@ -6,7 +6,6 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.outlined.Bolt
-import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LibraryMusic
@@ -96,11 +95,6 @@ internal enum class SettingsPage(
         AutoSettingsSchema.backup.metadata,
         Icons.Outlined.Sync
     ),
-    ListenTogether(
-        titleRes = R.string.listen_together_title,
-        descriptionRes = R.string.settings_listen_together_expand,
-        icon = Icons.Outlined.Cloud
-    ),
     About(
         titleRes = R.string.settings_about,
         descriptionRes = R.string.settings_about_desc,
@@ -141,7 +135,6 @@ internal val SettingsHomePageGroups: List<List<SettingsPage>> = listOf(
     ),
     listOf(
         SettingsPage.Backup,
-        SettingsPage.ListenTogether,
         SettingsPage.About
     )
 )

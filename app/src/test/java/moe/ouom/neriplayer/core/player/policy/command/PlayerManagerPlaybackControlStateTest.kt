@@ -91,31 +91,6 @@ class PlayerManagerPlaybackControlStateTest {
     }
 
     @Test
-    fun `listen together noisy pause resumes silently only for muted listener route loss`() {
-        assertTrue(
-            shouldResumeSilentlyForListenTogetherNoisyPause(
-                playWhenReady = false,
-                playWhenReadyChangeReason = Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY,
-                muteListenTogetherListenerForAudioRouteLoss = true
-            )
-        )
-        assertFalse(
-            shouldResumeSilentlyForListenTogetherNoisyPause(
-                playWhenReady = false,
-                playWhenReadyChangeReason = Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS,
-                muteListenTogetherListenerForAudioRouteLoss = true
-            )
-        )
-        assertFalse(
-            shouldResumeSilentlyForListenTogetherNoisyPause(
-                playWhenReady = false,
-                playWhenReadyChangeReason = Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY,
-                muteListenTogetherListenerForAudioRouteLoss = false
-            )
-        )
-    }
-
-    @Test
     fun `route mute only records a restorable nonzero volume`() {
         assertNull(
             resolveAudioRouteMuteRestoreVolume(

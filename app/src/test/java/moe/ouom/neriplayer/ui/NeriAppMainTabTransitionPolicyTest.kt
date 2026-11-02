@@ -326,7 +326,7 @@ class NeriAppMainTabTransitionPolicyTest {
     @Test
     fun `default debug child keeps the debug home content in the drawer background`() {
         val motion = resolveMainTabBackgroundMotion(
-            route = Destinations.DebugListenTogether.route,
+            route = Destinations.DebugUsbExclusive.route,
             coherentFeedbackEnabled = false
         )
         val transform = resolveMainTabBackgroundTransform(motion, progress = 1f)

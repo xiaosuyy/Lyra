@@ -317,7 +317,6 @@ import moe.ouom.neriplayer.ui.component.lyrics.resolveLyricsEditorSeed
 import moe.ouom.neriplayer.ui.component.lyrics.resolvePreferredLyricContent
 import moe.ouom.neriplayer.ui.component.lyrics.resolveStoredLyricText
 import moe.ouom.neriplayer.ui.component.lyrics.toEditableLyricsText
-import moe.ouom.neriplayer.ui.screen.debug.ListenTogetherRoomPanel
 import moe.ouom.neriplayer.ui.screen.tab.settings.miuix.MiuixSettingsButton
 import moe.ouom.neriplayer.ui.screen.tab.settings.miuix.MiuixSettingsDialog
 import moe.ouom.neriplayer.ui.screen.tab.settings.miuix.MiuixSettingsDialogContent
@@ -1884,17 +1883,7 @@ fun NowPlayingScreen(
     val nowPlayingActiveIconColor = rememberStableNowPlayingActiveContentColor(
         targetColor = targetNowPlayingActiveIconColor
     )
-    val listenTogetherSessionManager = remember { AppContainer.listenTogetherSessionManager }
-    val listenTogetherSessionState by listenTogetherSessionManager.sessionState.collectAsStateWithLifecycle()
-    val listenTogetherRoomState by listenTogetherSessionManager.roomState.collectAsStateWithLifecycle()
-    val playbackProgressSeekEnabled = resolveListenTogetherProgressSeekEnabled(
-        sessionUserUuid = listenTogetherSessionState.userUuid,
-        fallbackRole = listenTogetherSessionState.role,
-        roomId = listenTogetherSessionState.roomId,
-        controllerUserUuid = listenTogetherRoomState?.controllerUserUuid,
-        controllerUserId = listenTogetherRoomState?.controllerUserId,
-        allowMemberControl = listenTogetherRoomState?.settings?.allowMemberControl
-    )
+    val playbackProgressSeekEnabled = true
     val showProgressQualitySwitch by settingsRepo
         .nowPlayingProgressShowQualitySwitchFlow
         .collectAsStateWithLifecycle(initialValue = true)
@@ -4408,7 +4397,6 @@ private enum class MoreOptionsPage {
     FONT_SIZE,
     EDIT_INFO,
     BILI_VIDEO_SKIP,
-    LISTEN_TOGETHER,
     PLAYBACK_SOUND
 }
 
@@ -4467,7 +4455,6 @@ fun MoreOptionsSheet(
     ModalBottomSheet(
         onDismissRequest = { dismissSheet() },
         sheetState = sheetState,
-        sheetGesturesEnabled = page != MoreOptionsPage.LISTEN_TOGETHER,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         BackHandler(
@@ -4510,7 +4497,6 @@ fun MoreOptionsSheet(
                         onOpenLyricBehavior = { page = MoreOptionsPage.LYRIC_BEHAVIOR },
                         onOpenFontSize = { page = MoreOptionsPage.FONT_SIZE },
                         onOpenBiliVideoSkip = { page = MoreOptionsPage.BILI_VIDEO_SKIP },
-                        onOpenListenTogether = { page = MoreOptionsPage.LISTEN_TOGETHER },
                         onShowSongDetails = {
                             dismissSheet { onShowSongDetails(originalSong) }
                         },
@@ -4527,23 +4513,6 @@ fun MoreOptionsSheet(
                             dismissSheet(afterHidden)
                         }
                     )
-                }
-
-                MoreOptionsPage.LISTEN_TOGETHER -> {
-                    val listenTogetherScrollState = rememberScrollState()
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .bottomSheetScrollGuard()
-                            .verticalScroll(listenTogetherScrollState)
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                    ) {
-                        ListenTogetherRoomPanel(
-                            modifier = Modifier.fillMaxWidth(),
-                            showBaseUrlEditor = false
-                        )
-                    }
                 }
 
                 MoreOptionsPage.BILI_VIDEO_SKIP -> {

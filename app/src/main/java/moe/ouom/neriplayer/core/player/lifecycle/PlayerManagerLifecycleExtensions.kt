@@ -92,7 +92,6 @@ import moe.ouom.neriplayer.core.player.policy.audio.BLUETOOTH_DISCONNECT_CONFIRM
 import moe.ouom.neriplayer.core.player.policy.audio.shouldConfirmBluetoothDisconnect
 import moe.ouom.neriplayer.core.player.policy.command.PlaybackCommandSource
 import moe.ouom.neriplayer.core.player.policy.command.shouldClearResumePlaybackRequestOnPlayWhenReadyPause
-import moe.ouom.neriplayer.core.player.policy.command.shouldResumeSilentlyForListenTogetherNoisyPause
 import moe.ouom.neriplayer.core.player.policy.offload.requiresPcmAudioProcessing
 import moe.ouom.neriplayer.core.player.policy.offload.shouldUpdateAudioOffloadForReactiveChange
 import moe.ouom.neriplayer.core.player.policy.pending.shouldAcceptPlayerCallback
@@ -116,7 +115,6 @@ import moe.ouom.neriplayer.core.player.policy.wake.PlaybackTransitionWakeLock
 import moe.ouom.neriplayer.core.player.prefetch.prefetchNextGenericTrackUrl
 import moe.ouom.neriplayer.core.player.resolver.youtube.YouTubeSeekRefreshPolicy
 import moe.ouom.neriplayer.core.player.service.AudioPlayerService
-import moe.ouom.neriplayer.listentogether.playback.shouldMuteListenTogetherListenerForOutputDisconnect
 import moe.ouom.neriplayer.core.player.url.currentPlaybackCacheKeyForRecovery
 import moe.ouom.neriplayer.core.player.url.invalidateCachedResourceForPlaybackRecovery
 import moe.ouom.neriplayer.core.player.url.shouldAdvanceAfterStuckTrackEnd
@@ -905,26 +903,6 @@ internal fun PlayerManager.initializeImpl(
                         "NERI-PlayerManager",
                         "playWhenReady=false, reason=${playWhenReadyChangeReasonName(reason)}, state=${playbackStateName(player.playbackState)}, mediaId=${player.currentMediaItem?.mediaId}, stack=[${debugStackHint()}]"
                     )
-                    if (shouldResumeSilentlyForListenTogetherNoisyPause(
-                            playWhenReady = playWhenReady,
-                            playWhenReadyChangeReason = reason,
-                            muteListenTogetherListenerForAudioRouteLoss =
-                                shouldMuteListenTogetherListenerForAudioRouteLoss()
-                        )
-                    ) {
-                        NPLogger.d(
-                            "NERI-PlayerManager",
-                            "restore Listen Together listener playWhenReady after noisy route by muting locally"
-                        )
-                        suppressPlaybackForAudioRouteLoss(
-                            reason = "listen_together_exoplayer_becoming_noisy"
-                        )
-                        playImpl(
-                            commandSource = PlaybackCommandSource.LOCAL_SAFETY,
-                            allowFadeIn = false
-                        )
-                        return
-                    }
                     if (
                         shouldClearResumePlaybackRequestOnPlayWhenReadyPause(
                             playWhenReady = playWhenReady,
@@ -1545,7 +1523,6 @@ internal fun PlayerManager.updateAudioOffloadPreferences(reason: String) {
         highResolutionOutputEnabled = playbackHighResolutionOutputEnabled,
         audioReactiveActive = AudioReactive.enabled,
         audioSource = _currentPlaybackAudioInfo.value?.source,
-        listenTogetherPlaybackRate = listenTogetherSyncPlaybackRate,
     )
     if (lastRequiresPcmAudioProcessing == requiresPcmProcessing) return
     lastRequiresPcmAudioProcessing = requiresPcmProcessing
@@ -1632,14 +1609,6 @@ internal fun PlayerManager.handleAudioBecomingNoisyImpl(): Boolean {
     }
     val currentDevice = _currentAudioDevice.value
     val playbackActive = _isPlayingFlow.value || _playWhenReadyFlow.value || resumePlaybackRequested
-    if (shouldMuteListenTogetherListenerForAudioRouteLoss()) {
-        NPLogger.d(
-            "NERI-PlayerManager",
-            "handleAudioBecomingNoisy(): mute Listen Together listener without pausing"
-        )
-        suppressPlaybackForAudioRouteLoss(reason = "listen_together_becoming_noisy")
-        return true
-    }
     val nativeState = UsbExclusiveSessionController.state.value
     val nativePlayerPcmActive = nativeState.opened && nativeState.source == "player_pcm"
     if (
@@ -1735,27 +1704,6 @@ private fun PlayerManager.handleDeviceChange(
         previousDevice.name != newDevice.name
     val nativeOpenGate = UsbExclusiveSessionController.playerPcmOpenGateReason()
     val nextRouteIsUsbOutput = isUsbOutputType(newDevice.type)
-    val listenTogetherOutputDisconnected =
-        shouldMuteListenTogetherListenerForOutputDisconnect(
-            listenTogetherActive = isListenTogetherActive(),
-            isCurrentUserController = isCurrentUserControllerInListenTogether(),
-            previousRouteWasHeadsetLike =
-                previousDevice?.type?.let(::isHeadsetLikeOutput) == true,
-            newRouteIsBuiltinSpeaker =
-                newDevice.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
-            outputDeviceRemoved = outputDeviceRemoved,
-            routeChanged = usbRouteChanged
-        )
-    if (listenTogetherOutputDisconnected) {
-        bluetoothDisconnectPauseJob?.cancel()
-        bluetoothDisconnectPauseJob = null
-        NPLogger.d(
-            "NERI-PlayerManager",
-            "Detected Listen Together listener output disconnect " +
-                "(${previousDevice?.type} -> ${newDevice.type}), muting without pausing."
-        )
-        suppressPlaybackForAudioRouteLoss(reason = "listen_together_output_disconnect")
-    }
     if (
         usbExclusivePlaybackEnabled &&
         nativeOpenGate?.contains("usb_device_detached", ignoreCase = true) == true &&
@@ -1831,7 +1779,6 @@ private fun PlayerManager.handleDeviceChange(
         "NERI-PlayerManager",
         "handleDeviceChange(): ${previousDevice?.type}:${previousDevice?.name} -> ${newDevice.type}:${newDevice.name}, isPlaying=${_isPlayingFlow.value}"
     )
-    if (listenTogetherOutputDisconnected) return
     if (shouldPauseForBluetoothDisconnect(previousDevice, newDevice)) {
         schedulePauseForBluetoothDisconnect(
             previousDevice = previousDevice,

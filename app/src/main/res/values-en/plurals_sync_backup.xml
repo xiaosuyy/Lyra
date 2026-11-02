@@ -5,10 +5,6 @@
         <item quantity="one">Restored %1$d app setting</item>
         <item quantity="other">Restored %1$d app settings</item>
     </plurals>
-    <plurals name="settings_config_import_restored_listen_together">
-        <item quantity="one">Restored %1$d Listen Together setting</item>
-        <item quantity="other">Restored %1$d Listen Together settings</item>
-    </plurals>
     <plurals name="settings_config_import_restored_auth">
         <item quantity="one">Restored %1$d sign-in state</item>
         <item quantity="other">Restored %1$d sign-in states</item>

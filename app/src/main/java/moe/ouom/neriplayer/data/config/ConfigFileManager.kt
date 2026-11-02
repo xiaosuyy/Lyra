@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.core.di.AppContainer
-import moe.ouom.neriplayer.data.listentogether.ListenTogetherPreferences
 import moe.ouom.neriplayer.data.auth.bili.BiliCookieRepository
 import moe.ouom.neriplayer.data.auth.netease.NeteaseCookieRepository
 import moe.ouom.neriplayer.data.auth.youtube.YouTubeAuthRepository
@@ -42,7 +41,6 @@ class ConfigFileManager(private val context: Context) {
     suspend fun exportConfig(uri: Uri): Result<String> = withContext(Dispatchers.IO) {
         try {
             val settingsPrefs = context.dataStore.data.first()
-            val listenTogetherPreferences = ListenTogetherPreferences(context)
             val neteaseCookieRepo = NeteaseCookieRepository(context)
             val biliCookieRepo = BiliCookieRepository(context)
             val youTubeAuthRepo = YouTubeAuthRepository(context)
@@ -50,7 +48,6 @@ class ConfigFileManager(private val context: Context) {
             val payload = AppConfigBackup(
                 exportedAt = System.currentTimeMillis(),
                 settings = settingsPrefs.toTypedPreferenceSnapshot(),
-                listenTogether = listenTogetherPreferences.snapshot(),
                 language = LanguageConfigSnapshot(
                     code = LanguageManager.getCurrentLanguage(context).code
                 ),
@@ -106,9 +103,6 @@ class ConfigFileManager(private val context: Context) {
                 if (sections.settings) {
                     restoreSettings(sanitizedSettings)
                 }
-                if (sections.listenTogether) {
-                    AppContainer.listenTogetherPreferences.restore(payload.listenTogether)
-                }
 
                 val currentLanguage = LanguageManager.getCurrentLanguage(context)
                 val importedLanguage = if (sections.language) {
@@ -148,11 +142,6 @@ class ConfigFileManager(private val context: Context) {
                 Result.success(
                     AppConfigImportResult(
                         restoredSettingsCount = sanitizedSettings.entryCount(),
-                        restoredListenTogetherCount = if (sections.listenTogether) {
-                            payload.listenTogether.entryCount()
-                        } else {
-                            0
-                        },
                         restoredAuthCount = restoredAuthCount,
                         restoredSyncCount = payload.syncSectionCount(sections),
                         warnings = warnings,

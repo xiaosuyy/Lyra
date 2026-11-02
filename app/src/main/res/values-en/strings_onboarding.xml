@@ -143,8 +143,6 @@
     <string name="onboarding_learning_download_desc">Manage download tasks, file locations, and local imports in settings. Permissions are requested only when needed.</string>
     <string name="onboarding_learning_backup_title">Backup and restore</string>
     <string name="onboarding_learning_backup_desc">Configure GitHub and WebDAV separately. Their automatic sync switches are independent.</string>
-    <string name="onboarding_learning_listen_together_title">Listen Together</string>
-    <string name="onboarding_learning_listen_together_desc">Create a room from playback or settings to share tracks, progress, and playback modes with friends.</string>
     <string name="onboarding_learning_queue_title">Playback queue</string>
     <string name="onboarding_learning_queue_desc">Open the queue from Now Playing to inspect tracks, drag to reorder, and use playback modes or the sleep timer.</string>
     <string name="onboarding_learning_enter_app">Enter BlueBlue</string>

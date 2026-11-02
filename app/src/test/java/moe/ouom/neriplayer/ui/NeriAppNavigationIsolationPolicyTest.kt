@@ -63,7 +63,6 @@ class NeriAppNavigationIsolationPolicyTest {
     @Test
     fun `debug root and every first level tool use paired handoff`() {
         val firstLevelRoutes = listOf(
-            Destinations.DebugListenTogether.route,
             Destinations.DebugUsbExclusive.route,
             Destinations.DebugYouTube.route,
             Destinations.DebugBili.route,
@@ -127,7 +126,7 @@ class NeriAppNavigationIsolationPolicyTest {
         assertNull(
             resolveDebugNavigationTransitionDirection(
                 initialRoute = Destinations.Library.route,
-                targetRoute = Destinations.DebugListenTogether.route
+                targetRoute = Destinations.DebugUsbExclusive.route
             )
         )
         assertNull(

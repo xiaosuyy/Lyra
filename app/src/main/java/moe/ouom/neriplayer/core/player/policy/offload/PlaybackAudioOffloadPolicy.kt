@@ -16,7 +16,6 @@ internal fun requiresPcmAudioProcessing(
     highResolutionOutputEnabled: Boolean,
     audioReactiveActive: Boolean,
     audioSource: PlaybackAudioSource?,
-    listenTogetherPlaybackRate: Float,
 ): Boolean {
     // 网易云直链和 B 站换源都容易触发系统 offload 残留缓冲，主动走 PCM 管线
     return audioSource == PlaybackAudioSource.NETEASE ||
@@ -29,8 +28,7 @@ internal fun requiresPcmAudioProcessing(
         abs(volumeBalance) > PLAYBACK_PARAMETER_EPSILON ||
         volumeNormalizationEnabled ||
         highResolutionOutputEnabled ||
-        audioReactiveActive ||
-        abs(listenTogetherPlaybackRate - 1f) > PLAYBACK_PARAMETER_EPSILON
+        audioReactiveActive
 }
 
 internal fun shouldUpdateAudioOffloadForReactiveChange(

@@ -78,48 +78,4 @@ class LyricSeekPreviewTest {
             )
         )
     }
-
-    @Test
-    fun `resolveListenTogetherProgressSeekEnabled disables seek only for restricted listeners`() {
-        assertTrue(
-            resolveListenTogetherProgressSeekEnabled(
-                sessionUserUuid = null,
-                fallbackRole = null,
-                roomId = null,
-                controllerUserUuid = null,
-                controllerUserId = null,
-                allowMemberControl = false
-            )
-        )
-        assertTrue(
-            resolveListenTogetherProgressSeekEnabled(
-                sessionUserUuid = "owner",
-                fallbackRole = "listener",
-                roomId = "ABC123",
-                controllerUserUuid = "owner",
-                controllerUserId = null,
-                allowMemberControl = false
-            )
-        )
-        assertTrue(
-            resolveListenTogetherProgressSeekEnabled(
-                sessionUserUuid = "member",
-                fallbackRole = "listener",
-                roomId = "ABC123",
-                controllerUserUuid = "owner",
-                controllerUserId = null,
-                allowMemberControl = true
-            )
-        )
-        assertFalse(
-            resolveListenTogetherProgressSeekEnabled(
-                sessionUserUuid = "member",
-                fallbackRole = "listener",
-                roomId = "ABC123",
-                controllerUserUuid = "owner",
-                controllerUserId = null,
-                allowMemberControl = false
-            )
-        )
-    }
 }

@@ -27,7 +27,6 @@ import moe.ouom.neriplayer.core.player.url.currentPlaybackCacheKeyForRecovery
 import moe.ouom.neriplayer.core.player.url.invalidateCachedResourceForPlaybackRecovery
 import moe.ouom.neriplayer.core.player.url.allowsCustomCacheKey
 import moe.ouom.neriplayer.core.player.url.offlineCacheKeyFromUrl
-import moe.ouom.neriplayer.core.player.url.resolvePlaybackAudioInfoForListenTogetherStreamCandidate
 import moe.ouom.neriplayer.core.player.url.synchronizeCachedPlaybackDescriptor
 import moe.ouom.neriplayer.core.player.usb.path.UsbExclusiveAudioPathState
 import moe.ouom.neriplayer.core.player.usb.path.UsbExclusiveAudioPathTracker
@@ -413,11 +412,7 @@ private suspend fun PlayerManager.applyPlaybackCandidate(
         )
     }
     if (requestToken != playbackRequestToken) return
-    val selectedAudioInfo = resolvePlaybackAudioInfoForListenTogetherStreamCandidate(
-        candidate = candidate,
-        resolvedAudioInfo = null,
-        existingAudioInfo = _currentPlaybackAudioInfo.value
-    )
+    val selectedAudioInfo = candidate.audioInfo
     val cacheSynchronization = synchronizeCachedPlaybackDescriptor(
         cacheKey = cacheKey,
         audioInfo = selectedAudioInfo,

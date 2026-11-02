@@ -5,10 +5,9 @@ internal fun shouldKeepPlaybackServiceSticky(
     hasPlaybackSurfaceContent: Boolean,
     hasResumableQueue: Boolean,
     foregroundPlaybackRequired: Boolean,
-    listenTogetherSessionActive: Boolean,
 ): Boolean {
     if (!playerRuntimeReady || !hasPlaybackSurfaceContent) return false
-    return hasResumableQueue || foregroundPlaybackRequired || listenTogetherSessionActive
+    return hasResumableQueue || foregroundPlaybackRequired
 }
 
 internal fun shouldUseStickyStartModeWhilePlayerRuntimeInitializes(

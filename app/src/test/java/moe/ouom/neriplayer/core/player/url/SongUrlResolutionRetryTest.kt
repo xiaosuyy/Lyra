@@ -43,37 +43,4 @@ class SongUrlResolutionRetryTest {
         assertEquals(1, attempts)
         assertSame(SongUrlResult.RequiresLogin, result)
     }
-
-    @Test
-    fun `authoritative stream wait skips local resolution`() = runBlocking {
-        var resolved = false
-
-        val result = resolveSongUrlOrWaitForAuthoritativeStream(
-            shouldWaitForAuthoritativeStream = { true }
-        ) {
-            resolved = true
-            SongUrlResult.Failure
-        }
-
-        assertSame(SongUrlResult.WaitingForAuthoritativeStream, result)
-        assertEquals(false, resolved)
-    }
-
-    @Test
-    fun `authoritative stream wait is rechecked after local resolution`() = runBlocking {
-        var shouldWait = false
-
-        val result = resolveSongUrlOrWaitForAuthoritativeStream(
-            shouldWaitForAuthoritativeStream = { shouldWait }
-        ) {
-            shouldWait = true
-            SongUrlResult.Success(
-                url = "https://example.com/preview.m4a",
-                isPreviewClip = true,
-                noticeMessage = "preview"
-            )
-        }
-
-        assertSame(SongUrlResult.WaitingForAuthoritativeStream, result)
-    }
 }

@@ -48,7 +48,6 @@ import moe.ouom.neriplayer.core.api.youtube.YouTubeMusicPlaybackRepository
 import moe.ouom.neriplayer.core.api.youtube.YouTubePlaybackBootstrapCoordinator
 import moe.ouom.neriplayer.core.download.ManagedDownloadStorage
 import moe.ouom.neriplayer.core.player.download.AudioDownloadManager
-import moe.ouom.neriplayer.data.listentogether.ListenTogetherPreferences
 import moe.ouom.neriplayer.data.local.playlist.LocalPlaylistRepository
 import moe.ouom.neriplayer.data.auth.bili.BiliCookieRepository
 import moe.ouom.neriplayer.data.auth.netease.NeteaseCookieRepository
@@ -68,9 +67,6 @@ import moe.ouom.neriplayer.data.playlist.usage.PlaylistUsageRepository
 import moe.ouom.neriplayer.data.stats.PlaybackStatsRepository
 import moe.ouom.neriplayer.data.sync.CoverUrlMapper
 import moe.ouom.neriplayer.data.traffic.TrafficStatsRepository
-import moe.ouom.neriplayer.listentogether.network.http.ListenTogetherApi
-import moe.ouom.neriplayer.listentogether.ListenTogetherSessionManager
-import moe.ouom.neriplayer.listentogether.network.ws.ListenTogetherWebSocketClient
 import moe.ouom.neriplayer.data.settings.dataStore
 import moe.ouom.neriplayer.data.settings.persistBootstrapSettingsSnapshot
 import moe.ouom.neriplayer.data.settings.persistPlaybackPreferenceSnapshot
@@ -232,7 +228,6 @@ object AppContainer {
     // 基础 Repo
     val settingsRepo by lazy { SettingsRepository(application) }
     val homeLayoutRepository by lazy { HomeLayoutRepository(application) }
-    val listenTogetherPreferences by lazy { ListenTogetherPreferences(application) }
     val neteaseCookieRepo by lazy { NeteaseCookieRepository(application) }
     val biliCookieRepo by lazy { BiliCookieRepository(application) }
     val youtubeAuthRepo by lazy { YouTubeAuthRepository(application) }
@@ -411,20 +406,6 @@ object AppContainer {
             youtubeMusicClient = youtubeMusicClient
         )
     }
-    val listenTogetherApi by lazy { ListenTogetherApi(sharedOkHttpClient) }
-    private val listenTogetherOkHttpClient by lazy {
-        sharedOkHttpClient.newBuilder()
-            .pingInterval(15, TimeUnit.SECONDS)
-            .build()
-    }
-    val listenTogetherWebSocketClient by lazy { ListenTogetherWebSocketClient(listenTogetherOkHttpClient) }
-    val listenTogetherSessionManager by lazy {
-        ListenTogetherSessionManager(
-            api = listenTogetherApi,
-            webSocketClient = listenTogetherWebSocketClient
-        )
-    }
-
     fun launchBackgroundIo(block: suspend CoroutineScope.() -> Unit) = scope.launch(block = block)
 
     fun pauseYouTubeBackgroundWebWorkForForegroundLogin() {

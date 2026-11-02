@@ -81,7 +81,6 @@ internal sealed class SongUrlResult {
         }
     }
 
-    object WaitingForAuthoritativeStream : SongUrlResult()
     object RequiresLogin : SongUrlResult()
     object Failure : SongUrlResult()
 }

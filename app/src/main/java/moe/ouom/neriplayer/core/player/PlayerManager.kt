@@ -70,6 +70,7 @@ import moe.ouom.neriplayer.core.api.search.SongSearchInfo
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.core.di.AppContainer.settingsRepo
 import moe.ouom.neriplayer.core.lyricon.LyriconManager
+import moe.ouom.neriplayer.core.source.MusicSourceIds
 import moe.ouom.neriplayer.core.player.audio.focus.StartupAudioFocusController
 import moe.ouom.neriplayer.core.player.effects.AudioReactive
 import moe.ouom.neriplayer.core.player.effects.PlaybackEffectsController
@@ -142,7 +143,6 @@ import moe.ouom.neriplayer.core.player.policy.wake.resolvePlaybackWakeMode
 import moe.ouom.neriplayer.core.player.policy.command.shouldShowPauseButtonForPlaybackControls
 import moe.ouom.neriplayer.core.player.policy.command.shouldBootstrapPlaybackServiceOnAppLaunch
 import moe.ouom.neriplayer.core.player.policy.command.shouldRunPlaybackServiceInForeground
-import moe.ouom.neriplayer.core.player.playback.applyListenTogetherPlaybackModeImpl
 import moe.ouom.neriplayer.core.player.playback.cancelPendingPauseRequestImpl
 import moe.ouom.neriplayer.core.player.playback.cancelVolumeFadeImpl
 import moe.ouom.neriplayer.core.player.playback.cycleRepeatModeImpl
@@ -204,7 +204,6 @@ import moe.ouom.neriplayer.core.player.timer.SleepTimerMode
 import moe.ouom.neriplayer.core.player.url.YOUTUBE_PLAYBACK_PREFER_M4A
 import moe.ouom.neriplayer.core.player.url.refreshCurrentSongUrlImpl
 import moe.ouom.neriplayer.core.player.url.safeCustomPlaybackCacheKey
-import moe.ouom.neriplayer.core.player.url.stripListenTogetherStreamQualityMetadata
 import moe.ouom.neriplayer.core.player.usb.path.UsbExclusiveAudioPathState
 import moe.ouom.neriplayer.core.player.usb.path.UsbExclusiveAudioPathTracker
 import moe.ouom.neriplayer.core.player.usb.session.UsbExclusiveSessionController
@@ -225,17 +224,6 @@ import moe.ouom.neriplayer.data.settings.DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS
 import moe.ouom.neriplayer.data.settings.PlaybackPreferenceSnapshot
 import moe.ouom.neriplayer.data.settings.UsbExclusivePreferences
 import moe.ouom.neriplayer.data.settings.resolveEffectiveLyricOffsetMs
-import moe.ouom.neriplayer.listentogether.mapping.buildStableTrackKey
-import moe.ouom.neriplayer.listentogether.mapping.resolvedAudioId
-import moe.ouom.neriplayer.listentogether.mapping.resolvedChannelId
-import moe.ouom.neriplayer.listentogether.mapping.resolvedPlaylistContextId
-import moe.ouom.neriplayer.listentogether.mapping.resolvedSubAudioId
-import moe.ouom.neriplayer.listentogether.playback.authoritativeStreamUrlForCurrentTrack
-import moe.ouom.neriplayer.listentogether.playback.currentStableKey
-import moe.ouom.neriplayer.listentogether.playback.shouldHoldListenTogetherPlaybackForSafetyPause
-import moe.ouom.neriplayer.listentogether.playback.shouldMuteListenTogetherListenerForAudioRouteLoss
-import moe.ouom.neriplayer.listentogether.protocol.ListenTogetherChannels
-import moe.ouom.neriplayer.listentogether.session.resolveListenTogetherSessionRole
 import moe.ouom.neriplayer.ui.component.lyrics.LyricEntry
 import moe.ouom.neriplayer.ui.viewmodel.playlist.BiliVideoItem
 import moe.ouom.neriplayer.data.model.SongItem
@@ -344,10 +332,6 @@ object PlayerManager {
     internal var audioRouteMuteRequiresExplicitRestore = false
     internal val _audioRouteMuteSuppressedFlow = MutableStateFlow(false)
     val audioRouteMuteSuppressedFlow: StateFlow<Boolean> = _audioRouteMuteSuppressedFlow
-    @Volatile
-    internal var listenTogetherSafetyPausePendingResume = false
-    @Volatile
-    internal var listenTogetherSafetyResumeInFlight = false
     internal var playbackSoundPersistJob: Job? = null
     internal var playbackSoundApplyJob: Job? = null
     internal var lastRequiresPcmAudioProcessing: Boolean? = null
@@ -541,9 +525,6 @@ object PlayerManager {
         }
     @Volatile
     internal var suppressAutoResumeForCurrentSession = false
-    @Volatile
-    internal var listenTogetherSyncPlaybackRate = 1f
-
     internal val _currentSongFlow = MutableStateFlow<SongItem?>(null)
     val currentSongFlow: StateFlow<SongItem?> = _currentSongFlow
     @Volatile
@@ -1175,69 +1156,7 @@ object PlayerManager {
             player.playbackState == Player.STATE_READY &&
             !shouldTreatReadyAtStartAsUnhealthyPrepared()
 
-    fun setListenTogetherSyncPlaybackRate(rate: Float) {
-        ensureInitialized()
-        val resolvedRate = rate.coerceIn(0.95f, 1.05f)
-        if (kotlin.math.abs(listenTogetherSyncPlaybackRate - resolvedRate) < 0.001f) return
-        NPLogger.d(
-            "NERI-PlayerManager",
-            "setListenTogetherSyncPlaybackRate(): old=$listenTogetherSyncPlaybackRate, new=$resolvedRate, stack=[${debugStackHint()}]"
-        )
-        listenTogetherSyncPlaybackRate = resolvedRate
-        schedulePlaybackSoundConfigApply(
-            previousConfig = playbackSoundConfig,
-            newConfig = playbackSoundConfig
-        )
-    }
-
-    fun resetListenTogetherSyncPlaybackRate() {
-        setListenTogetherSyncPlaybackRate(1f)
-    }
-
     @Suppress("unused")
-    fun resetForListenTogetherJoin() {
-        ensureInitialized()
-        if (!initialized) return
-        NPLogger.d(
-            "NERI-PlayerManager",
-            "resetForListenTogetherJoin(): currentSong=${_currentSongFlow.value?.name}, queueSize=${currentPlaylist.size}, currentIndex=$currentIndex, isPlaying=${_isPlayingFlow.value}, stack=[${debugStackHint()}]"
-        )
-        cancelPendingPauseRequest(resetVolumeToFull = true)
-        clearListenTogetherSafetyPause()
-        playbackRequestToken += 1
-        cancelPlaybackStartupWatchdog(reason = "listen_together_reset")
-        clearActivePlaybackCandidates()
-        playJob?.cancel()
-        playJob = null
-        pendingMediaLoadActive = false
-        currentYouTubePrefetchJob?.cancel()
-        currentYouTubePrefetchJob = null
-        currentYouTubePrefetchVideoIds = emptySet()
-        updateResumePlaybackRequested(false)
-        restoredShouldResumePlayback = false
-        restoredResumePositionMs = 0L
-        stopProgressUpdates()
-        cancelVolumeFade(resetToFull = true)
-        persistCurrentLongFormPlaybackProgress()
-        runCatching { player.stop() }
-        runCatching { player.clearMediaItems() }
-        _isPlayingFlow.value = false
-        clearPendingSeekPosition()
-        _playbackPositionMs.value = 0L
-        _currentMediaUrl.value = null
-        currentMediaUrlResolvedAtMs = 0L
-        setCurrentSongForPlayback(null)
-        _currentQueueFlow.value = emptyList()
-        shuffleRestorePlaylistReference = null
-        shuffleRestoreCurrentIndex = -1
-        currentPlaylist = emptyList()
-        currentIndex = -1
-        consecutivePlayFailures = 0
-        NPLogger.d("NERI-PlayerManager", "resetForListenTogetherJoin(): state cleared")
-        ioScope.launch {
-            persistState(positionMs = 0L, shouldResumePlayback = false)
-        }
-    }
 
     internal fun pendingSeekPositionOrNull(): Long? {
         return pendingSeekPositionMs.takeIf { it != C.TIME_UNSET }
@@ -1280,177 +1199,6 @@ object PlayerManager {
         val normalized = url?.trim().orEmpty()
         return normalized.startsWith("https://", ignoreCase = true) ||
             normalized.startsWith("http://", ignoreCase = true)
-    }
-
-    internal fun activeListenTogetherRoomState() = AppContainer.listenTogetherSessionManager.roomState.value
-
-    internal fun activeListenTogetherSessionState() = AppContainer.listenTogetherSessionManager.sessionState.value
-
-    internal fun isListenTogetherActive(): Boolean {
-        return !activeListenTogetherSessionState().roomId.isNullOrBlank()
-    }
-
-    internal fun isCurrentUserControllerInListenTogether(): Boolean {
-        val session = activeListenTogetherSessionState()
-        val room = activeListenTogetherRoomState()
-        return resolveListenTogetherSessionRole(
-            sessionUserId = session.userUuid,
-            fallbackRole = session.role,
-            state = room
-        ) == "controller"
-    }
-
-    internal fun shouldMuteListenTogetherListenerForAudioRouteLoss(): Boolean {
-        return shouldMuteListenTogetherListenerForAudioRouteLoss(
-            listenTogetherActive = isListenTogetherActive(),
-            isCurrentUserController = isCurrentUserControllerInListenTogether()
-        )
-    }
-
-    internal fun markListenTogetherSafetyPausePendingResume() {
-        listenTogetherSafetyPausePendingResume = true
-        listenTogetherSafetyResumeInFlight = false
-    }
-
-    internal fun shouldHoldListenTogetherPlaybackForSafetyPause(causeType: String?): Boolean {
-        return shouldHoldListenTogetherPlaybackForSafetyPause(
-            safetyPausePendingResume = listenTogetherSafetyPausePendingResume,
-            causeType = causeType
-        )
-    }
-
-    internal fun requestListenTogetherSafetyPauseResume(): Boolean {
-        if (!listenTogetherSafetyPausePendingResume) return false
-        if (!isListenTogetherActive() || isCurrentUserControllerInListenTogether()) {
-            clearListenTogetherSafetyPause()
-            return false
-        }
-        if (listenTogetherSafetyResumeInFlight) return true
-        listenTogetherSafetyResumeInFlight = true
-        AppContainer.listenTogetherSessionManager.resumeListenerAfterSafetyPause()
-        return true
-    }
-
-    internal fun completeListenTogetherSafetyPauseResume() {
-        listenTogetherSafetyPausePendingResume = false
-        listenTogetherSafetyResumeInFlight = false
-    }
-
-    internal fun retryListenTogetherSafetyPauseResume() {
-        listenTogetherSafetyResumeInFlight = false
-    }
-
-    internal fun clearListenTogetherSafetyPause() {
-        listenTogetherSafetyPausePendingResume = false
-        listenTogetherSafetyResumeInFlight = false
-    }
-
-    internal fun currentListenTogetherTargetStableKey(): String? {
-        val room = activeListenTogetherRoomState() ?: return null
-        return room.currentStableKey()
-    }
-
-    internal fun currentListenTogetherTargetStreamUrl(): String? {
-        val room = activeListenTogetherRoomState() ?: return null
-        return room.authoritativeStreamUrlForCurrentTrack()
-    }
-
-    internal fun SongItem.listenTogetherStableKeyOrNull(): String? {
-        val channel = resolvedChannelId() ?: return null
-        val audioId = resolvedAudioId() ?: return null
-        return buildStableTrackKey(
-            channelId = channel,
-            audioId = audioId,
-            subAudioId = resolvedSubAudioId(),
-            playlistContextId = resolvedPlaylistContextId()
-        )
-    }
-
-    internal fun shouldWaitForListenTogetherAuthoritativeStream(song: SongItem): Boolean {
-        if (!isListenTogetherAuthoritativeStreamTarget(song)) return false
-        if (isListenTogetherAuthoritativeStreamConfirmedUnavailable(song)) return false
-        return !isDirectStreamUrl(currentListenTogetherTargetStreamUrl())
-    }
-
-    internal fun shouldAwaitListenTogetherSharedStreamFallback(
-        song: SongItem,
-        localResolutionRequiresSharedStream: Boolean
-    ): Boolean {
-        return moe.ouom.neriplayer.listentogether.playback
-            .shouldAwaitListenTogetherSharedStreamFallback(
-                listenerAudioLinkSharingActive = isListenTogetherAudioLinkFallbackEnabled(),
-                localResolutionRequiresSharedStream = localResolutionRequiresSharedStream,
-                controllerLinkConfirmedUnavailable =
-                    isListenTogetherAuthoritativeStreamConfirmedUnavailable(song),
-                hasAuthoritativeStream = isDirectStreamUrl(currentListenTogetherTargetStreamUrl())
-            )
-    }
-
-    internal fun isListenTogetherAudioLinkFallbackEnabled(): Boolean {
-        if (!isListenTogetherActive()) return false
-        if (isCurrentUserControllerInListenTogether()) return false
-        val room = activeListenTogetherRoomState() ?: return false
-        return room.settings.shareAudioLinks && room.roomStatus == "active"
-    }
-
-    internal fun isListenTogetherLocalResolutionPendingFor(song: SongItem): Boolean {
-        val targetStableKey = song.listenTogetherStableKeyOrNull() ?: return false
-        return isPendingMediaLoadActive() &&
-            playJob?.isActive == true &&
-            _currentSongFlow.value?.listenTogetherStableKeyOrNull() == targetStableKey
-    }
-
-    internal fun isListenTogetherAuthoritativeStreamTarget(song: SongItem): Boolean {
-        if (!isListenTogetherAudioLinkFallbackEnabled()) return false
-        activeListenTogetherRoomState() ?: return false
-        val targetStableKey = currentListenTogetherTargetStableKey() ?: return false
-        val songStableKey = song.listenTogetherStableKeyOrNull() ?: return false
-        return songStableKey == targetStableKey
-    }
-
-    internal fun isListenTogetherAuthoritativeStreamConfirmedUnavailable(song: SongItem): Boolean {
-        if (!isListenTogetherAuthoritativeStreamTarget(song)) return false
-        val room = activeListenTogetherRoomState() ?: return false
-        val songStableKey = song.listenTogetherStableKeyOrNull() ?: return false
-        return AppContainer.listenTogetherSessionManager.isControllerAudioLinkUnavailable(
-            roomId = room.roomId,
-            stableKey = songStableKey
-        )
-    }
-
-    internal fun stopCurrentPlaybackForListenTogetherAwaitingStream() {
-        NPLogger.d(
-            "NERI-PlayerManager",
-            "stopCurrentPlaybackForListenTogetherAwaitingStream(): currentSong=${_currentSongFlow.value?.name}, mediaUrl=${_currentMediaUrl.value}, targetStableKey=${currentListenTogetherTargetStableKey()}, stack=[${debugStackHint()}]"
-        )
-        cancelPendingPauseRequest(resetVolumeToFull = true)
-        clearPlaybackDemandCacheKey(reason = "listen_together_awaiting_stream")
-        cancelPlaybackStartupWatchdog(reason = "listen_together_awaiting_stream")
-        clearActivePlaybackCandidates()
-        stopProgressUpdates()
-        cancelVolumeFade(resetToFull = true)
-        persistCurrentLongFormPlaybackProgress()
-        runCatching { player.stop() }
-        runCatching { player.clearMediaItems() }
-        _isPlayingFlow.value = false
-        _currentMediaUrl.value = null
-        currentMediaUrlResolvedAtMs = 0L
-        pendingMediaLoadActive = false
-        pendingMediaLoadPositionMs = 0L
-        clearPendingSeekPosition()
-        _playbackPositionMs.value = 0L
-    }
-
-    internal fun rejectListenTogetherControl(
-        messageResId: Int,
-        debugReason: String? = null
-    ): Boolean {
-        NPLogger.w(
-            "NERI-PlayerManager",
-            "rejectListenTogetherControl(): messageResId=$messageResId, reason=${debugReason ?: "unspecified"}, sessionRoomId=${activeListenTogetherSessionState().roomId}, roomStatus=${activeListenTogetherRoomState()?.roomStatus}, stack=[${debugStackHint()}]"
-        )
-        postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(messageResId)))
-        return true
     }
 
     internal fun rejectUsbExclusiveToggleControl(): Boolean {
@@ -1500,39 +1248,19 @@ object PlayerManager {
         if (usbExclusiveToggleTransitionActive) {
             return rejectUsbExclusiveToggleControl()
         }
-        if (!isListenTogetherActive()) return false
-        val room = activeListenTogetherRoomState()
-        if (room?.roomStatus == "controller_offline" && !isCurrentUserControllerInListenTogether()) {
-            return rejectListenTogetherControl(
-                R.string.listen_together_error_controller_offline,
-                debugReason = "local_control_blocked:controller_offline"
-            )
-        }
-        if (room?.settings?.allowMemberControl == false && !isCurrentUserControllerInListenTogether()) {
-            return rejectListenTogetherControl(
-                R.string.listen_together_error_member_control_disabled,
-                debugReason = "local_control_blocked:member_control_disabled"
-            )
-        }
         return false
     }
 
     internal fun shouldBlockLocalSongSwitch(song: SongItem, commandSource: PlaybackCommandSource): Boolean {
-        if (commandSource != PlaybackCommandSource.LOCAL) return false
-        if (!isListenTogetherActive()) return false
-        if (!isLocalSong(song)) return false
-        return rejectListenTogetherControl(
-            R.string.listen_together_error_local_playback_blocked,
-            debugReason = "local_song_switch_blocked:${song.stableKey()}"
-        )
+        return false
     }
 
     internal fun isYouTubeMusicTrack(song: SongItem): Boolean {
-        return song.channelId == ListenTogetherChannels.YOUTUBE_MUSIC || isYouTubeMusicSong(song)
+        return song.channelId == MusicSourceIds.YOUTUBE_MUSIC || isYouTubeMusicSong(song)
     }
 
     internal fun isBiliTrack(song: SongItem): Boolean {
-        return song.channelId == ListenTogetherChannels.BILIBILI ||
+        return song.channelId == MusicSourceIds.BILIBILI ||
             song.album.startsWith(BILI_SOURCE_TAG)
     }
     internal fun shouldPersistEmbeddedLyrics(song: SongItem): Boolean {
@@ -1945,7 +1673,6 @@ object PlayerManager {
     ) {
         pendingPlaybackSoundConfig = resolvePlaybackSoundConfigForEngine(
             baseConfig = newConfig,
-            listenTogetherSyncPlaybackRate = listenTogetherSyncPlaybackRate,
             usbExclusivePlaybackEnabled = usbExclusivePlaybackEnabled
         )
         playbackSoundApplyJob?.cancel()
@@ -2462,7 +2189,7 @@ object PlayerManager {
         mimeType: String? = null,
         allowCustomCacheKey: Boolean = true
     ): MediaItem {
-        val mediaUrl = stripListenTogetherStreamQualityMetadata(url)
+        val mediaUrl = url
         val mediaUri = mediaUrl.toUri()
         val isLocalFile =
             mediaUrl.startsWith("file://") ||
@@ -2649,11 +2376,6 @@ object PlayerManager {
         enabled: Boolean,
         commandSource: PlaybackCommandSource = PlaybackCommandSource.LOCAL
     ) = this.setShuffleImpl(enabled, commandSource)
-
-    fun applyListenTogetherPlaybackMode(
-        repeatMode: Int?,
-        shuffleEnabled: Boolean?
-    ) = this.applyListenTogetherPlaybackModeImpl(repeatMode, shuffleEnabled)
 
     internal fun stopProgressUpdates() = this.stopProgressUpdatesImpl()
 

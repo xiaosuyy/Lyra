@@ -44,7 +44,6 @@ import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Error
-import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material.icons.outlined.Usb
@@ -108,7 +107,6 @@ fun DebugHomeScreen(
     scrollState: ScrollState,
     alwaysRecordLogsEnabled: Boolean,
     onAlwaysRecordLogsChange: (Boolean) -> Unit,
-    onOpenListenTogetherDebug: () -> Unit,
     onOpenUsbExclusiveDebug: () -> Unit,
     onOpenYouTubeDebug: () -> Unit,
     onOpenBiliDebug: () -> Unit,
@@ -195,23 +193,6 @@ fun DebugHomeScreen(
             )
         ) {
             Column(Modifier.fillMaxWidth()) {
-                ListItem(
-                    leadingContent = {
-                        Icon(
-                            imageVector = Icons.Outlined.Headphones,
-                            contentDescription = stringResource(R.string.listen_together_title),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    },
-                    headlineContent = { Text(stringResource(R.string.listen_together_title)) },
-                    supportingContent = { Text(stringResource(R.string.listen_together_debug_entry_desc)) },
-                    modifier = Modifier.clickable(onClick = onOpenListenTogetherDebug),
-                    colors = ListItemDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    )
-                )
-
                 ListItem(
                     leadingContent = {
                         Icon(

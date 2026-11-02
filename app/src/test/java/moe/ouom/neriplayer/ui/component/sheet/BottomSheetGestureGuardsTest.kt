@@ -84,7 +84,7 @@ class BottomSheetGestureGuardsTest {
     }
 
     @Test
-    fun listenTogetherSheetDefaultGuardKeepsDownwardMotionInsideSheet() {
+    fun sheetDefaultGuardKeepsDownwardMotionInsideSheet() {
         assertFalse(
             shouldPassBottomSheetMotionToParent(
                 availableY = 24f,

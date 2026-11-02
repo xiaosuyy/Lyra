@@ -161,13 +161,6 @@ class ConfigTransferViewModel : ViewModel() {
                 append('\n')
                 append(
                     quantityText(
-                        R.plurals.settings_config_import_restored_listen_together,
-                        result.restoredListenTogetherCount
-                    )
-                )
-                append('\n')
-                append(
-                    quantityText(
                         R.plurals.settings_config_import_restored_auth,
                         result.restoredAuthCount
                     )

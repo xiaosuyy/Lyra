@@ -122,10 +122,6 @@ import moe.ouom.neriplayer.data.settings.DEFAULT_PLAYBACK_SERVICE_IDLE_SHUTDOWN_
 import moe.ouom.neriplayer.data.settings.PlaybackServiceIdleShutdownPreference
 import moe.ouom.neriplayer.data.settings.readPlaybackPreferenceSnapshot
 import moe.ouom.neriplayer.data.traffic.isOfflineModeNow
-import moe.ouom.neriplayer.listentogether.mapping.toSongItem
-import moe.ouom.neriplayer.listentogether.playback.currentTrack
-import moe.ouom.neriplayer.listentogether.playback.expectedPositionMs
-import moe.ouom.neriplayer.listentogether.protocol.ListenTogetherRoomState
 import moe.ouom.neriplayer.util.media.IsLandHelp
 import moe.ouom.neriplayer.util.media.buildRemoteSongShareUrl
 import moe.ouom.neriplayer.util.media.isShareablePublicHttpUrl
@@ -244,13 +240,6 @@ internal fun shouldStopPlaybackOnTaskRemoved(
     return hasPlaybackSurfaceContent && transportActive
 }
 
-internal fun resolveTaskRemovedTransportActive(
-    playerTransportActive: Boolean,
-    listenTogetherRemotePlaying: Boolean,
-): Boolean {
-    return playerTransportActive || listenTogetherRemotePlaying
-}
-
 internal data class TaskRemovedPlaybackAction(
     val stopPlaybackImmediately: Boolean,
     val persistPlaybackState: Boolean,
@@ -271,16 +260,11 @@ internal data class TaskRemovedPlaybackCallbacks(
 internal fun resolveTaskRemovedPlaybackAction(
     hasPlaybackSurfaceContent: Boolean,
     playerTransportActive: Boolean,
-    listenTogetherRemotePlaying: Boolean,
     hasItems: Boolean,
 ): TaskRemovedPlaybackAction {
-    val transportActive = resolveTaskRemovedTransportActive(
-        playerTransportActive = playerTransportActive,
-        listenTogetherRemotePlaying = listenTogetherRemotePlaying,
-    )
     val stopPlaybackImmediately = shouldStopPlaybackOnTaskRemoved(
         hasPlaybackSurfaceContent = hasPlaybackSurfaceContent,
-        transportActive = transportActive,
+        transportActive = playerTransportActive,
     )
     return TaskRemovedPlaybackAction(
         stopPlaybackImmediately = stopPlaybackImmediately,
@@ -780,7 +764,6 @@ class AudioPlayerService : Service() {
             hasPlaybackSurfaceContent = true,
             hasResumableQueue = PlayerManager.hasItems(),
             foregroundPlaybackRequired = PlayerManager.shouldRunPlaybackServiceInForeground(),
-            listenTogetherSessionActive = isListenTogetherSessionActive(),
         )
     }
 
@@ -788,7 +771,7 @@ class AudioPlayerService : Service() {
         return "hasItems=${PlayerManager.hasItems()} currentSong=${PlayerManager.currentSongFlow.value != null} " +
             "isPlaying=${PlayerManager.isPlayingFlow.value} " +
             "transportActive=${PlayerManager.isTransportActiveWithoutInitialization()} " +
-            "listenTogetherActive=${isListenTogetherSessionActive()} foreground=$isForegroundStarted " +
+            "foreground=$isForegroundStarted " +
             "runtimeReady=$playerRuntimeReady allowRestart=$allowServiceRestart"
     }
 
@@ -872,7 +855,6 @@ class AudioPlayerService : Service() {
             transportActive = playerInitialized &&
                 PlayerManager.isTransportActiveWithoutInitialization(),
             transportBuffering = playerInitialized && PlayerManager.isTransportBuffering(),
-            listenTogetherSessionActive = isListenTogetherSessionActive(),
             usbSessionActiveOrTransitioning = usbSessionActiveOrTransitioning,
             sleepTimerActive = playerInitialized &&
                 PlayerManager.sleepTimerManager.timerState.value.isActive,
@@ -1436,19 +1418,6 @@ class AudioPlayerService : Service() {
                 refreshIdleShutdown("current_song")
             }
         }
-        val listenTogetherSessionManager = AppContainer.listenTogetherSessionManager
-        serviceScope.launch {
-            listenTogetherSessionManager.sessionState.collectSafely("listenTogetherSessionState") {
-                handleListenTogetherServiceStateChanged("session")
-                refreshIdleShutdown("listen_together_session")
-            }
-        }
-        serviceScope.launch {
-            listenTogetherSessionManager.roomState.collectSafely("listenTogetherRoomState") {
-                handleListenTogetherServiceStateChanged("room")
-                refreshIdleShutdown("listen_together_room")
-            }
-        }
         serviceScope.launch {
             PlayerManager.playlistsFlow.collectSafely("playlistsFlow") {
                 if (!refreshFavoriteSongKeys()) return@collectSafely
@@ -1621,11 +1590,6 @@ class AudioPlayerService : Service() {
                             "active USB audio device detached id=${detachedDevice?.deviceId} " +
                                 "name=${detachedDevice?.deviceName}"
                         )
-                        if (PlayerManager.shouldMuteListenTogetherListenerForAudioRouteLoss()) {
-                            PlayerManager.suppressPlaybackForAudioRouteLoss(
-                                reason = "listen_together_usb_output_disconnect"
-                            )
-                        }
                         StartupAudioFocusController.forceRelease("usb_device_detached")
                         PlayerManager.stopPlaybackAfterUsbExclusiveNativeFailure(
                             "usb_device_detached"
@@ -2299,15 +2263,9 @@ class AudioPlayerService : Service() {
 
     private fun buildCurrentPlaybackWidgetState(): PlaybackWidgetState {
         val song = playbackSurfaceSong()
-        val fallbackSongActive = PlayerManager.currentSongFlow.value == null && song != null
-        val positionMs = if (fallbackSongActive) {
-            listenTogetherExpectedPositionMs()
-        } else {
-            PlayerManager.playbackPositionFlow.value
-        }
+        val positionMs = PlayerManager.playbackPositionFlow.value
         val isBuffering = PlayerManager.isTransportBuffering()
-        val isPlaying = PlayerManager.isTransportActive() ||
-            (fallbackSongActive && isListenTogetherRemotePlaying())
+        val isPlaying = PlayerManager.isTransportActive()
         val status = when {
             isBuffering -> getString(R.string.widget_playback_buffering)
             isPlaying -> getString(R.string.widget_playback_playing)
@@ -2491,12 +2449,7 @@ class AudioPlayerService : Service() {
     private fun updatePlaybackState(force: Boolean = false) {
         val isTransportActive = PlayerManager.isTransportActive()
         val isBuffering = PlayerManager.isTransportBuffering()
-        val fallbackSongActive = PlayerManager.currentSongFlow.value == null && playbackSurfaceSong() != null
-        val pos = if (fallbackSongActive) {
-            listenTogetherExpectedPositionMs()
-        } else {
-            PlayerManager.playbackPositionFlow.value
-        }
+        val pos = PlayerManager.playbackPositionFlow.value
 
         val song = playbackSurfaceSong()
         val isFav = isFavoriteSong(song)
@@ -2526,7 +2479,6 @@ class AudioPlayerService : Service() {
         val playbackState = when {
             isBuffering -> PlaybackState.STATE_BUFFERING
             isTransportActive -> PlaybackState.STATE_PLAYING
-            fallbackSongActive && isListenTogetherRemotePlaying() -> PlaybackState.STATE_BUFFERING
             else -> PlaybackState.STATE_PAUSED
         }
         val playbackSpeed = if (playbackState == PlaybackState.STATE_PLAYING) {
@@ -2705,22 +2657,16 @@ class AudioPlayerService : Service() {
         val playerTransportActive = runCatching {
             PlayerManager.isTransportActiveWithoutInitialization()
         }.getOrDefault(false)
-        val listenTogetherRemotePlaying = isListenTogetherRemotePlaying()
-        val transportActive = resolveTaskRemovedTransportActive(
-            playerTransportActive = playerTransportActive,
-            listenTogetherRemotePlaying = listenTogetherRemotePlaying,
-        )
         val taskRemovedAction = resolveTaskRemovedPlaybackAction(
             hasPlaybackSurfaceContent = hasPlaybackSurfaceContent,
             playerTransportActive = playerTransportActive,
-            listenTogetherRemotePlaying = listenTogetherRemotePlaying,
             hasItems = hasItems,
         )
         NPLogger.w(
             "NERI-APS",
             "onTaskRemoved hasSurface=$hasPlaybackSurfaceContent " +
-                "transportActive=$transportActive playerTransport=$playerTransportActive " +
-                "listenTogetherRemotePlaying=$listenTogetherRemotePlaying hasItems=$hasItems " +
+                "transportActive=$playerTransportActive " +
+                "hasItems=$hasItems " +
                 "isPlaying=${PlayerManager.isPlayingFlow.value}"
         )
         if (taskRemovedAction.stopPlaybackImmediately) {
@@ -3040,55 +2986,12 @@ class AudioPlayerService : Service() {
         stopSelf()
     }
 
-    private fun handleListenTogetherServiceStateChanged(reason: String) {
-        if (!hasPlaybackSurfaceContent()) {
-            stopSelfIfPlaybackSurfaceEmpty("listen_together_$reason")
-            return
-        }
-        ensureForegroundStarted()
-        updateAll()
-    }
-
-    private fun stopSelfIfPlaybackSurfaceEmpty(reason: String) {
-        if (
-            !hasReceivedStartCommand ||
-            pendingStartCommands.isNotEmpty() ||
-            hasPlaybackSurfaceContent()
-        ) {
-            return
-        }
-        allowServiceRestart = false
-        NPLogger.w("NERI-APS", "Stopping service because playback surface is empty: reason=$reason")
-        stopForegroundIfStarted(reason)
-        stopSelf()
-    }
-
     private fun playbackSurfaceSong(): SongItem? {
-        return PlayerManager.currentSongFlow.value ?: listenTogetherRoomSong()
-    }
-
-    private fun listenTogetherRoomSong(): SongItem? {
-        val room = AppContainer.listenTogetherSessionManager.roomState.value ?: return null
-        val track = room.currentTrack()
-        return track?.toSongItem()
+        return PlayerManager.currentSongFlow.value
     }
 
     private fun hasPlaybackSurfaceContent(): Boolean {
-        return PlayerManager.hasItems() || isListenTogetherSessionActive() || listenTogetherRoomSong() != null
-    }
-
-    private fun isListenTogetherSessionActive(): Boolean {
-        return !AppContainer.listenTogetherSessionManager.sessionState.value.roomId.isNullOrBlank()
-    }
-
-    private fun isListenTogetherRemotePlaying(): Boolean {
-        return AppContainer.listenTogetherSessionManager.roomState.value?.playback?.state == "playing"
-    }
-
-    private fun listenTogetherExpectedPositionMs(): Long {
-        return AppContainer.listenTogetherSessionManager.roomState.value
-            ?.let(::resolveListenTogetherMediaSessionPosition)
-            ?: 0L
+        return PlayerManager.hasItems()
     }
 
     private fun NotificationPaddedIcon(
@@ -3115,15 +3018,4 @@ class AudioPlayerService : Service() {
 
         return IconCompat.createWithBitmap(bmp)
     }
-}
-
-internal fun resolveListenTogetherMediaSessionPosition(
-    roomState: ListenTogetherRoomState,
-    nowMs: Long = System.currentTimeMillis()
-): Long {
-    val activeTrack = roomState.currentTrack()
-    return roomState.playback.expectedPositionMs(
-        nowMs = nowMs,
-        durationMs = activeTrack?.durationMs ?: 0L
-    )
 }

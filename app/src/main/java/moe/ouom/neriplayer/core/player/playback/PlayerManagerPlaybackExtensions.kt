@@ -67,11 +67,7 @@ import moe.ouom.neriplayer.core.player.resolver.youtube.YouTubeSeekRefreshPolicy
 import moe.ouom.neriplayer.core.player.service.AudioPlayerService
 import moe.ouom.neriplayer.core.player.url.cancelUrlRefreshIfNotReusableForPendingLoad
 import moe.ouom.neriplayer.core.player.url.allowsCustomCacheKey
-import moe.ouom.neriplayer.core.player.url.listenTogetherFallbackResult
-import moe.ouom.neriplayer.core.player.url.listenTogetherPreferredQualityKey
-import moe.ouom.neriplayer.core.player.url.mergeListenTogetherFallbackResult
 import moe.ouom.neriplayer.core.player.url.resolveSongUrl
-import moe.ouom.neriplayer.core.player.url.resolvePlaybackAudioInfoForListenTogetherStreamCandidate
 import moe.ouom.neriplayer.core.player.url.synchronizeCachedPlaybackDescriptor
 import moe.ouom.neriplayer.core.player.url.youtubePlaybackRecoveryStrategyForSeek
 import moe.ouom.neriplayer.core.player.usb.path.UsbExclusiveAudioPathState
@@ -93,7 +89,6 @@ import moe.ouom.neriplayer.data.model.sameIdentityAs
 import moe.ouom.neriplayer.data.model.stableKey
 import moe.ouom.neriplayer.data.platform.youtube.extractYouTubeMusicVideoId
 import moe.ouom.neriplayer.data.platform.youtube.youtubeMusicThumbnailUrl
-import moe.ouom.neriplayer.listentogether.playback.shouldShowListenTogetherPreviewClipNotice
 import moe.ouom.neriplayer.ui.feedback.AppFeedback
 
 internal fun PlayerManager.cancelVolumeFadeImpl(resetToFull: Boolean = false) {
@@ -148,7 +143,7 @@ private fun PlayerManager.volumeWhileAudioRouteMuted(volume: Float): Float {
 internal fun PlayerManager.clearAudioRouteMuteSuppression(reason: String) {
     clearAudioRouteMuteSuppression(
         reason = reason,
-        preserveExplicitRestore = shouldMuteListenTogetherListenerForAudioRouteLoss()
+        preserveExplicitRestore = false
     )
 }
 
@@ -192,7 +187,7 @@ internal fun resolveAudioRouteMuteRestoreVolume(
 
 internal fun PlayerManager.suppressPlaybackForAudioRouteLoss(reason: String) {
     if (!isPlayerInitialized()) return
-    val requiresExplicitRestore = shouldMuteListenTogetherListenerForAudioRouteLoss()
+    val requiresExplicitRestore = false
     cancelVolumeFade(resetToFull = false)
     runPlayerActionOnMainThread {
         if (!isPlayerInitialized()) return@runPlayerActionOnMainThread
@@ -281,13 +276,6 @@ internal fun PlayerManager.restorePlaybackAfterTransientAudioRouteLoss(reason: S
 }
 
 internal fun PlayerManager.pauseForAudioRouteLoss(reason: String) {
-    if (shouldMuteListenTogetherListenerForAudioRouteLoss()) {
-        NPLogger.d(
-            "NERI-PlayerManager",
-            "pauseForAudioRouteLoss(): keep Listen Together listener playing silently, reason=$reason, currentSong=${_currentSongFlow.value?.name}"
-        )
-        return
-    }
     _playWhenReadyFlow.value = false
     _isPlayingFlow.value = false
     if (lyriconEnabled) {
@@ -473,78 +461,6 @@ internal fun PlayerManager.resolveCurrentPlaybackStartPlan(
     )
 }
 
-private data class ListenTogetherTrackFinishPlan(
-    val shouldAdvance: Boolean,
-    val nextIndex: Int
-)
-
-private fun PlayerManager.handleListenTogetherTrackFinishedIfNeeded(): Boolean {
-    if (!isListenTogetherActive()) return false
-    if (currentPlaylist.isEmpty() || currentIndex !in currentPlaylist.indices) return false
-
-    val finishPositionMs = resolvedTrackFinishPositionMs()
-    val resolvedFinishPlan = resolveListenTogetherTrackFinishPlan()
-    val finishPlan = if (
-        resolvedFinishPlan.shouldAdvance &&
-        isCurrentUserControllerInListenTogether() &&
-        reshuffleCurrentQueueForRepeatAllCycle()
-    ) {
-        resolvedFinishPlan.copy(nextIndex = currentIndex)
-    } else {
-        resolvedFinishPlan
-    }
-    NPLogger.d(
-        "NERI-PlayerManager",
-        "listen together track finished: currentIndex=$currentIndex, nextIndex=${finishPlan.nextIndex}, shouldAdvance=${finishPlan.shouldAdvance}, finishPositionMs=$finishPositionMs"
-    )
-    pause(commandSource = PlaybackCommandSource.REMOTE_SYNC)
-    _playbackPositionMs.value = finishPositionMs
-    emitPlaybackCommand(
-        type = "TRACK_FINISHED",
-        source = PlaybackCommandSource.LOCAL,
-        currentIndex = finishPlan.nextIndex,
-        positionMs = finishPositionMs,
-        shouldPlay = finishPlan.shouldAdvance
-    )
-    return true
-}
-
-private fun PlayerManager.resolvedTrackFinishPositionMs(): Long {
-    val songDurationMs = _currentSongFlow.value?.durationMs?.takeIf { it > 0L } ?: 0L
-    val playerDurationMs = runCatching { player.duration.takeIf { it > 0L } ?: 0L }.getOrDefault(0L)
-    val playerPositionMs = runCatching { player.currentPosition.coerceAtLeast(0L) }.getOrDefault(0L)
-    return maxOf(songDurationMs, playerDurationMs, playerPositionMs)
-}
-
-private fun PlayerManager.resolveListenTogetherTrackFinishPlan(): ListenTogetherTrackFinishPlan {
-    val fallbackIndex = currentIndex.coerceIn(0, currentPlaylist.lastIndex)
-    return when (repeatModeSetting) {
-        Player.REPEAT_MODE_ONE -> ListenTogetherTrackFinishPlan(
-            shouldAdvance = true,
-            nextIndex = fallbackIndex
-        )
-
-        Player.REPEAT_MODE_ALL -> ListenTogetherTrackFinishPlan(
-            shouldAdvance = true,
-            nextIndex = resolveListenTogetherNextIndex(allowWrap = true) ?: fallbackIndex
-        )
-
-        else -> {
-            val nextIndex = resolveListenTogetherNextIndex(allowWrap = false)
-            ListenTogetherTrackFinishPlan(
-                shouldAdvance = nextIndex != null,
-                nextIndex = nextIndex ?: fallbackIndex
-            )
-        }
-    }
-}
-
-private fun PlayerManager.resolveListenTogetherNextIndex(allowWrap: Boolean): Int? {
-    if (currentPlaylist.isEmpty() || currentIndex !in currentPlaylist.indices) return null
-    if (currentIndex < currentPlaylist.lastIndex) return currentIndex + 1
-    return if (allowWrap) 0 else null
-}
-
 internal fun PlayerManager.handleTrackEnded() {
     clearPendingSeekPosition()
     val finishedSong = _currentSongFlow.value
@@ -564,9 +480,6 @@ internal fun PlayerManager.handleTrackEnded() {
         "handleTrackEnded: currentIndex=$currentIndex, queueSize=${currentPlaylist.size}, repeatMode=$repeatModeSetting, shuffle=${player.shuffleModeEnabled}, isLastInPlaylist=$isLastInPlaylist"
     )
 
-    if (handleListenTogetherTrackFinishedIfNeeded()) {
-        return
-    }
 
     if (sleepTimerManager.shouldStopOnTrackEnd(isLastInPlaylist)) {
         pause()
@@ -785,8 +698,7 @@ private fun PlayerManager.reshuffleCurrentQueueForRepeatAllCycle(): Boolean {
         !player.shuffleModeEnabled ||
         repeatModeSetting != Player.REPEAT_MODE_ALL ||
         currentPlaylist.size <= 1 ||
-        currentIndex != currentPlaylist.lastIndex ||
-        (isListenTogetherActive() && !isCurrentUserControllerInListenTogether())
+        currentIndex != currentPlaylist.lastIndex
     ) {
         return false
     }
@@ -886,7 +798,7 @@ internal fun PlayerManager.playAtIndex(
     val requestToken = playbackRequestToken
     BiliSponsorBlockPlaybackController.onPlaybackRequestStarted(song, requestToken)
     BiliVideoSkipPlaybackController.onPlaybackRequestStarted(song, requestToken)
-    if (isBiliTrack(song) && !isListenTogetherActive()) {
+    if (isBiliTrack(song)) {
         BiliVideoSkipPlaybackController.prepareActiveBiliTrackTarget(
             song = song,
             requestToken = requestToken,
@@ -909,17 +821,12 @@ internal fun PlayerManager.playAtIndex(
     enterPendingMediaLoad(resolvedResumePositionMs)
     playJob = ioScope.launch {
         try {
-        val localResult = resolveSongUrl(
+        val result = resolveSongUrl(
             song = song,
             playbackRequestTokenOverride = requestToken,
             shouldApplyCacheMutation = {
                 shouldApplyResolvedMedia(requestToken, playbackRequestToken) && isActive
             }
-        )
-        val result = mergeListenTogetherFallbackResult(
-            localResult = localResult,
-            listenTogetherFallback = listenTogetherFallbackResult(song),
-            preferredQualityKey = listenTogetherPreferredQualityKey(song)
         )
         if (!shouldApplyResolvedMedia(requestToken, playbackRequestToken) || !isActive) {
             NPLogger.d(
@@ -952,7 +859,6 @@ internal fun PlayerManager.playAtIndex(
                 }
 
                 var appliedResolvedMedia = false
-                var switchedToAuthoritativeStreamWait = false
                 withContext(Dispatchers.Main) {
                     if (!shouldApplyResolvedMediaSideEffects(
                             requestGeneration = requestToken,
@@ -962,28 +868,9 @@ internal fun PlayerManager.playAtIndex(
                     ) {
                         return@withContext
                     }
-                    if (
-                        shouldAwaitListenTogetherSharedStreamFallback(
-                            song = song,
-                            localResolutionRequiresSharedStream = result.isPreviewClip
-                        )
-                    ) {
-                        switchedToAuthoritativeStreamWait = true
-                        stopCurrentPlaybackForListenTogetherAwaitingStream()
-                        return@withContext
-                    }
                     consecutivePlayFailures = 0
                     result.noticeMessage?.let { message ->
-                        if (shouldShowListenTogetherPreviewClipNotice(
-                                isPreviewClip = result.isPreviewClip,
-                                listenerAudioLinkSharingActive =
-                                    isListenTogetherAudioLinkFallbackEnabled(),
-                                controllerLinkConfirmedUnavailable =
-                                    isListenTogetherAuthoritativeStreamConfirmedUnavailable(song)
-                            )
-                        ) {
-                            postPlayerEvent(PlayerEvent.ShowError(message))
-                        }
+                        postPlayerEvent(PlayerEvent.ShowError(message))
                     }
                     maybeUpdateSongDuration(song, result.durationMs ?: 0L)
                     val cacheKey = result.cacheKeyOverride ?: computeCacheKey(song)
@@ -1000,11 +887,7 @@ internal fun PlayerManager.playAtIndex(
                     )
                     val selectedCandidate = currentPlaybackCandidate()
                     val selectedUrl = selectedCandidate?.url ?: result.url
-                    val selectedAudioInfo = resolvePlaybackAudioInfoForListenTogetherStreamCandidate(
-                        candidate = selectedCandidate,
-                        resolvedAudioInfo = result.audioInfo,
-                        existingAudioInfo = _currentPlaybackAudioInfo.value
-                    )
+                    val selectedAudioInfo = selectedCandidate?.audioInfo ?: result.audioInfo
                     val selectedMimeType = selectedCandidate?.mimeType ?: result.mimeType
                     val selectedExpectedContentLength =
                         selectedCandidate?.expectedContentLength ?: result.expectedContentLength
@@ -1084,47 +967,12 @@ internal fun PlayerManager.playAtIndex(
                     }
                     appliedResolvedMedia = true
                 }
-                if (switchedToAuthoritativeStreamWait) {
-                    scheduleStatePersist(
-                        positionMs = resolvedResumePositionMs,
-                        shouldResumePlayback = true
-                    )
-                    return@launch
-                }
                 if (!appliedResolvedMedia) {
                     return@launch
                 }
                 maybeWarmNextYouTubeMusicAfterCurrentResolved()
             }
-            SongUrlResult.WaitingForAuthoritativeStream -> {
-                withContext(Dispatchers.Main) {
-                    stopCurrentPlaybackForListenTogetherAwaitingStream()
-                }
-                NPLogger.d(
-                    "NERI-PlayerManager",
-                    "Waiting for authoritative listen-together stream: song=${song.name}, stableKey=${song.listenTogetherStableKeyOrNull()}"
-                )
-                scheduleStatePersist(
-                    positionMs = resolvedResumePositionMs,
-                    shouldResumePlayback = true
-                )
-            }
             is SongUrlResult.RequiresLogin -> {
-                if (
-                    shouldAwaitListenTogetherSharedStreamFallback(
-                        song = song,
-                        localResolutionRequiresSharedStream = true
-                    )
-                ) {
-                    withContext(Dispatchers.Main) {
-                        stopCurrentPlaybackForListenTogetherAwaitingStream()
-                    }
-                    scheduleStatePersist(
-                        positionMs = resolvedResumePositionMs,
-                        shouldResumePlayback = true
-                    )
-                    return@launch
-                }
                 clearPlaybackDemandCacheKey(reason = "play_at_index_requires_login")
                 NPLogger.w(
                     "NERI-PlayerManager",
@@ -1143,21 +991,6 @@ internal fun PlayerManager.playAtIndex(
                 }
             }
             is SongUrlResult.Failure -> {
-                if (
-                    shouldAwaitListenTogetherSharedStreamFallback(
-                        song = song,
-                        localResolutionRequiresSharedStream = true
-                    )
-                ) {
-                    withContext(Dispatchers.Main) {
-                        stopCurrentPlaybackForListenTogetherAwaitingStream()
-                    }
-                    scheduleStatePersist(
-                        positionMs = resolvedResumePositionMs,
-                        shouldResumePlayback = true
-                    )
-                    return@launch
-                }
                 clearPlaybackDemandCacheKey(reason = "play_at_index_failure")
                 NPLogger.e(
                     "NERI-PlayerManager",
@@ -1305,9 +1138,6 @@ internal fun PlayerManager.playImpl(
 ) {
     ensureInitialized()
     if (!initialized) return
-    if (commandSource == PlaybackCommandSource.LOCAL && requestListenTogetherSafetyPauseResume()) {
-        return
-    }
     if (commandSource == PlaybackCommandSource.LOCAL && shouldBlockLocalRoomControl(commandSource)) return
     if (requestUsbExclusiveLoudPlaybackConfirmation(
             commandSource = commandSource,
@@ -2045,38 +1875,6 @@ internal fun PlayerManager.setShuffleImpl(
     )
 }
 
-internal fun PlayerManager.applyListenTogetherPlaybackModeImpl(
-    repeatMode: Int?,
-    shuffleEnabled: Boolean?
-) {
-    val normalizedRepeatMode = repeatMode?.let { mode ->
-        when (mode) {
-            Player.REPEAT_MODE_OFF,
-            Player.REPEAT_MODE_ALL,
-            Player.REPEAT_MODE_ONE -> mode
-            else -> Player.REPEAT_MODE_OFF
-        }
-    }
-    val repeatChanged = normalizedRepeatMode != null && repeatModeSetting != normalizedRepeatMode
-    val shuffleChanged = shuffleEnabled != null && _shuffleModeFlow.value != shuffleEnabled
-    if (!repeatChanged && !shuffleChanged) return
-    if (repeatChanged) {
-        repeatModeSetting = normalizedRepeatMode
-        if (isPlayerInitialized()) {
-            syncExoRepeatMode()
-        }
-        _repeatModeFlow.value = repeatModeSetting
-    }
-    if (shuffleChanged) {
-        val nextShuffleEnabled = shuffleEnabled == true
-        if (isPlayerInitialized()) {
-            player.shuffleModeEnabled = nextShuffleEnabled
-        }
-        _shuffleModeFlow.value = nextShuffleEnabled
-    }
-    scheduleStatePersist()
-}
-
 internal fun PlayerManager.startProgressUpdates() {
     if (!shouldRunPlaybackProgressUpdates(
             initialized = initialized,
@@ -2140,7 +1938,7 @@ internal fun PlayerManager.startProgressUpdates() {
                 _playbackDurationMs.value = durationMs
             }
             val currentSong = _currentSongFlow.value
-            if (currentSong != null && !isListenTogetherActive()) {
+            if (currentSong != null) {
                 val userSkipPositionMs = BiliVideoSkipPlaybackController.nextSkipPosition(
                     song = currentSong,
                     currentPositionMs = positionMs,
