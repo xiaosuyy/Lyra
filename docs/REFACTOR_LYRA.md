@@ -76,10 +76,17 @@ Do not change them without a designed data migration.
 ## 6. 图标替换 / Icon Replacement
 
 - 源图：[`icon/lyra.png`](../icon/lyra.png)（用户提供，1254×1254，黑底圆角方块 + 白色
-  Lyra 字标）。
-- 派生资源：mipmap 各密度 webp、`ic_lyra` / `ic_lyra_round` adaptive icon、
-  monochrome 图层、通知小图标与启动画面 `ic_lyra_splash.xml`。
-- 旧的 `icon/` 下 NeriPlayer SVG/XML 图标源文件已全部删除。
+  Lyra 字标）。字标本身是横幅比例，实测范围 937×457（宽高比约 2.05）。
+- **安全区适配**：源图不能按满幅直接铺到 108dp 的 adaptive 画布上——圆形或圆角遮罩会
+  切掉首尾字母。因此前景与 monochrome 图层只保留字标（透明背景），并缩放到 66dp 安全
+  圆内（在 432px 画布上为 237×116，约占画布宽度的 55%）；legacy mipmap 与
+  `ic_lyra` / `ic_lyra_round` 采用同一比例，保证圆形遮罩下字标同样完整。
+- 派生资源：mipmap 各密度 webp（方角 + 圆形两套）、`ic_lyra` / `ic_lyra_round`、
+  adaptive 的 foreground 与 monochrome 图层、通知小图标与启动画面
+  `ic_lyra_splash.xml`。
+- 旧的 `icon/` 下 NeriPlayer SVG/XML 图标源文件，以及 Android Studio 模板残留的
+  `ic_launcher_foreground.xml` / `ic_launcher_background.xml`（绿色机器人矢量）已全部
+  删除；下载页原先把它当封面兜底图，现改用 `ic_lyra_round`。
 
 ## 7. 提交清单 / Commit List
 
