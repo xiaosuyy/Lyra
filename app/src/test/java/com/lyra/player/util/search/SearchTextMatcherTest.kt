@@ -18,10 +18,10 @@ class SearchTextMatcherTest {
 
     @Test
     fun `tokensOf preserves camel case word boundaries`() {
-        assertTrue(SearchTextMatcher.matches("np", "Lyra"))
+        assertTrue(SearchTextMatcher.matches("lp", "LyraPlayer"))
         assertEquals(
-            listOf("neriplayer", "neri", "player", "np"),
-            SearchTextMatcher.tokensOf("Lyra")
+            listOf("lyraplayer", "lyra", "player", "lp"),
+            SearchTextMatcher.tokensOf("LyraPlayer")
         )
         assertEquals(
             listOf("youtubemusic", "you", "tube", "music", "ytm"),

@@ -15,12 +15,12 @@ class ManagedDownloadStorageDirectoryUriTest {
     @Test
     fun `canonicalizeDirectoryUri collapses tree document uri to canonical tree uri`() {
         val uri =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FNeriPlayer"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FLyra"
 
         val normalized = ManagedDownloadStorage.canonicalizeDirectoryUri(uri)
 
         assertEquals(
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FNeriPlayer",
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra",
             normalized
         )
     }
@@ -28,9 +28,9 @@ class ManagedDownloadStorageDirectoryUriTest {
     @Test
     fun `areEquivalentDirectoryUris matches canonical tree and tree document variants`() {
         val canonical =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FNeriPlayer"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra"
         val treeDocument =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FNeriPlayer"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FLyra"
 
         assertTrue(ManagedDownloadStorage.areEquivalentDirectoryUris(canonical, treeDocument))
     }

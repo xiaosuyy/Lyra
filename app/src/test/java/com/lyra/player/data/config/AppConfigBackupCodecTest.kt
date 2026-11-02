@@ -86,7 +86,7 @@ class AppConfigBackupCodecTest {
             AppConfigBackupCodec.decode(
                 """
                 {
-                  "kind": "com.lyra.player.config",
+                  "kind": "moe.ouom.neriplayer.config",
                   "formatVersion": 1,
                   "exportedAt": 1717171717
                 }
@@ -102,7 +102,7 @@ class AppConfigBackupCodecTest {
         val decoded = AppConfigBackupCodec.decodeForImport(
             """
             {
-              "kind": "com.lyra.player.config",
+              "kind": "moe.ouom.neriplayer.config",
               "formatVersion": 1,
               "settings": {
                 "booleans": {

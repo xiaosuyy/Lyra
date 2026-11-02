@@ -10,12 +10,12 @@ class ManagedDownloadStorageDirectoryIdentityTest {
     @Test
     fun `directoryIdentity uses stable tree document id`() {
         val rawUri =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FNeriPlayer"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FLyra"
 
         val identity = ManagedDownloadStorage.directoryIdentity(rawUri)
 
         assertEquals(
-            "tree:com.android.externalstorage.documents:primary:Music/LyraPlayer",
+            "tree:com.android.externalstorage.documents:primary:Music/Lyra",
             identity
         )
     }
@@ -23,12 +23,12 @@ class ManagedDownloadStorageDirectoryIdentityTest {
     @Test
     fun `directoryIdentity ignores query and fragment noise`() {
         val rawUri =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FNeriPlayer?persisted=true#anchor"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra?persisted=true#anchor"
 
         val identity = ManagedDownloadStorage.directoryIdentity(rawUri)
 
         assertEquals(
-            "tree:com.android.externalstorage.documents:primary:Music/LyraPlayer",
+            "tree:com.android.externalstorage.documents:primary:Music/Lyra",
             identity
         )
     }
@@ -36,9 +36,9 @@ class ManagedDownloadStorageDirectoryIdentityTest {
     @Test
     fun `areEquivalentDirectoryUris matches same directory with different uri text`() {
         val first =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FNeriPlayer"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra"
         val second =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FNeriPlayer?fromPicker=1"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra/document/primary%3AMusic%2FLyra?fromPicker=1"
 
         assertTrue(ManagedDownloadStorage.areEquivalentDirectoryUris(first, second))
     }
@@ -46,9 +46,9 @@ class ManagedDownloadStorageDirectoryIdentityTest {
     @Test
     fun `areEquivalentDirectoryUris distinguishes different directories`() {
         val first =
-            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FNeriPlayer"
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FLyra"
         val second =
-            "content://com.android.externalstorage.documents/tree/primary%3ADownload%2FNeriPlayer"
+            "content://com.android.externalstorage.documents/tree/primary%3ADownload%2FLyra"
 
         assertFalse(ManagedDownloadStorage.areEquivalentDirectoryUris(first, second))
     }
