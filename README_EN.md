@@ -1,45 +1,26 @@
 [English](./README_EN.md) | [中文](./README.md)
 
-<h1 align="center">NeriPlayer</h1>
+<h1 align="center">Lyra</h1>
 
 <div align="center">
 
 <h3>✨ A native Android audio player that combines multi-source streaming, local control, rich lyrics, and self-hosted sync 🎵</h3>
 
 <p>
-  <a href="https://github.com/cwuom/NeriPlayer/releases">
-    <img alt="Downloads" src="https://img.shields.io/github/downloads/cwuom/NeriPlayer/total?style=social" />
-  </a>
-  <a href="https://github.com/cwuom/NeriPlayer/releases">
-    <img alt="Release" src="https://img.shields.io/github/v/release/cwuom/NeriPlayer?include_prereleases&label=Release" />
-  </a>
   <img alt="Android 9+" src="https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white" />
-  <a href="https://t.me/ouom_pub">
-    <img alt="Telegram" src="https://img.shields.io/badge/Telegram-@ouom__pub-blue" />
-  </a>
-  <a href="https://t.me/neriplayer_ci">
-    <img alt="CI Builds" src="https://img.shields.io/badge/CI_Builds-@neriplayer__ci-orange" />
-  </a>
 </p>
 
 <p>
-  <img src="icon/neriplayer.svg" width="260" alt="NeriPlayer logo" />
+  <img src="icon/lyra.png" width="260" alt="Lyra logo" />
 </p>
 
 <p>
-The project name and icon are inspired by "Kazamata Neri" from
-"星空鉄道とシロの旅".
-</p>
-
-<p>
-NeriPlayer is a native Android app for Android 9 (API 28) and above,
+Lyra is a native Android app for Android 9 (API 28) and above,
 focused on multi-source exploration, online playback, local control, and
 user-owned data.
 </p>
 
 🛠️ <strong>Active development</strong>
-
-<a href="https://trendshift.io/repositories/23906" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23906" alt="cwuom%2FNeriPlayer | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 </div>
 
@@ -53,7 +34,7 @@ user-owned data.
 ---
 
 > [!NOTE]
-> NeriPlayer does not provide a public cloud music library or media distribution service.
+> Lyra does not provide a public cloud music library or media distribution service.
 > Online audio capabilities depend on your authorization on third-party platforms.
 > VIP or restricted content still follows the original platform rules.
 > YouTube Music references in this document describe account sessions, playback compatibility,
@@ -68,11 +49,10 @@ If you only want to try the app, start with [Getting Started](#getting-started).
 If you want to understand what makes the project different, read
 [Why it stands out](#why-it-stands-out) and [Key Features](#key-features).
 If you plan to contribute, read [CONTRIBUTING_EN.md](./CONTRIBUTING_EN.md).
-If you want to self-host Listen Together, jump to
-[Listen Together Deployment](#listen-together-deployment).
+If you are migrating from NeriPlayer / BlueBlue, read the [rename and refactor notes](./docs/REFACTOR_LYRA.md).
 
 ```text
-NeriPlayer
+Lyra
 ├── Multi-source playback: NetEase / Bilibili / YouTube Music
 ├── Local-first data: cache, downloads, playlists, history, stats, settings
 ├── User-owned sync: GitHub / WebDAV metadata sync
@@ -84,7 +64,7 @@ NeriPlayer
 
 ## About
 
-NeriPlayer is a native Android audio player built with **Jetpack Compose + Media3**.
+Lyra is a native Android audio player built with **Jetpack Compose + Media3**.
 It does not build a public cloud service. Instead, it integrates online content
 from **NetEase Cloud Music**, **Bilibili**, and **YouTube Music** when the user
 has the corresponding third-party platform account capability. It also provides
@@ -108,7 +88,7 @@ Current positioning:
   music clients often have risk-control and behavior-sampling systems. Uploading
   local playback history directly may be interpreted as abnormal login or playback
   behavior and could put an account at risk. To protect account safety,
-  NeriPlayer does not upload local playback history or playback stats back to
+  Lyra does not upload local playback history or playback stats back to
   those platforms.
 - **Single Activity + Compose**: `MainActivity` is the only external entry point.
   The UI is organized by Compose `NavHost`, a dynamic bottom bar, Mini Player,
@@ -117,7 +97,7 @@ Current positioning:
   `Loading -> Disclaimer -> Onboarding -> Main`. If the previous launch ended in
   a crash or system ANR, the app enters `Safe Mode` first.
 - **Test guardrails**: download storage, sync merging, YouTube playback compatibility,
-  Listen Together, lyrics, playback policies, config backup, and safe mode all
+  lyrics, playback policies, config backup, and safe mode all
   have focused unit or device tests.
 
 ---
@@ -228,7 +208,7 @@ Current positioning:
   reports, and core app data. Cache cleanup targets regenerable cache data and
   does not treat user-saved downloads as disposable cache.
 - **Self-owned sync plus playback stats**:
-  NeriPlayer does not provide a public cloud library or developer-hosted user
+  Lyra does not provide a public cloud library or developer-hosted user
   data service. GitHub/WebDAV sync stores playlists, favorites, recent plays,
   and playback stats in the user's own remote. `PlaybackStatsRepository` records
   play count, total listen time, first/last played time, and daily buckets by
@@ -269,32 +249,6 @@ Current positioning:
   system ANR trace. `ExceptionHandler` and `NativeCrashHandler` record JVM and
   native crashes. If the previous startup failed, `SafeModeManager` can skip full
   app initialization and open safe mode for preview, copy, or export.
-- **Listen Together syncs the room, not just a progress bar**:
-  the Android client and Cloudflare Worker maintain rooms, roles, queues,
-  playback state, repeat/shuffle modes, controller-offline recovery, member
-  control requests, optional session playback-candidate sharing, version-gated updates, and
-  custom server URLs. Repeat/shuffle changes use `PLAYBACK_MODE` /
-  `REQUEST_PLAYBACK_MODE`, while member controls and asynchronous playback-candidate
-  results validate the target stable track key so they cannot affect a track
-  that has already changed. The client also estimates server clock offset, corrects
-  position drift by threshold, and reloads the authoritative playback candidate after an
-  asynchronous shared candidate result arrives so pending local startup cannot override
-  the room's pause/play command.
-  Invites must carry the room secret needed for a first join, while member secrets
-  are kept out of public room state. Local tracks cannot create or replace a room
-  track. When session candidate sharing is enabled, Durable Objects temporarily
-  cache the controller's current playback candidates so listeners can retrieve them
-  without waiting for another controller response. A current track keeps at most
-  three validated candidates; listeners always resolve with their own quality policy first,
-  try those local candidates first, and keep the session-only candidates as isolated startup
-  fallbacks, so they never enter song or offline caches. Valid playback-mode queue snapshots
-  reuse the requester's real shuffle or restored order without reloading the current track.
-  Mode commits re-anchor projected position with the previous repeat semantics. When enabled,
-  member joins and explicit departures publish an authoritative room pause; reconnecting with
-  the same member credential does not trigger that pause, and both roles keep their WebSocket
-  connection alive. A transport-only disconnect remains reconnectable. Durable Objects persist
-  room state while WebSocket keeps active
-  members in sync.
 
 ---
 
@@ -302,7 +256,7 @@ Current positioning:
 
 ### a. Download a Release build (recommended)
 
-1. Go to [GitHub Releases](https://github.com/cwuom/NeriPlayer/releases).
+1. Open your repository's GitHub Releases page and download the latest release.
 2. Which APK should you choose?
    - Most phones should use `arm64-v8a`.
    - Older 32-bit devices should use `armeabi-v7a`.
@@ -314,9 +268,8 @@ Current positioning:
 
 ### b. Download a CI build
 
-1. Go to [GitHub Actions](https://github.com/cwuom/NeriPlayer/actions), download
+1. Open your repository's GitHub Actions page, download
    the Artifacts from the latest successful build, and extract them.
-2. Or visit [NeriPlayer CI Builds](https://t.me/neriplayer_ci).
 
 > The master CI artifact is `arm64-v8a` by default; the manual Release workflow
 > builds multi-ABI APKs.
@@ -325,8 +278,8 @@ Current positioning:
 
 1. Clone the repository and initialize submodules:
    ```bash
-   git clone --recursive https://github.com/cwuom/NeriPlayer.git
-   cd NeriPlayer
+   git clone --recursive <this-repo-url>
+   cd <repo-directory>
    ```
 2. Open the project with the latest stable Android Studio and sync dependencies.
 3. Build the Debug APK:
@@ -401,13 +354,11 @@ For release build and signing details, see
   the public API receives only a SHA-256 prefix of the current BV ID; matching
   page, duration, and `intro`/`outro`/`sponsor`/`music_offtopic`/`filler`/`padding` segments are
   skipped locally. No account data, playback history, or segment submissions are
-  uploaded, and the feature remains disabled during Listen Together to prevent room
-  state drift.
+  uploaded.
 - ⏭️ **Custom Bilibili skip intervals**: manage multiple intervals for a video part
   from Now Playing's More Options or a Bilibili favorite/collection entry. Rules are
   persisted by `BVID + CID` and sync through GitHub/WebDAV. The Now Playing editor
-  provides set-start/set-end, 5-second seek, and play/pause controls; local auto-skip
-  remains off during Listen Together to avoid room-state drift.
+  provides set-start/set-end, 5-second seek, and play/pause controls.
 - 🔁 **NetEase playback fallback**:
   when a NetEase song is unavailable, has no playable result, or only returns a
   preview clip, the player first tries lower quality. Bilibili and local-audio
@@ -444,7 +395,7 @@ For release build and signing details, see
   USB descriptors first, then tries a reported compatible rate when the exact
   format is unavailable and compatibility fallback is enabled. Handling of Android's
   `USB_DEVICE_ATTACHED` event can be disabled separately when users do not want
-  NeriPlayer to react to DAC insertion.
+  the app to react to DAC insertion.
   Compatible UAC2 asynchronous topologies resolve a clock chain and explicit feedback endpoint,
   schedule packets from device feedback, and reacquire the feedback clock after
   long scheduling gaps. If playback startup, native transfer backpressure, or
@@ -530,27 +481,7 @@ For release build and signing details, see
   hits, and can warn before downloads on mobile data or roaming.
 - ♻️ **Backup and restore**:
   playlist JSON import/export, plus full config import/export for settings,
-  language, platform auth, GitHub/WebDAV config, and Listen Together settings.
-- 🎧 **Listen Together**:
-  create or join rooms, sync playback state over WebSocket, support host/listener
-  permissions, member-control toggles, automatic pause for new members and explicit
-  departures when enabled (same-member reconnects do not pause), repeat/shuffle mode sync,
-  optional sharing of controller-resolved stream URLs,
-  invite links, deep links, custom server URLs, and host-offline detection. A first join
-  requires the invite secret and member reconnects use member secrets. Controllers can copy the
-  complete invite or its secret separately; tapping Join reads a valid invite from the clipboard
-  and does not enter a room when none is present. Local tracks cannot create a room or replace
-  its current track. When sharing is enabled, the Worker caches and exposes only the current
-  controller URL; disabling sharing clears that cache. The Worker keeps at most three
-  deduplicated HTTP(S) candidates for the current track; listeners resolve their own quality
-  policy first, try local candidates first, and retain shared candidates as session-scoped startup
-  fallbacks. Candidates are never written to normal song or offline caches. Shuffle requests reuse
-  the requester's validated real queue order, disabling shuffle restores that order without
-  reloading the current song. Queue reorder/add/remove actions carry versioned replayable intents
-  so concurrent room edits converge without replacing the current track by a stale index, and
-  playback-mode commits re-anchor room position. Single-track
-  repeat wraps position by track duration. Outdated client control events are filtered, and
-  `REQUEST_SET_TRACK` can only choose a song already in the current queue.
+  language, platform auth, and GitHub/WebDAV config.
 - 🌈 **Personalization and themes**:
   auto/light/dark mode, dynamic color, seed colors, theme styles, UI scaling,
   custom background image, haptic feedback, lyric font size (separate cover and
@@ -597,7 +528,7 @@ For release build and signing details, see
   track identity remains available through album/description metadata.
 - 🛠️ **Developer mode and debug tools**:
   tap the version number **7 times** to reveal the `Debug` tab, including
-  YouTube / Bili / NetEase / Search / Listen Together probes, log viewer, and
+  YouTube / Bili / NetEase / Search probes, log viewer, and
   crash log viewer.
 - 🧾 **Friendlier sign-in and logging**:
   NetEase and Bilibili support QR login with web-login fallback. Persistent file
@@ -647,7 +578,7 @@ For release build and signing details, see
 - NDK `27.0.12077973`
 - CMake `3.28.0+`
 - Version name format: `<git_short_hash>.<MMddHHmm>`
-- Release APK filename: `NeriPlayer-<versionName>[-abi].apk`
+- Release APK filename: `Lyra-<versionName>[-abi].apk`
 - Release builds are `arm64-v8a` by default. Use `-PbuildAllReleaseAbis=true`
   for multi-ABI output.
 - `.github/workflows/android_native_ci.yml` runs Release + `-Werror`,
@@ -661,14 +592,12 @@ For release build and signing details, see
 - `:accompanist-lyrics-core` / `:accompanist-lyrics-ui`: lyrics parsing and Compose lyrics UI submodules.
 - `build-logic`: shared Gradle convention plugins.
 - `buildSrc`: retained auxiliary Gradle build logic.
-- `np-submodule/NeriPlayer-LTW`: Listen Together Cloudflare Workers server.
 - `np-submodule/miuix`: vendored upstream Miuix source/docs tree, not part of the current app module graph.
 
 ### Entry point and navigation
 
 - `MainActivity` is the only external entry point. It handles startup, notification
-  permission, external audio imports, USB attach events, and
-  `neriplayer://listen-together/join` links.
+  permission, external audio imports, and USB attach events.
 - If the previous launch ended with a JVM/native crash or system ANR, the app
   enters `Safe Mode` first and exposes only recovery and export actions.
 - The main UI is **Compose NavHost + dynamic bottom bar**:
@@ -853,7 +782,7 @@ For release build and signing details, see
   local playlist is created or enriched, the app can continue hydrating titles,
   artists, albums, and covers in the background while preserving edited local metadata.
 - Download "metadata post-processing" can be disabled separately. When disabled,
-  NeriPlayer still keeps management metadata, but stops writing tags, lyrics,
+  the app still keeps management metadata, but stops writing tags, lyrics,
   and covers back into the audio file itself.
 - `BackupManager` supports playlist JSON export/import and diff analysis.
 - `ConfigFileManager` supports full config export/import for migration.
@@ -862,41 +791,9 @@ For implementation details, see [CONTRIBUTING_EN.md](./CONTRIBUTING_EN.md).
 
 ---
 
-## Listen Together Deployment
-
-NeriPlayer includes a built-in "Listen Together" feature. You can deploy your
-own server or use a server deployed by others.
-
-Server source and deployment entry points:
-
-- `np-submodule/NeriPlayer-LTW` inside this repository
-- Public deployment template:
-  [TheSmallHanCat/NeriPlayer-LTW](https://github.com/TheSmallHanCat/NeriPlayer-LTW)
-
-The server is based on **Cloudflare Workers** and **Durable Objects**, using
-WebSocket for real-time sync.
-
-### Deploy to Cloudflare Workers
-
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/TheSmallHanCat/NeriPlayer-LTW)
-
-The app can configure a Listen Together server URL, test availability, and reset
-the local Listen Together identity from Settings.
-
-Additional notes:
-
-- Room IDs use a 6-character readable charset, and nicknames must be 1-24
-  characters long using Chinese characters, letters, or digits
-- A first join requires the invite secret, and local tracks cannot create a
-  Listen Together room
-- For full protocol, event, and deployment details, see
-  [np-submodule/NeriPlayer-LTW/README.md](./np-submodule/NeriPlayer-LTW/README.md)
-
----
-
 ## GitHub Sync
 
-NeriPlayer can sync local metadata to **your own GitHub repository**.
+Lyra can sync local metadata to **your own GitHub repository**.
 When created from inside the app, the repository defaults to private, and
 existing repositories are also supported.
 
@@ -953,7 +850,7 @@ Current sync targets:
 
 ## WebDAV Sync
 
-NeriPlayer also supports storing the same sync data in a WebDAV remote file.
+Lyra also supports storing the same sync data in a WebDAV remote file.
 
 - Sync targets are the same as GitHub Sync.
 - Automatic sync and manual sync are supported.
@@ -988,12 +885,6 @@ and community feedback. They are not fixed-date commitments.
 - [x] Translation spacing for Japanese kana lyric lines
 - [x] Lyrics-editor source selection, temporary result caching, and
   word-level-first lyric matching
-- [x] Listen Together repeat/shuffle sync, stable-track-key target validation,
-  server clock-offset estimation, and authoritative playback recovery
-- [x] Listen Together duration-based position projection, single-track repeat wrapping,
-  and up to three session-only playback candidates
-- [x] Listen Together invite/member secrets, ordered control events, and queue-only
-  member track selection
 - [x] 32-bit high-resolution system output, PCM-float channel balance, and thread-safe loudness-normalization state
 - [x] USB-exclusive foreground/background recovery, playback wake policies, and bit-perfect volume mode
 - [x] UAC2 explicit feedback, long-gap clock reacquisition, coordinated AudioSink
@@ -1003,14 +894,13 @@ and community feedback. They are not fixed-date commitments.
 - [x] GitHub/WebDAV cleanup for malformed sync snapshots, missing-field songs, and deletion records
 - [x] Compatible reading of JSON, raw GZIP, and legacy Base64 sync payloads
 - [x] Responsibility-based package splits for player, download storage, startup,
-  lyric UI, and Listen Together
+  and lyric UI
 - [x] Versioned local-playlist display order with compatible migration of older
   GitHub/WebDAV sync data
 - [x] USB exclusive device selection, quality policies, background-playback guidance, and layered automatic recovery
 - [x] Fast local scan previews, background metadata hydration, and cover fallback resolution
 - [x] Existing-metadata scan filtering, long-form progress memory, and completion clearing
 - [x] Optional BilibiliSponsorBlock auto-skip and compact Now Playing lyric-range selection
-- [x] Listen Together session-candidate sharing toggles, asynchronous playback-candidate resolution, and more stable room sync
 - [x] Long-press lyric selection, copy, song sharing, and lyric card generation
 - [x] Phonetic lyric display and the lyric behavior sheet
 - [x] Independent 200 ms Lyricon/SuperLyric position feed, safer lyric matching, and Super Island share URLs
@@ -1051,7 +941,7 @@ and community feedback. They are not fixed-date commitments.
 
 ---
 
-Thank you for using NeriPlayer. Since the project has many features and user
+Thank you for using Lyra. Since the project has many features and user
 environments can vary a lot, you may occasionally encounter behavior differences
 or unexpected issues. If you run into any problems, feel free to submit feedback.
 We will keep improving the project over time.
@@ -1062,15 +952,15 @@ We will keep improving the project over time.
 
 - Before reporting, enable developer mode by tapping the **version number** 7 times in Settings.
 - After developer mode is enabled, regular file logging is enabled. Crash logs are stored separately.
-- Open [Issues](https://github.com/cwuom/NeriPlayer/issues) and include:
+- Open your repository's issue tracker and include:
   OS version, device model, app version, reproduction steps, and key logs.
 - Windows:
   ```bash
-  adb logcat | findstr NeriPlayer
+  adb logcat | findstr LyraPlayer
   ```
 - Linux / macOS:
   ```bash
-  adb logcat | grep NeriPlayer
+  adb logcat | grep LyraPlayer
   ```
 
 ---
@@ -1117,14 +1007,13 @@ We will keep improving the project over time.
   retain `backup.json` and legacy `backup.bin` Base64 reads during migration, while
   GitHub uploads use Git Data API binary blobs and non-force branch updates.
 - Long-form progress memory does not override an explicitly requested position or replace
-  third-party playback history. BilibiliSponsorBlock calls a public API and stays disabled
-  during Listen Together.
+  third-party playback history.
 
 ---
 
 ## Privacy
 
-- NeriPlayer does not provide its own public cloud media distribution service,
+- Lyra does not provide its own public cloud media distribution service,
   and does not include ad SDKs, third-party analytics, or third-party crash SDKs.
 - The project follows a decentralized data strategy: you choose and control the
   sync target, and personal media data is not gathered into a maintainer-operated
@@ -1204,7 +1093,7 @@ We will keep improving the project over time.
 
 ## License
 
-NeriPlayer is released under **GPL-3.0**.
+Lyra is released under **GPL-3.0**.
 
 This means:
 
@@ -1212,7 +1101,7 @@ This means:
 - ⚠️ Modified distributions using the repository-root GPL-3.0 grant must keep
   complying with GPL-3.0.
 - 🧩 `app/src/main/cpp/README.md` provides a conditional attribution-based
-  alternative license only for the listed NeriPlayer-owned native source.
+  alternative license only for the listed original NeriPlayer-owned native source.
   Third-party code and repository content outside that scope are excluded.
 - ✍️ An external native contribution is not added to the alternative-license
   scope merely by submitting a PR; the contributor must explicitly record a
@@ -1221,16 +1110,13 @@ This means:
 
 ---
 
-# Contributing to NeriPlayer
+# Contributing to Lyra
 
 Before contributing, please read [CONTRIBUTING_EN.md](./CONTRIBUTING_EN.md).
 
 ---
 
-<p align="center">
-  <img src="https://moe-counter.lxchapu.com/:neriplayer?theme=moebooru" alt="Moe Counter">
-  <br/>
-  <a href="https://starchart.cc/cwuom/NeriPlayer">
-    <img src="https://starchart.cc/cwuom/NeriPlayer.svg" alt="Star History Chart">
-  </a>
-</p>
+## Acknowledgements
+
+- Thanks to every contributor and user.
+- This project is renamed from [NeriPlayer](https://github.com/cwuom/NeriPlayer); thanks to the original project for the foundation.

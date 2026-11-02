@@ -1,23 +1,21 @@
 [English](./CONTRIBUTING_EN.md) | [中文](./CONTRIBUTING.md)
 
-## Contributing to NeriPlayer / 贡献指南
+## Contributing to Lyra / 贡献指南
 
-感谢你愿意为 NeriPlayer 做出贡献。
-本文描述**当前 Android 客户端和一起听 Worker 的真实实现**，
+感谢你愿意为 Lyra 做出贡献。
+本文描述**当前 Android 客户端的真实实现**，
 请以源码和运行行为为准同步维护文档。
 
 ---
 
 ### 项目定位 / Scope
 
-- NeriPlayer 是一个**原生 Android 音频播放器**，不是公共云端曲库服务。
+- Lyra 是一个**原生 Android 音频播放器**，不是公共云端曲库服务。
 - 在线内容能力主要来自 **网易云音乐**、**Bilibili** 与 **YouTube Music**。
 - 播放页元数据/歌词补全链路目前使用 **网易云 + QQ 音乐**，
   并接入 LRCLIB 外部歌词来源。
 - 数据默认保存在本地；GitHub / WebDAV 同步是**可选能力**，
   同步对象是歌单、收藏、最近播放、播放统计等元数据，不是媒体文件本身。
-- 一起听服务端在 `np-submodule/NeriPlayer-LTW`，基于 Cloudflare Workers
-  与 Durable Objects。
 
 ---
 
@@ -29,16 +27,17 @@
   - 面向用户和新贡献者，说明项目定位、能力边界、安装构建、同步与隐私。
 - `CONTRIBUTING.md` / `CONTRIBUTING_EN.md`
   - 面向开发者，说明真实模块边界、扩展路径、测试和提交要求。
+- `docs/REFACTOR_LYRA.md`
+  - 说明本次从 NeriPlayer 改名为 Lyra 的重命名映射、保留的持久化标识符
+    和已删除的功能模块。
 - `app/src/main/cpp/README.md`
-  - 说明 NeriPlayer 自有 Native 源码的替代授权范围、第三方排除项和
+  - 说明原 NeriPlayer 自有 Native 源码的替代授权范围、第三方排除项和
     外部贡献所需的显式双授权声明。
 - `app/src/main/cpp/tests/usb/config/host-gate-contract.md`
   - 说明公开 Native USB host 门禁、CI 覆盖与真实设备验证边界。
 - `app/src/main/cpp/tests/usb/corpus/README.md` 与
   `app/src/main/cpp/tests/usb/fixtures/README.md`
   - 说明公开测试语料/夹具只能使用合成或可审计资料，真实设备证据留在私有目录。
-- `np-submodule/NeriPlayer-LTW/README.md`
-  - 面向一起听服务端部署者，说明 Worker API、事件模型、部署和本地检查。
 
 行为变更如果影响用户理解，请同步更新 README；
 如果影响扩展方式、测试方式或模块边界，请同步更新 CONTRIBUTING。
@@ -55,9 +54,8 @@
 - **compileSdk / targetSdk / minSdk**：37 / 36 / 28
 - **NDK**：`27.0.12077973`
 - **CMake**：`3.28.0+`
-- **Node.js**：22，用于一起听 Worker 检查
 - **版本名格式**：`<git短哈希>.<MMddHHmm>`
-- **Release APK 文件名**：`NeriPlayer-<versionName>[-abi].apk`
+- **Release APK 文件名**：`Lyra-<versionName>[-abi].apk`
 
 补充说明：
 
@@ -90,8 +88,6 @@
 - **系统入口与桌面外壳**：`LauncherShortcuts`、桌面小组件、
   `USB_DEVICE_ATTACHED` 处理开关和播放服务控制入口。
 - **存储与缓存 UI**：`StorageUsageAnalyzer`、缓存清理选项、下载目录索引和 SAF 快照。
-- **一起听**：Android 客户端、Worker 协议字段、角色权限、队列、
-  版本门控更新、会话候选共享开关和房主离线恢复。
 - **诊断恢复**：安全模式、JVM/Native 崩溃日志、ANR 记录和 Debug 探针。
 - **本地持久化**：播放/流量统计的批量写入、生命周期 flush、原子文件替换和
   SAF/本地歌单初始化就绪状态。
@@ -105,8 +101,8 @@
 
 1. 克隆仓库：
    ```bash
-   git clone --recursive https://github.com/cwuom/NeriPlayer.git
-   cd NeriPlayer
+   git clone --recursive <本仓库地址>
+   cd <仓库目录>
    ```
 2. 构建调试版：
    ```bash
@@ -130,7 +126,7 @@
 1. 在 `~/.gradle/gradle.properties`、项目 Gradle properties 或命令行 `-P`
    中提供签名信息：
    ```properties
-   KEYSTORE_FILE=/absolute/path/to/neri.jks
+   KEYSTORE_FILE=/absolute/path/to/lyra.jks
    KEYSTORE_PASSWORD=your_store_password
    KEY_ALIAS=key0
    KEY_PASSWORD=your_key_password
@@ -155,7 +151,7 @@
 
 4. 产物位于 `app/build/outputs/apk/release/`，文件名格式为：
    ```text
-   NeriPlayer-<git短哈希>.<MMddHHmm>[-abi].apk
+   Lyra-<git短哈希>.<MMddHHmm>[-abi].apk
    ```
 
 安全提醒：
@@ -180,20 +176,18 @@
   - Android/Kotlin/Compose convention plugins。
 - `buildSrc`
   - 保留的辅助 Gradle 构建逻辑模块。
-- `np-submodule/NeriPlayer-LTW`
-  - 一起听 Cloudflare Workers 服务端。
 - `np-submodule/miuix`
   - 仓库内附带的上游 Miuix 源码/文档树，当前不参与主应用模块构建。
 
 #### Android 客户端关键路径
 
-- `app/src/main/java/moe/ouom/neriplayer/NeriPlayerApplication.kt`
+- `app/src/main/java/com/lyra/player/LyraApplication.kt`
   - 应用初始化入口，负责语言、异常处理、`AppContainer`、
     Lyricon、全局下载管理和共享图片加载器。
 
-- `app/src/main/java/moe/ouom/neriplayer/activity/`
+- `app/src/main/java/com/lyra/player/activity/`
   - `MainActivity.kt` 是唯一对外入口，负责安全模式、启动流程、免责声明、
-    启动引导、外部音频导入、一起听深链和顶层 Compose 宿主。
+    启动引导、外部音频导入和顶层 Compose 宿主。
   - 平台登录 Activity 位于 `activity/auth/`，并在独立次进程中运行；
     `activity/sync/` 保存 Activity 侧的同步告警状态。
   - `UsbDeviceAttachHandling.kt` 负责按设置启停 USB 设备插入 Activity alias，
@@ -202,7 +196,7 @@
     `BiliWebLoginActivity.kt`、`BiliQrLoginActivity.kt` 与 `YouTubeWebLoginActivity.kt`
     是内部平台登录页。
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/NeriApp.kt`
+- `app/src/main/java/com/lyra/player/ui/LyraApp.kt`
   - 顶层 Compose 应用骨架，负责 `NavHost`、动态底栏、
     `MiniPlayer`、`Now Playing` 覆盖层、Debug 路由、主题、缓存清理和播放服务同步。
   - 主标签页面由 `MainTabLayerHost.kt` 保留出场/入场双场景，
@@ -210,38 +204,38 @@
   - `ui/feedback/` 承载应用级 Snackbar/Toast 反馈策略；新增全局反馈前先确认
     `AppFeedback` 与 `ViewSnackbar` 是否已经覆盖所需场景。
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/component/lyrics/`
+- `app/src/main/java/com/lyra/player/ui/component/lyrics/`
   - `AdvancedLyricsView.kt` 与 `SyncedLyricsView.kt` 负责高级歌词排版、
     逐字/逐词高亮、翻译/音译显示、点击跳转和长按回调。
   - `LyricShareSheet.kt` 负责歌词行选择、复制、歌曲分享和歌词卡片生成。
   - 旧 `AppleMusicLyric` 名称只存在于 `ui/component/LyricsCompatibility.kt`
     的 `@Deprecated` 包装中，新代码统一使用 `SyncedLyricsView`。
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/component/playback/`
-  - `NeriMiniPlayer.kt` 负责底部迷你播放器、播放暂停和横向滑动切歌；
+- `app/src/main/java/com/lyra/player/ui/component/playback/`
+  - `LyraMiniPlayer.kt` 负责底部迷你播放器、播放暂停和横向滑动切歌；
     播放音效与睡眠定时器面板也在该目录。
   - `ui/component/` 根目录中的同名文件主要是旧包兼容入口，新增实现应放入
     `lyrics/`、`playback/`、`download/`、`navigation/` 等职责子包。
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/screen/tab/`
+- `app/src/main/java/com/lyra/player/ui/screen/tab/`
   - `LibraryScreen.kt` 负责媒体库顶层分类，本地内容可在歌单/歌手之间切换，
     收藏页可展示歌单和已关注艺术家。
   - `LocalArtistLibraryGrid.kt` 展示本地艺术家网格、空状态和艺术家卡片。
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/screen/playlist/`
+- `app/src/main/java/com/lyra/player/ui/screen/playlist/`
   - `LocalArtistDetailScreen.kt` 展示本地艺术家详情，支持播放全部、
     多选、导出歌单和批量下载可在线解析的歌曲。
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/screen/artist/`
+- `app/src/main/java/com/lyra/player/ui/screen/artist/`
   - 网易云艺术家详情页，展示艺术家信息、热门歌曲、分页专辑和关注状态。
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/viewmodel/artist/`
+- `app/src/main/java/com/lyra/player/ui/viewmodel/artist/`
   - 网易云艺术家摘要、JSON 解析和详情页状态管理。
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/onboarding/`
+- `app/src/main/java/com/lyra/player/ui/onboarding/`
   - 首次启动引导，覆盖语言、平台账号、权限说明、播放控件、GitHub 同步和个性化设置。
 
-- `app/src/main/java/moe/ouom/neriplayer/core/api/`
+- `app/src/main/java/com/lyra/player/core/api/`
   - `netease/`：网易云接口、加密和账号能力。
   - `bili/`：Bilibili 搜索、二维码登录、收藏夹、合集、播放信息和音频播放解析。
     Explore 链接识别会保留 Bilibili 分 P、`cid` 和 `season_id` 上下文；
@@ -252,7 +246,7 @@
     当前实现为 `CloudMusicSearchApi` 与 `QQMusicSearchApi`。
   - `lyrics/`：外部歌词来源，当前实现为 `LrcLibClient`。
 
-- `app/src/main/java/moe/ouom/neriplayer/core/player/`
+- `app/src/main/java/com/lyra/player/core/player/`
   - `PlayerManager.kt`：Media3 ExoPlayer 的统一管理层，
     负责音源解析、播放队列、缓存、状态恢复、失败重试和播放策略。
   - `service/AudioPlayerService.kt`：前台播放服务、媒体通知、MediaSession 和媒体按钮。
@@ -281,7 +275,7 @@
     并已经包含 32-bit PCM、PCM float 软件转换、UAC2 显式反馈、
     协调式 AudioSink 重配置、动态传输缩放和背压卡顿恢复。
 
-- `app/src/main/java/moe/ouom/neriplayer/core/download/`
+- `app/src/main/java/com/lyra/player/core/download/`
   - `GlobalDownloadManager.kt` 维护全局下载任务与本地已下载列表。
   - `ManagedDownloadStorage.kt` 是应用目录/SAF 目录的外观入口；具体实现已拆到
     `storage/commit/`、`delete/`、`lookup/`、`migration/`、`recovery/`、
@@ -291,13 +285,13 @@
   - `naming/ManagedDownloadNaming.kt` 管理下载文件名模板和历史命名兼容。
   - `metadata/DownloadedAudioTagWriter.kt` 写入音频标签；`catalog/` 管理已下载歌曲目录模型。
 
-- `app/src/main/java/moe/ouom/neriplayer/core/startup/`
+- `app/src/main/java/com/lyra/player/core/startup/`
   - 启动阶段与决策已按 `app/`、`crash/`、`download/`、`logging/`、
     `permission/`、`player/`、`safemode/`、`sync/` 和 `theme/` 拆分；
     `MainActivity` 只负责协调这些组件与 UI 生命周期。
 
-- `app/src/main/java/moe/ouom/neriplayer/data/`
-  - `model/`：跨播放器、歌单、下载、同步、一起听和 UI 共享的 `SongItem`、
+- `app/src/main/java/com/lyra/player/data/`
+  - `model/`：跨播放器、歌单、下载、同步和 UI 共享的 `SongItem`、
     `SongIdentity` 与媒体模型扩展。
   - `settings/`：`DataStore` 设置、KSP schema、启动快照、主题快照和播放偏好快照。
   - `auth/`：网易云、Bilibili、YouTube 的 Cookie / Auth 本地存储与校验。
@@ -316,26 +310,19 @@
   - `sync/github/`：GitHub 传输、三路合并、序列化、省流模式和安全存储。
   - `sync/webdav/`：WebDAV 同步、远端配置、Worker 和 WebDAV API。
 
-- `app/src/main/java/moe/ouom/neriplayer/listentogether/`
-  - `protocol/` 定义房间、事件与传输模型，`network/` 负责 HTTP/WebSocket 与重连，
-    `playback/` 负责队列、权威播放候选和进度同步，`control/`、`session/`、`invite/`、
-    `mapping/`、`validation/` 分别承载控制、会话策略、邀请、模型映射和输入边界。
-  - 根目录保留 `ListenTogetherSessionManager.kt` 与少量兼容入口；新增协议逻辑
-    不应继续堆入根包。
-
 - `app/src/main/cpp/`
   - Native 崩溃处理位于 `crash/`；USB 实现按 `usb/exclusive/`、
     `usb/feedback/`、`usb/iso/`、`usb/pcm/`、`usb/uac1/`、`usb/uac2/`
     拆分，对应 host 测试位于 `tests/usb/`。
 
-- `app/src/main/java/moe/ouom/neriplayer/core/lyricon/`
+- `app/src/main/java/com/lyra/player/core/lyricon/`
   - 词幕适配（Lyricon Provider）与 SuperLyric 输出，
     同步歌曲、播放状态、进度、逐字歌词和翻译。
 
-- `app/src/main/java/moe/ouom/neriplayer/navigation/`
+- `app/src/main/java/com/lyra/player/navigation/`
   - `LauncherShortcuts.kt` 负责桌面图标快捷方式到导航/播放请求的映射。
 
-- `app/src/main/java/moe/ouom/neriplayer/widget/`
+- `app/src/main/java/com/lyra/player/widget/`
   - 桌面播放小组件的 provider、状态快照、封面取色视觉和 RemoteViews 更新逻辑。
 
 ---
@@ -423,7 +410,7 @@
   距离结尾 30 秒以内清零，显式播放位置优先，持久化字段为 `resumePositionMs`。
   这不是第三方平台播放历史。
 - BilibiliSponsorBlock 默认关闭，只发送当前 BV 号的 SHA-256 前缀并在本地执行跳转；
-  一起听期间保持关闭，不能把公开接口结果写入同步或房间状态。
+  不能把公开接口结果写入同步数据。
 - 32-bit 高解析系统输出会优先保留普通系统输出的高精度管线，并旁路响度均衡、
   声道平衡、音频可视化和应用内倍速等处理；改动时必须同时确认设置文案和测试。
 - USB 独占依赖兼容 **UAC1.0** 或 **UAC2.0 Type I PCM** 的 DAC、
@@ -437,15 +424,6 @@
   延迟重试；其他无效报告仍按 fail-closed 处理。
 - 本地扫描结果可能先用快速元数据返回，再由后台任务补全歌曲名、歌手、
   专辑和封面；不要假设首次扫描结果已经是最终形态。
-- 一起听在 `shareAudioLinks=false` 时，房间快照和队列不应暴露 `streamUrl`；
-  关闭该开关时还要立即清空已缓存会话候选，`REQUEST_LINK` 也应直接拒绝。
-  `streamUrl` 是历史协议字段名，不表示 Worker 可作为媒体代理或公共分发入口。
-- 一起听循环/随机模式通过 `PLAYBACK_MODE` / `REQUEST_PLAYBACK_MODE` 同步；
-  成员控制必须校验目标 stable track key，过滤 `clientInstanceId`、`clientSequence`、
-  `clientTimeMs` 之前的事件，且 `REQUEST_SET_TRACK` 只能选当前队列曲目。
-- 一起听当前曲目最多保留 3 条去重 HTTP(S) 候选；听众先按本机音质策略解析，
-  候选只作为本次会话的失败回退，不能写入普通歌曲或离线缓存。服务端位置按曲目
-  时长推算，单曲循环按时长取模；同一成员凭成员密钥重连不应触发新成员自动暂停。
 
 ---
 
@@ -509,8 +487,8 @@
    `explore_search_history_enabled` 关闭时，探索页必须隐藏历史并停止新增记录，
    不要在开关切换时静默删除已有记录。
 10. 歌词字号现在分成封面页和歌词页两组，且歌词和翻译各自独立；
-   修改相关 UI 时同时更新 `SettingsRepository.lyricFontScalesFlow`、
-   `setLyricFontScale(target, scale)` 和对应的预览/播放调用点。
+    修改相关 UI 时同时更新 `SettingsRepository.lyricFontScalesFlow`、
+    `setLyricFontScale(target, scale)` 和对应的预览/播放调用点。
 
 #### 6. 修改 USB 独占播放
 
@@ -628,33 +606,9 @@
 6. 蓝牙歌词的原文与翻译是独立开关；同时输出时必须通过同一个原子快照更新
    标题/艺术家字段，并保留曲目信息、字段长度限制、空白清洗和重复提交去重测试。
 
-#### 13. 修改一起听
+#### 13. 修改主导航与玻璃转场
 
-1. Android 客户端逻辑在 `listentogether/`。
-2. 服务端逻辑在 `np-submodule/NeriPlayer-LTW`。
-3. 协议字段变更必须同时兼容客户端和 Worker，并更新测试。
-4. `shareAudioLinks=false` 时，HTTP/WS 房间快照都不能暴露
-   `track.streamUrl` 与 `queue[*].streamUrl`；关闭该开关时要立即清空
-   房间里已缓存的会话候选。
-5. `REQUEST_LINK` / `LINK_READY`、成员控制、房主离线恢复和版本门控更新
-   要一起看，避免旧状态覆盖新状态。
-6. 循环/随机模式使用 `PLAYBACK_MODE` / `REQUEST_PLAYBACK_MODE`；成员请求与
-   `LINK_READY` 都要校验目标 stable track key，避免异步结果落到错误歌曲。
-7. 首次加入需要 `joinSecret`，已有成员重连需要 `memberSecret`；这些密钥不得写入
-   脱敏房间状态或日志，邀请 URI 的 `secret` 参数也要按敏感输入处理。
-8. 控制事件可携带 `clientInstanceId`、`clientSequence` 和 `clientTimeMs`；Worker
-   会拒绝过期顺序，`REQUEST_SET_TRACK` 只能选择当前队列已有曲目，客户端兼容路径
-   也必须保持一致。
-9. 成员显式离开时调用 `/api/rooms/:roomId/leave`，Worker 删除成员并广播
-   `MEMBER_LEFT`；普通 WebSocket 断线属于传输波动，必须保留成员凭据以支持重连；
-   控制者显式离开则关闭房间。
-10. 房间号 6 位、昵称 1-24、队列上限 2000 和请求去重要视为协议边界，
-   不要只改 UI 校验而忘记服务端约束。
-11. 设置页支持自定义服务端地址和可用性测试，不要硬编码单一地址。
-
-#### 14. 修改主导航与玻璃转场
-
-1. 主标签生产路径由 `NeriApp.kt` 与 `MainTabLayerHost.kt` 共同承载；
+1. 主标签生产路径由 `LyraApp.kt` 与 `MainTabLayerHost.kt` 共同承载；
    标签顺序与方向统一通过 `resolveMainTabTransitionDirection` 决定。
 2. 转场期间必须同时保留出场和入场 scene，并通过
    `SaveableStateHolder` 保留各标签状态；快速反向或连续点击不能先清空旧 scene。
@@ -664,11 +618,11 @@
    开启后才使用背景与详情页同步接力的连贯反馈。
 5. 修改动效时要覆盖正向、反向、中断、重复请求、状态恢复和启动首帧；
    几何测试不得把尚未布局的 `Rect(0, 0, 0, 0)` scene 当成真实重叠。
-6. 至少同步检查 `NeriAppMainTabTransitionPolicyTest`、
-   `AdvancedGlassNavigationTransitionTest`、`NeriAppNavigationTransitionTest`
-   和 `HostNavigationTransitionGeometryTest`。
+6. 至少同步检查 `LyraAppMainTabTransitionPolicyTest`、
+   `AdvancedGlassNavigationTransitionTest` 和
+   `LyraAppNavigationIsolationPolicyTest`。
 
-#### 15. 修改桌面小组件、启动器快捷方式或全局反馈
+#### 14. 修改桌面小组件、启动器快捷方式或全局反馈
 
 1. 桌面小组件入口在 `widget/PlaybackWidgetProviders.kt`，
    状态和取色策略在 `PlaybackWidgetState.kt` 与 `PlaybackWidgetVisuals.kt`。
@@ -693,19 +647,19 @@
 - 开启后底栏会出现独立 `Debug` 页。
 - 普通文件日志仅在开发者模式开启时启用。
 - 崩溃日志由 `ExceptionHandler` / `NativeCrashHandler` 独立落盘，不依赖开发者模式。
-- Debug 页包含 YouTube、Bili、Netease、Search、Listen Together 探针，
+- Debug 页包含 YouTube、Bili、Netease、Search 探针，
   以及普通日志和崩溃日志查看器。
 
 常用命令：
 
 ```bash
-adb logcat | findstr NeriPlayer
+adb logcat | findstr LyraPlayer
 ```
 
 Linux / macOS 可改用：
 
 ```bash
-adb logcat | grep NeriPlayer
+adb logcat | grep LyraPlayer
 ```
 
 ---
@@ -754,16 +708,9 @@ adb logcat | grep NeriPlayer
    ```
    host gate 会固定执行同一组 CTest；Android 编译还要确认
    `arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64` 均生成非空 `lib_neri.so`。
-7. 如修改一起听 Worker：
-   ```bash
-   npm ci --prefix np-submodule/NeriPlayer-LTW
-   npm run check --prefix np-submodule/NeriPlayer-LTW
-   ```
-   这里的 `npm run check` 会依次执行 `node --check`、协议测试和
-   `wrangler deploy --dry-run`；协议或房间状态改动还需要实际验证 create/join/ws 流程。
-8. 新增单元测试放到 `app/src/test/`；
+7. 新增单元测试放到 `app/src/test/`；
    新增设备或 Compose UI 测试放到 `app/src/androidTest/`。
-9. 行为变更涉及 README、设置文案、用户流程或同步格式时，请同步更新文档。
+8. 行为变更涉及 README、设置文案、用户流程或同步格式时，请同步更新文档。
 
 当前已有测试覆盖的重点包括：
 
@@ -782,9 +729,7 @@ adb logcat | grep NeriPlayer
 - GitHub/WebDAV 同步序列化、缺字段快照清洗、旧歌单顺序迁移、删除策略、
   播放统计滚动窗口、全量累计合并、旧版 bucket-only 兼容、WebDAV 并发回退、
   原子文件写入和上传重试
-- 长音频进度阈值、显式位置优先、BilibiliSponsorBlock 本地跳转与一起听禁用策略
-- 一起听地址校验、版本门控、循环/随机模式、stable track key 目标校验、
-  播放同步规划、会话候选回退、邀请/成员密钥、显式离开/重连、事件排序、Session 控制/取消与协议兼容
+- 长音频进度阈值、显式位置优先、BilibiliSponsorBlock 本地跳转
 - 歌词视图、日语假名翻译间距、逐词时间、外部蓝牙歌词、播放音效和播放策略
 - 配置备份、设置生成、安全守卫、崩溃日志文件和安全模式相关逻辑
 
@@ -813,7 +758,7 @@ Commit 信息建议遵循 Conventional Commits，
 - 本项目使用 **GPL-3.0** 协议。
 - 提交贡献即表示你同意至少以 GPL-3.0 分发你的修改。
 - `app/src/main/cpp/README.md` 中的替代授权只覆盖明确列出的
-  NeriPlayer 自有 Native 源码，不覆盖第三方代码或其他仓库内容。
+  原 NeriPlayer 自有 Native 源码，不覆盖第三方代码或其他仓库内容。
 - Native PR 本身不代表授予替代授权；若贡献者同意双授权，必须在 PR、
   commit 或版权持有人接受的其他可审计记录中加入该 README 提供的声明。
 - 未提供显式双授权的外部 Native 贡献仍可按 GPL-3.0 接受，
@@ -823,7 +768,7 @@ Commit 信息建议遵循 Conventional Commits，
 
 ### 沟通方式 / Communication
 
-- [Issues](https://github.com/cwuom/NeriPlayer/issues)：缺陷、功能建议、讨论
+- Issues：缺陷、功能建议、讨论（见本仓库的 Issue 页面）
 - [README.md](./README.md)：功能与使用说明
 - [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)：社区行为准则
 

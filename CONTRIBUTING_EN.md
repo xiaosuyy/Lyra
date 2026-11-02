@@ -1,16 +1,16 @@
 [English](./CONTRIBUTING_EN.md) | [中文](./CONTRIBUTING.md)
 
-## Contributing to NeriPlayer
+## Contributing to Lyra
 
-Thank you for contributing to NeriPlayer.
-This document describes the **current Android client and Listen Together Worker
-implementation**. Keep documentation aligned with the source code and runtime behavior.
+Thank you for contributing to Lyra.
+This document describes the **current Android client implementation**.
+Keep documentation aligned with the source code and runtime behavior.
 
 ---
 
 ### Scope
 
-- NeriPlayer is a **native Android audio player**, not a public cloud music service.
+- Lyra is a **native Android audio player**, not a public cloud music service.
 - Online source capabilities mainly come from **NetEase Cloud Music**,
   **Bilibili**, and **YouTube Music**.
 - Playback metadata and lyrics completion currently use **NetEase + QQ Music**,
@@ -18,8 +18,6 @@ implementation**. Keep documentation aligned with the source code and runtime be
 - Data is local by default. GitHub / WebDAV sync is **optional** and syncs
   metadata such as playlists, favorites, recent plays, and playback stats,
   not media files.
-- The Listen Together server lives in `np-submodule/NeriPlayer-LTW` and is based
-  on Cloudflare Workers and Durable Objects.
 
 ---
 
@@ -32,19 +30,19 @@ When maintaining docs, split them by audience:
     installation/builds, sync, and privacy.
 - `CONTRIBUTING.md` / `CONTRIBUTING_EN.md`
   - For developers: module boundaries, extension paths, tests, and PR expectations.
+- `docs/REFACTOR_LYRA.md`
+  - Describes the rename from NeriPlayer to Lyra: rename mappings, retained
+    persistence identifiers, and removed feature modules.
 - `app/src/main/cpp/README.md`
-  - Defines the alternative-license scope for NeriPlayer-owned native source,
-    third-party exclusions, and the explicit dual-license statement required
-    for external contributions to enter that scope.
+  - Defines the alternative-license scope for original NeriPlayer-owned native
+    source, third-party exclusions, and the explicit dual-license statement
+    required for external contributions to enter that scope.
 - `app/src/main/cpp/tests/usb/config/host-gate-contract.md`
   - Defines the public native USB host gate, CI coverage, and real-device boundary.
 - `app/src/main/cpp/tests/usb/corpus/README.md` and
   `app/src/main/cpp/tests/usb/fixtures/README.md`
   - Define the synthetic/auditable boundary for public USB test corpus and fixtures;
     device-derived evidence stays in the private evidence tree.
-- `np-submodule/NeriPlayer-LTW/README.md`
-  - For Listen Together server deployers: Worker API, event model, deployment,
-    and local checks.
 
 If a behavior change affects user understanding, update the README.
 If it affects extension paths, tests, or module boundaries, update CONTRIBUTING.
@@ -61,9 +59,8 @@ If it affects extension paths, tests, or module boundaries, update CONTRIBUTING.
 - **compileSdk / targetSdk / minSdk**: 37 / 36 / 28
 - **NDK**: `27.0.12077973`
 - **CMake**: `3.28.0+`
-- **Node.js**: 20, for Listen Together Worker checks
 - **Version name format**: `<git_short_hash>.<MMddHHmm>`
-- **Release APK filename**: `NeriPlayer-<versionName>[-abi].apk`
+- **Release APK filename**: `Lyra-<versionName>[-abi].apk`
 
 Additional notes:
 
@@ -79,7 +76,7 @@ Additional notes:
 
 ### Quality Guardrails
 
-NeriPlayer covers a broad product surface. Protect these paths first:
+Lyra covers a broad product surface. Protect these paths first:
 
 - **Playback**: `PlayerManager`, playback resolution, cache, URL refresh,
   playback fallback, long-form progress memory, BilibiliSponsorBlock skip
@@ -104,8 +101,6 @@ NeriPlayer covers a broad product surface. Protect these paths first:
   `USB_DEVICE_ATTACHED` handling, and playback-service control entry points.
 - **Storage and cache UI**: `StorageUsageAnalyzer`, cache cleanup options,
   download directory indexes, and SAF snapshots.
-- **Listen Together**: Android client, Worker protocol fields, roles, queues,
-  version-gated updates, session-candidate sharing toggles, and controller-offline recovery.
 - **Diagnostics**: safe mode, JVM/native crash logs, ANR capture, and Debug probes.
 - **Local persistence**: debounced playback/traffic-stat writes, lifecycle flushes,
   atomic file replacement, and local-playlist/SAF initialization readiness.
@@ -120,8 +115,8 @@ for the new behavior.
 
 1. Clone the repository:
    ```bash
-   git clone --recursive https://github.com/cwuom/NeriPlayer.git
-   cd NeriPlayer
+   git clone --recursive <this-repo-url>
+   cd <repo-directory>
    ```
 2. Build the Debug APK:
    ```bash
@@ -148,7 +143,7 @@ extra Gradle property.
 1. Provide signing config in `~/.gradle/gradle.properties`, project Gradle
    properties, or through command-line `-P` properties:
    ```properties
-   KEYSTORE_FILE=/absolute/path/to/neri.jks
+   KEYSTORE_FILE=/absolute/path/to/lyra.jks
    KEYSTORE_PASSWORD=your_store_password
    KEY_ALIAS=key0
    KEY_PASSWORD=your_key_password
@@ -174,7 +169,7 @@ extra Gradle property.
 
 4. Artifacts are generated in `app/build/outputs/apk/release/`:
    ```text
-   NeriPlayer-<git_short_hash>.<MMddHHmm>[-abi].apk
+   Lyra-<git_short_hash>.<MMddHHmm>[-abi].apk
    ```
 
 Security reminders:
@@ -200,21 +195,18 @@ Security reminders:
   - Android/Kotlin/Compose convention plugins.
 - `buildSrc`
   - Retained auxiliary Gradle build logic.
-- `np-submodule/NeriPlayer-LTW`
-  - Listen Together Cloudflare Workers server.
 - `np-submodule/miuix`
   - Vendored upstream Miuix source/docs tree, not part of the current app module graph.
 
 #### Android client key paths
 
-- `app/src/main/java/moe/ouom/neriplayer/NeriPlayerApplication.kt`
+- `app/src/main/java/com/lyra/player/LyraApplication.kt`
   - Application initialization. Handles language, crash handling, `AppContainer`,
     Lyricon, global downloads, and the shared image loader.
 
-- `app/src/main/java/moe/ouom/neriplayer/activity/`
+- `app/src/main/java/com/lyra/player/activity/`
   - `MainActivity.kt`: the only external entry point. Handles safe mode, startup, disclaimer,
-    onboarding, external audio imports, Listen Together deep links, and the top-level
-    Compose host.
+    onboarding, external audio imports, and the top-level Compose host.
   - Platform login activities live under `activity/auth/` and run in dedicated
     secondary processes. `activity/sync/` stores Activity-side sync warning state.
   - `UsbDeviceAttachHandling.kt` enables or disables the USB attach Activity alias
@@ -224,7 +216,7 @@ Security reminders:
     `BiliWebLoginActivity.kt`, `BiliQrLoginActivity.kt`, and `YouTubeWebLoginActivity.kt`:
     internal platform sign-in pages.
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/NeriApp.kt`
+- `app/src/main/java/com/lyra/player/ui/LyraApp.kt`
   - Top-level Compose app shell. Handles `NavHost`, dynamic bottom bar, `MiniPlayer`,
     `Now Playing` overlay, Debug routes, themes, cache cleanup, and playback service sync.
   - `MainTabLayerHost.kt` retains outgoing and incoming main-tab scenes,
@@ -233,7 +225,7 @@ Security reminders:
   - `ui/feedback/` owns app-wide Snackbar/Toast feedback policy. Before adding a
     new global feedback surface, check `AppFeedback` and `ViewSnackbar` first.
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/component/lyrics/`
+- `app/src/main/java/com/lyra/player/ui/component/lyrics/`
   - `AdvancedLyricsView.kt` and `SyncedLyricsView.kt`: advanced lyric layout,
     word/character highlighting, translation/phonetic display, click-to-seek,
     and long-press callbacks.
@@ -241,34 +233,34 @@ Security reminders:
   - The old `AppleMusicLyric` name exists only as an `@Deprecated` wrapper in
     `ui/component/LyricsCompatibility.kt`. New code should use `SyncedLyricsView`.
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/component/playback/`
-  - `NeriMiniPlayer.kt`: bottom Mini Player, play/pause, and horizontal swipe for previous/next.
+- `app/src/main/java/com/lyra/player/ui/component/playback/`
+  - `LyraMiniPlayer.kt`: bottom Mini Player, play/pause, and horizontal swipe for previous/next.
     Playback sound and sleep-timer sheets also live here.
   - Same-named files in the `ui/component/` root are primarily legacy package
     compatibility entry points. New implementations belong in responsibility-based
     subpackages such as `lyrics/`, `playback/`, `download/`, and `navigation/`.
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/screen/tab/`
+- `app/src/main/java/com/lyra/player/ui/screen/tab/`
   - `LibraryScreen.kt`: top-level Library categories. Local content can switch
     between playlists and artists, and Favorites can show playlists and followed artists.
   - `LocalArtistLibraryGrid.kt`: local artist grid, empty state, and artist cards.
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/screen/playlist/`
+- `app/src/main/java/com/lyra/player/ui/screen/playlist/`
   - `LocalArtistDetailScreen.kt`: local artist details with play-all,
     multi-select, playlist export, and batch download for resolvable online songs.
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/screen/artist/`
+- `app/src/main/java/com/lyra/player/ui/screen/artist/`
   - NetEase artist detail screens for artist info, hot songs, paged albums,
     and follow state.
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/viewmodel/artist/`
+- `app/src/main/java/com/lyra/player/ui/viewmodel/artist/`
   - NetEase artist summaries, JSON parsing, and detail-screen state management.
 
-- `app/src/main/java/moe/ouom/neriplayer/ui/onboarding/`
+- `app/src/main/java/com/lyra/player/ui/onboarding/`
   - First-run onboarding for language, platform accounts, permission guidance,
     playback controls, GitHub sync, and personalization.
 
-- `app/src/main/java/moe/ouom/neriplayer/core/api/`
+- `app/src/main/java/com/lyra/player/core/api/`
   - `netease/`: NetEase endpoints, crypto, and account capabilities.
   - `bili/`: Bilibili search, QR login, favorites, collections, playback info,
     and audio playback resolution.
@@ -281,7 +273,7 @@ Security reminders:
     `CloudMusicSearchApi` and `QQMusicSearchApi`.
   - `lyrics/`: external lyrics sources. Current implementation: `LrcLibClient`.
 
-- `app/src/main/java/moe/ouom/neriplayer/core/player/`
+- `app/src/main/java/com/lyra/player/core/player/`
   - `PlayerManager.kt`: unified Media3 ExoPlayer management, playback resolution, queue,
     cache, state recovery, retry, and playback policy.
   - `service/AudioPlayerService.kt`: foreground playback service, media notification,
@@ -314,7 +306,7 @@ Security reminders:
     PCM-float conversion, UAC2 explicit feedback, coordinated AudioSink
     reconfiguration, dynamic transfer scaling, and backpressure stall recovery.
 
-- `app/src/main/java/moe/ouom/neriplayer/core/download/`
+- `app/src/main/java/com/lyra/player/core/download/`
   - `GlobalDownloadManager.kt`: global download tasks and downloaded song list.
   - `ManagedDownloadStorage.kt` is the facade for app-managed and SAF storage.
     Implementation details are split across `storage/commit/`, `delete/`, `lookup/`,
@@ -325,14 +317,14 @@ Security reminders:
   - `metadata/DownloadedAudioTagWriter.kt`: audio tag writing; `catalog/` owns
     downloaded-song catalog models.
 
-- `app/src/main/java/moe/ouom/neriplayer/core/startup/`
+- `app/src/main/java/com/lyra/player/core/startup/`
   - Startup stages and decisions are split across `app/`, `crash/`, `download/`,
     `logging/`, `permission/`, `player/`, `safemode/`, `sync/`, and `theme/`.
     `MainActivity` coordinates these components with the UI lifecycle.
 
-- `app/src/main/java/moe/ouom/neriplayer/data/`
+- `app/src/main/java/com/lyra/player/data/`
   - `model/`: shared `SongItem`, `SongIdentity`, and media model extensions used
-    by playback, playlists, downloads, sync, Listen Together, and UI.
+    by playback, playlists, downloads, sync, and UI.
   - `settings/`: `DataStore` settings, KSP schema, bootstrap snapshot, theme snapshot,
     and playback preference snapshot.
   - `auth/`: NetEase, Bilibili, and YouTube cookie/auth storage and validation.
@@ -353,27 +345,19 @@ Security reminders:
     and secure storage.
   - `sync/webdav/`: WebDAV sync, remote config, Worker, and WebDAV API.
 
-- `app/src/main/java/moe/ouom/neriplayer/listentogether/`
-  - `protocol/` defines room, event, and transport models; `network/` owns
-    HTTP/WebSocket and reconnect behavior; `playback/` owns queues, authoritative
-    stream links, and position sync. `control/`, `session/`, `invite/`, `mapping/`,
-    and `validation/` own their corresponding policies and boundaries.
-  - The root retains `ListenTogetherSessionManager.kt` and a few compatibility
-    entry points. New protocol logic should not keep accumulating in the root package.
-
 - `app/src/main/cpp/`
   - Native crash handling lives under `crash/`. USB code is split across
     `usb/exclusive/`, `usb/feedback/`, `usb/iso/`, `usb/pcm/`, `usb/uac1/`,
     and `usb/uac2/`, with matching host tests under `tests/usb/`.
 
-- `app/src/main/java/moe/ouom/neriplayer/core/lyricon/`
+- `app/src/main/java/com/lyra/player/core/lyricon/`
   - Lyricon integration and SuperLyric output for current song, playback state, position,
     word-level lyrics, and translations.
 
-- `app/src/main/java/moe/ouom/neriplayer/navigation/`
+- `app/src/main/java/com/lyra/player/navigation/`
   - `LauncherShortcuts.kt` maps app-icon shortcuts to navigation or playback requests.
 
-- `app/src/main/java/moe/ouom/neriplayer/widget/`
+- `app/src/main/java/com/lyra/player/widget/`
   - Home-screen playback widget providers, state snapshots, artwork-derived visuals,
     and RemoteViews updates.
 
@@ -485,8 +469,7 @@ Security reminders:
   explicit playback positions win, and the persisted field is `resumePositionMs`.
   This is not third-party playback history.
 - BilibiliSponsorBlock is disabled by default. It sends only a SHA-256 prefix of the
-  current BV ID and performs skips locally; it stays disabled during Listen Together,
-  and its public results must not enter sync or room state.
+  current BV ID and performs skips locally; its public results must not enter sync data.
 - 32-bit high-resolution system output preserves the high-precision pipeline on
   regular Android system output and bypasses loudness normalization, channel
   balance, audio visualization, and in-app speed processing. Check settings copy
@@ -506,18 +489,6 @@ Security reminders:
 - Local scan results may return quick metadata first and then hydrate richer
   title/artist/album/cover data in the background. Do not assume the first scan
   result is the final local metadata shape.
-- When `shareAudioLinks=false` in Listen Together, room snapshots and queue items
-  must not expose `streamUrl`. Turning the setting off must also clear any cached
-  shared candidates immediately, and `REQUEST_LINK` must be rejected.
-- Listen Together repeat/shuffle changes use `PLAYBACK_MODE` /
-  `REQUEST_PLAYBACK_MODE`. Member controls must validate the target stable track
-  key, reject older `clientInstanceId`/`clientSequence`/`clientTimeMs` events, and
-  limit `REQUEST_SET_TRACK` to the current queue.
-- The current Listen Together track keeps at most three deduplicated HTTP(S) candidates.
-  Listeners resolve their own quality policy first; candidates are only a session-scoped
-  fallback and must never be written to normal song or offline caches. Server position is
-  projected from track duration, with single-track repeat wrapping by duration; rejoining
-  with the same member credential must not trigger new-member auto-pause.
 
 ---
 
@@ -588,9 +559,9 @@ Use this for cover, lyrics, and track metadata completion, not for `Explore`.
    `explore_search_history_enabled` is off, Explore must hide the history and stop
    new records without silently deleting existing entries on toggle.
 10. Lyrics font size is now split between cover and lyrics pages, with separate
-   lyric and translation scales. When touching related UI, update
-   `SettingsRepository.lyricFontScalesFlow`, `setLyricFontScale(target, scale)`,
-   and the matching preview/playback call sites together.
+    lyric and translation scales. When touching related UI, update
+    `SettingsRepository.lyricFontScalesFlow`, `setLyricFontScale(target, scale)`,
+    and the matching preview/playback call sites together.
 
 #### 6. Modify USB exclusive playback
 
@@ -731,38 +702,9 @@ Use this for cover, lyrics, and track metadata completion, not for `Explore`.
    are active, update title/artist through one atomic snapshot and keep tests for
    track identity, field bounds, whitespace normalization, and duplicate suppression.
 
-#### 13. Modify Listen Together
+#### 13. Modify main navigation and glass transitions
 
-1. Android client logic is under `listentogether/`.
-2. Server logic is under `np-submodule/NeriPlayer-LTW`.
-3. Protocol field changes must stay compatible across the Android client and Worker,
-   and tests must be updated.
-4. When `shareAudioLinks=false`, HTTP and WebSocket room snapshots must not expose
-   `track.streamUrl` or `queue[*].streamUrl`, and turning the setting off must
-   clear any cached shared candidates immediately.
-5. `REQUEST_LINK` / `LINK_READY`, member control, controller-offline recovery,
-   and version-gated updates must be reviewed together so older state cannot
-   overwrite newer room state.
-6. Repeat/shuffle mode uses `PLAYBACK_MODE` / `REQUEST_PLAYBACK_MODE`. Member
-   requests and `LINK_READY` must validate the target stable track key so async
-   results cannot land on the wrong track.
-7. First joins require `joinSecret`; member reconnects require `memberSecret`.
-   Never persist either secret in sanitized room state or logs, and treat invite URI
-   `secret` values as sensitive input.
-8. Control events may carry `clientInstanceId`, `clientSequence`, and `clientTimeMs`.
-   The Worker filters stale order, and `REQUEST_SET_TRACK` can only select an item
-   already in the current queue. Keep the Android compatibility path aligned.
-9. Explicit member departure uses `/api/rooms/:roomId/leave`; the Worker removes
-   the member and broadcasts `MEMBER_LEFT`. A normal WebSocket close is transport
-   churn and must preserve the credential-bound member for reconnects; an explicit
-   controller departure closes the room.
-10. Treat the 6-character room ID, 1-24 character nickname, queue limit 2000,
-   and request de-duplication as protocol boundaries, not just UI validation details.
-11. Settings support custom server URLs and availability tests. Do not hard-code a single server.
-
-#### 14. Modify main navigation and glass transitions
-
-1. The production main-tab path is shared by `NeriApp.kt` and
+1. The production main-tab path is shared by `LyraApp.kt` and
    `MainTabLayerHost.kt`; tab order and direction come from
    `resolveMainTabTransitionDirection`.
 2. Keep both outgoing and incoming scenes alive during transitions and preserve
@@ -777,11 +719,11 @@ Use this for cover, lyrics, and track metadata completion, not for `Explore`.
 5. Cover forward, reverse, interrupted, repeated-request, state-restoration, and
    startup-first-frame behavior. Geometry tests must not treat an unlaid-out
    `Rect(0, 0, 0, 0)` scene as a real overlap.
-6. At minimum, check `NeriAppMainTabTransitionPolicyTest`,
-   `AdvancedGlassNavigationTransitionTest`, `NeriAppNavigationTransitionTest`,
-   and `HostNavigationTransitionGeometryTest`.
+6. At minimum, check `LyraAppMainTabTransitionPolicyTest`,
+   `AdvancedGlassNavigationTransitionTest`, and
+   `LyraAppNavigationIsolationPolicyTest`.
 
-#### 15. Modify home-screen widgets, launcher shortcuts, or global feedback
+#### 14. Modify home-screen widgets, launcher shortcuts, or global feedback
 
 1. Widget entry points live in `widget/PlaybackWidgetProviders.kt`; state and
    color extraction live in `PlaybackWidgetState.kt` and `PlaybackWidgetVisuals.kt`.
@@ -809,19 +751,19 @@ Use this for cover, lyrics, and track metadata completion, not for `Explore`.
 - A standalone `Debug` tab appears after enabling it.
 - Regular file logging is enabled only in Developer Mode.
 - Crash logs are written independently by `ExceptionHandler` / `NativeCrashHandler`.
-- The Debug tab contains YouTube, Bili, NetEase, Search, and Listen Together probes,
+- The Debug tab contains YouTube, Bili, NetEase, and Search probes,
   plus regular log and crash log viewers.
 
 Common command:
 
 ```bash
-adb logcat | findstr NeriPlayer
+adb logcat | findstr LyraPlayer
 ```
 
 Linux / macOS:
 
 ```bash
-adb logcat | grep NeriPlayer
+adb logcat | grep LyraPlayer
 ```
 
 ---
@@ -872,17 +814,9 @@ Before submitting, consider at least these checks:
    The host gate runs one fixed CTest inventory. The Android build must also
    produce non-empty `lib_neri.so` outputs for `arm64-v8a`, `armeabi-v7a`,
    `x86`, and `x86_64`.
-7. If you changed the Listen Together Worker:
-   ```bash
-   npm ci --prefix np-submodule/NeriPlayer-LTW
-   npm run check --prefix np-submodule/NeriPlayer-LTW
-   ```
-   `npm run check` runs `node --check`, protocol tests, and
-   `wrangler deploy --dry-run`. Protocol or room-state changes still need real
-   create/join/WebSocket flow verification.
-8. Add unit tests under `app/src/test/`.
+7. Add unit tests under `app/src/test/`.
    Add device or Compose UI tests under `app/src/androidTest/`.
-9. If behavior changes affect README, settings copy, user flows, or sync formats,
+8. If behavior changes affect README, settings copy, user flows, or sync formats,
    update documentation in the same PR.
 
 Existing focused tests cover areas such as:
@@ -893,8 +827,7 @@ Existing focused tests cover areas such as:
 - USB-exclusive keep-alive, startup watchdogs, foreground/background recovery,
   32-bit/float output, UAC2 explicit feedback, long-gap clock reacquisition,
   coordinated reconfiguration, Runtime Report v2, deferred-refresh retry,
-  backpressure recovery, USB attach handling, and
-  audio-focus policies
+  backpressure recovery, USB attach handling, and audio-focus policies
 - Dual-scene main-tab transitions, rapid reverse switching, drawer/coherent
   detail feedback, glass-owner isolation, and unlaid-out scene geometry filtering
 - Home-screen widget state/color/RemoteViews resources, launcher shortcut mapping,
@@ -906,12 +839,7 @@ Existing focused tests cover areas such as:
   legacy playlist-order migration, deletion policy, playback-stat rolling windows,
   aggregate-total merging, legacy bucket-only compatibility,
   WebDAV concurrency fallback, atomic writes, and upload retry
-- Long-form progress thresholds, explicit-position precedence, BilibiliSponsorBlock
-  local skips, and its Listen Together disable policy
-- Listen Together base URL validation, version gating, repeat/shuffle modes,
-  stable-track-key target validation, session-only playback candidates, invite/member secrets,
-  explicit leave/reconnect behavior, event ordering, playback sync planning,
-  session control/cancellation, and protocol compatibility
+- Long-form progress thresholds, explicit-position precedence, and BilibiliSponsorBlock local skips
 - Lyrics UI, Japanese kana translation spacing, word timing, external Bluetooth lyrics,
   playback sound controls, and playback policies
 - Config backup, generated settings, security guards, crash log files, and safe-mode behavior
@@ -942,7 +870,7 @@ Commit messages should follow Conventional Commits when possible, for example:
 - By submitting contributions, you agree to distribute your changes at least
   under GPL-3.0.
 - The alternative license in `app/src/main/cpp/README.md` covers only the listed
-  NeriPlayer-owned native source, not third-party code or other repository content.
+  original NeriPlayer-owned native source, not third-party code or other repository content.
 - A native PR does not itself grant the alternative license. Contributors who
   agree to dual licensing must record the README's statement in the PR, commit,
   or another auditable form accepted by the copyright holder.
@@ -954,7 +882,7 @@ Commit messages should follow Conventional Commits when possible, for example:
 
 ### Communication
 
-- [Issues](https://github.com/cwuom/NeriPlayer/issues): bugs, feature requests, and discussions
+- Issues: bugs, feature requests, and discussions (see this repository's Issues page)
 - [README_EN.md](./README_EN.md): features and usage
 - [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md): community code of conduct
 

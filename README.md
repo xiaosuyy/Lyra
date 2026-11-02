@@ -1,43 +1,28 @@
 [English](./README_EN.md) | [中文](./README.md)
 
-<h1 align="center">NeriPlayer (音理音理!)</h1>
+<h1 align="center">Lyra</h1>
 
 <div align="center">
 
 <h3>✨ 一个把多源在线播放、本地管理、歌词体验和自建同步做进原生 Android 的音频播放器 🎵</h3>
 
 <p>
-  <a href="https://github.com/cwuom/NeriPlayer/releases">
-    <img alt="Downloads" src="https://img.shields.io/github/downloads/cwuom/NeriPlayer/total?style=social" />
-  </a>
-  <a href="https://github.com/cwuom/NeriPlayer/releases">
-    <img alt="Release" src="https://img.shields.io/github/v/release/cwuom/NeriPlayer?include_prereleases&label=Release" />
-  </a>
   <img alt="Android 9+" src="https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white" />
-  <a href="https://t.me/ouom_pub">
-    <img alt="Telegram" src="https://img.shields.io/badge/Telegram-@ouom__pub-blue" />
-  </a>
-  <a href="https://t.me/neriplayer_ci">
-    <img alt="CI Builds" src="https://img.shields.io/badge/CI_Builds-@neriplayer__ci-orange" />
-  </a>
 </p>
 
 <p>
-  <img src="icon/neriplayer.svg" width="260" alt="NeriPlayer logo" />
+  <img src="icon/lyra.png" width="260" alt="Lyra logo" />
 </p>
 
 <p>
-本项目的名称及图标灵感来源于《星空鉄道とシロの旅》中的角色「风又音理」。
+Lyra 是一个本地优先的原生 Android 音频播放器，围绕「多源探索、在线播放、本地可控、数据自持」持续打磨。
 </p>
 
 <p>
-项目采用原生 Android 开发，支持 Android 9 (API 28) 及以上设备，
-围绕「多源探索、在线播放、本地可控、数据自持」持续打磨。
+项目采用原生 Android 开发，支持 Android 9 (API 28) 及以上设备。
 </p>
 
 🛠️ <strong>Active development / 持续迭代中</strong>
-
-<a href="https://trendshift.io/repositories/23906" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23906" alt="cwuom%2FNeriPlayer | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 </div>
 
@@ -51,7 +36,7 @@
 ---
 
 > [!NOTE]
-> NeriPlayer 不提供公共云端曲库或媒体分发服务。
+> Lyra 不提供公共云端曲库或媒体分发服务。
 > 在线音频能力依赖用户在第三方平台上的账号授权，
 > 会员或受限内容仍需遵循原平台规则。
 > 文档中提到的 YouTube Music 相关能力仅指账号会话、播放兼容和错误恢复，
@@ -65,11 +50,11 @@
 如果你想了解项目能力，请看 [项目亮点](#项目亮点--why-it-stands-out)
 和 [核心特性](#核心特性--key-features)。
 如果你准备贡献代码，请直接阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。
-如果你要自建一起听服务端，请看
-[一起听服务端部署](#一起听服务端部署--listen-together-deployment)。
+如果你是从 NeriPlayer / BlueBlue 迁移而来，请阅读
+[改名与重构说明](./docs/REFACTOR_LYRA.md)。
 
 ```text
-NeriPlayer
+Lyra
 ├── 多源在线播放：网易云 / Bilibili / YouTube Music
 ├── 本地优先数据：缓存、下载、歌单、历史、统计、设置
 ├── 可选自有同步：GitHub / WebDAV 元数据同步
@@ -79,7 +64,7 @@ NeriPlayer
 
 ## 项目简介 / About
 
-NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
+Lyra 是一个基于 **Jetpack Compose + Media3** 的原生 Android
 音频播放器。它不构建公共云端服务，而是在用户具备第三方平台账号能力的前提下，
 整合 **网易云音乐**、**Bilibili** 与 **YouTube Music** 的在线内容，
 并提供本地播放、下载、缓存、歌单管理和多种同步/备份能力。
@@ -95,14 +80,14 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
   数据写入用户自己控制的 GitHub/WebDAV 远端，而不是上传到项目维护者的中心化服务。
   应用并非没有能力把播放历史回写到第三方音乐平台；但中心化音乐平台的客户端
   通常存在风控与行为采样机制，直接上报历史播放数据可能触发异常登录、异常播放
-  或账号冻结等风险。出于保护账号安全的考虑，NeriPlayer 暂不向这些平台上传
+  或账号冻结等风险。出于保护账号安全的考虑，Lyra 暂不向这些平台上传
   本地播放历史和播放统计。
 - **单 Activity + Compose 架构**：`MainActivity` 是唯一对外入口，
   UI 由 Compose `NavHost`、动态底栏、Mini Player 与 Now Playing 覆盖层组织。
 - **启动与恢复链路**：正常启动流程为
   `Loading -> Disclaimer -> Onboarding -> Main`；
   如果上次启动发生崩溃或系统 ANR，会先进入 `Safe Mode`。
-- **测试护栏**：下载存储、同步合并、YouTube 播放兼容、一起听、歌词解析、
+- **测试护栏**：下载存储、同步合并、YouTube 播放兼容、歌词解析、
   播放策略、配置备份与安全模式等关键链路都有对应单元测试或设备测试。
 
 ---
@@ -183,7 +168,7 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
   平台歌单缓存、下载内容、日志、崩溃报告和核心应用数据分组统计；
   清缓存支持只清可再生成的缓存，不会把用户主动下载的歌曲当作缓存删掉。
 - **去中心化同步与播放统计**：
-  NeriPlayer 不提供公共云端曲库或开发者托管账号数据；
+  Lyra 不提供公共云端曲库或开发者托管账号数据；
   GitHub/WebDAV 同步只在用户自己的远端保存歌单、收藏、最近播放和
   播放统计等元数据。`PlaybackStatsRepository` 按歌曲稳定身份记录播放次数、
   收听时长、最近播放和每日桶，并参与同步合并；播放和流量统计采用延迟批量写入，
@@ -213,17 +198,6 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
   ANR trace；`ExceptionHandler` 与 `NativeCrashHandler` 分别记录 JVM 和
   Native 崩溃。上次启动异常时，`SafeModeManager` 可跳过完整应用初始化，
   直接进入安全模式预览、复制或导出日志。
-- **一起听不是“同步一个进度条”这么简单**：
-  客户端和 Cloudflare Worker 共同维护房间、角色、队列、播放状态、
-  循环/随机模式、房主离线恢复、成员控制请求、会话播放候选共享、版本门控更新和自定义服务端地址；
-  客户端还会估算服务端时钟偏移、按漂移阈值校正进度，并在会话候选异步返回后
-  重载权威音源，避免本地待启动状态覆盖房间的暂停或播放指令；
-  邀请链接必须包含首次加入所需的房间密钥，成员密钥不会出现在公开房间状态中；
-  本地歌曲不能创建或替换一起听房间当前曲目；开启会话候选共享后，房主当前歌曲的候选播放地址会由
-  Durable Object 临时缓存，听众可在成员会话内取得当前候选而无需等待房主再次响应；当前曲目最多保留三条
-  经校验的候选，听众始终先按本机音质策略解析，失败后才在会话内回退，候选不会写入歌曲
-  或离线缓存；同一成员凭据重连不会触发成员变更暂停，房主和听众都会定期保活连接；
-  服务端使用 Durable Objects 持久化房间状态，并通过 WebSocket 做实时同步。
 
 ---
 
@@ -231,7 +205,7 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
 
 ### a. 下载 Release 版本（推荐）
 
-1. 前往 [GitHub Releases](https://github.com/cwuom/NeriPlayer/releases)
+1. 前往本仓库的 GitHub Releases 页面下载最新版本。
 2. 如何选择版本？
 - 大部分手机请选择 `arm64-v8a`
 - 老旧 32 位设备请选择 `armeabi-v7a`
@@ -243,9 +217,8 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
 
 ### b. 下载 CI 版本
 
-1. 前往 [GitHub Actions](https://github.com/cwuom/NeriPlayer/actions)
+1. 前往本仓库的 GitHub Actions 页面，
    下载最近一次成功构建的 Artifacts 并解压。
-2. 或访问 [NeriPlayer CI Builds](https://t.me/neriplayer_ci)。
 
 > master 分支 CI 默认上传 `arm64-v8a` APK；手动 Release 流程会构建多 ABI APK。
 
@@ -253,8 +226,8 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
 
 1. 克隆仓库并初始化子模块：
    ```bash
-   git clone --recursive https://github.com/cwuom/NeriPlayer.git
-   cd NeriPlayer
+   git clone --recursive <本仓库地址>
+   cd Lyra
    ```
 2. 使用 Android Studio 最新稳定版打开项目并同步依赖。
 3. 构建调试版：
@@ -313,11 +286,10 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
   `player.js`/PoToken 缓存和优先级预取；签名或播放候选被拒时可回退 EJS/HLS。
 - ⏩ **可选 BilibiliSponsorBlock 自动跳过**：默认关闭。开启后仅向公开接口发送当前
   BV 号的 SHA-256 前缀，按分 P 和时长筛选 `intro`、`outro`、`sponsor`、
-  `music_offtopic`、`filler`、`padding` 片段并在本地跳转；不会上传账号、播放历史或新片段。一起听期间保持关闭，
-  避免房间播放状态漂移。
+  `music_offtopic`、`filler`、`padding` 片段并在本地跳转；不会上传账号、播放历史或新片段。
 - ⏭️ **Bilibili 自定义跳过区间**：可从正在播放的更多选项或 Bilibili 收藏夹/合集条目
   管理同一视频分 P 的多个区间；规则按 `BVID + CID` 本地持久化，并通过 GitHub/WebDAV
-  同步。播放页可使用设为开始/结束、前后 5 秒及播放/暂停辅助定位；一起听期间不应用本地自动跳过，避免房间状态漂移。
+  同步。播放页可使用设为开始/结束、前后 5 秒及播放/暂停辅助定位。
 - 🔁 **网易云播放兜底**：
   网易云歌曲无权限、无可用播放结果或仅返回试听片段时，会先尝试降低音质；
   Bilibili 和本地音频兜底默认关闭，只有用户主动开启后，才会按歌曲名、歌手和时长
@@ -350,7 +322,7 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
   协调式 AudioSink 重建、动态传输扩缩容和软恢复尽量拉回，
   必要时回退到系统播放避免整条链路卡死；播放器会按网络或本地来源选择唤醒策略，
   前后台切换后可恢复 USB 独占，启用比特完美音量时软件增益固定为 0 dB。
-  设置页会显示后台行为是否受电池优化或后台权限限制；服务端播放保持时，后台音频锚点
+  设置页会显示后台行为是否受电池优化或后台权限限制；后台音频锚点
   会根据实际输出路由选择静音或零均值载波，并通过 MediaSession 提供远程音量控制，
   不会把载波当作用户可听内容。
 - 💾 **可配置流媒体缓存**：
@@ -410,21 +382,7 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
   在移动网络或漫游环境下下载时可主动提示风险。
 - ♻️ **备份与恢复**：
   支持歌单 JSON 导入/导出；也支持完整配置导入/导出，
-  可迁移设置、语言、平台授权、GitHub/WebDAV 配置与一起听设置。
-- 🎧 **一起听**：
-  支持创建房间或加入他人房间，通过 WebSocket 实时同步播放状态，
-  支持房主/听众权限、成员控制开关、成员加入或显式离开时可自动暂停、同一成员重连不暂停、循环/随机模式同步、
-  可选共享房主解析的会话播放候选、邀请链接、深链加入、自定义服务端和房主离线检测；首次加入必须
-  提供邀请密钥，成员重连使用成员密钥。房主可分别复制邀请信息和邀请密钥；点击加入会从
-  剪贴板读取有效邀请，无有效邀请时不会入房。本地歌曲不能建房或替换房间当前曲目；会话候选共享
-  开启时，Worker 只公开并缓存当前曲目的房主候选，听众可直接取得缓存，关闭共享会清空缓存；
-  当前曲目最多保留 3 条候选，听众先按本机音质策略解析并优先尝试本机候选，本机候选
-  无法启动时再在本次会话内依次回退；候选不会写入歌曲或离线缓存。随机模式会提交并
-  复用发起端已经生成的真实队列顺序，关闭随机时恢复顺序；队列拖动、添加和删除会以
-  房间版本化操作合并，双方同时操作时保留可重放的意图，纯重排不会重载当前歌曲。
-  房间会按当前曲目时长推算服务端位置，单曲循环会按时长回绕，模式切换会重新锚定进度；
-  控制事件按客户端顺序过滤，`REQUEST_SET_TRACK` 只能选择当前队列歌曲，并继续校验稳定
-  曲目键和服务端时钟。
+  可迁移设置、语言、平台授权与 GitHub/WebDAV 配置。
 - 🌈 **个性化与主题**：
   支持自动/浅色/深色模式、动态取色、种子色、主题风格、UI 缩放、
   自定义背景图、触感反馈、歌词字号（封面页和歌词页可分别调整）、
@@ -465,7 +423,7 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
   歌曲分享支持 Xiaomi Super Island 链接。
 - 🛠️ **开发者模式与调试工具**：
   设置页连续点击版本号 **7 次** 后，底栏出现 `Debug` 页，
-  包含 YouTube / Bili / Netease / Search / Listen Together 探针、
+  包含 YouTube / Bili / Netease / Search 探针、
   普通日志与崩溃日志查看器。
 - 🧾 **登录与日志更友好**：
   支持网易云 / Bilibili 二维码登录与网页登录兜底；
@@ -509,7 +467,7 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
 - NDK `27.0.12077973`
 - CMake `3.28.0+`
 - 版本名格式：`<git短哈希>.<MMddHHmm>`
-- Release APK 文件名：`NeriPlayer-<versionName>[-abi].apk`
+- Release APK 文件名：`Lyra-<versionName>[-abi].apk`
 - 默认 Release 只构建 `arm64-v8a`；多 ABI 构建需加
   `-PbuildAllReleaseAbis=true`
 - `.github/workflows/android_native_ci.yml` 会在 Native 相关变更时运行
@@ -518,18 +476,17 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
 
 ### 模块结构
 
-- `:app`：主 Android 应用。
+- `:app`：主 Android 应用（包名 `com.lyra.player`）。
 - `:ksp-annotations` / `:ksp-processor`：设置项自动登记与生成。
 - `:accompanist-lyrics-core` / `:accompanist-lyrics-ui`：歌词解析与 Compose 歌词 UI 子模块。
 - `build-logic`：统一 Gradle convention plugin。
 - `buildSrc`：保留的辅助 Gradle 构建逻辑模块。
-- `np-submodule/NeriPlayer-LTW`：一起听 Cloudflare Workers 服务端。
 - `np-submodule/miuix`：仓库内附带的上游 Miuix 源码/文档树，当前不参与主应用模块构建。
 
 ### 入口与导航
 
 - `MainActivity` 是唯一对外入口，同时处理启动流程、通知权限、
-  外部音频导入、USB 设备插入事件和 `neriplayer://listen-together/join` 深链。
+  外部音频导入和 USB 设备插入事件。
 - 如果上次启动发生 JVM / Native 崩溃或系统 ANR，会优先进入 `Safe Mode`，
   只开放日志预览导出、配置导出、登录重置、设置重置和恢复正常启动。
 - 主界面是 **Compose NavHost + 动态底栏**：
@@ -673,38 +630,9 @@ NeriPlayer 是一个基于 **Jetpack Compose + Media3** 的原生 Android
 
 ---
 
-## 一起听服务端部署 / Listen Together Deployment
-
-NeriPlayer 内置“一起听”功能。你可以快速部署自己的服务端，
-也可以使用他人部署的服务。
-
-服务端源码与部署入口：
-
-- 当前仓库内的 `np-submodule/NeriPlayer-LTW`
-- 公开部署模板：
-  [TheSmallHanCat/NeriPlayer-LTW](https://github.com/TheSmallHanCat/NeriPlayer-LTW)
-
-服务端基于 **Cloudflare Workers** 和 **Durable Objects**，
-通过 WebSocket 提供实时同步。
-
-### 一键部署到 Cloudflare Workers
-
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/TheSmallHanCat/NeriPlayer-LTW)
-
-应用内可在设置页配置一起听服务端地址、测试可用性，并重置本机一起听身份。
-
-补充说明：
-
-- 房间号固定为 6 位可读字符，昵称长度为 1-24，当前允许中文、英文字母和数字
-- 首次加入必须使用邀请链接中的密钥；本地歌曲不能创建一起听房间
-- 更完整的协议、事件和部署细节请看
-  [np-submodule/NeriPlayer-LTW/README.md](./np-submodule/NeriPlayer-LTW/README.md)
-
----
-
 ## GitHub 同步 / GitHub Sync
 
-NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**。
+Lyra 支持将本地元数据同步到 **用户自己的 GitHub 仓库**。
 应用内新建仓库时默认创建为私有仓库，也支持接入已有仓库。
 
 当前同步对象包括：
@@ -754,7 +682,7 @@ NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**�
 
 ## WebDAV 同步 / WebDAV Sync
 
-除 GitHub 外，NeriPlayer 也支持将同一套同步数据保存到 WebDAV 远端文件。
+除 GitHub 外，Lyra 也支持将同一套同步数据保存到 WebDAV 远端文件。
 
 - 同步对象与 GitHub 同步一致。
 - 支持自动同步和手动立即同步。
@@ -785,9 +713,6 @@ NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**�
 - [x] Bilibili 分 P、合集分享和 `season_id` 链接识别
 - [x] 日语假名歌词的翻译行间距优化
 - [x] 编辑歌词时选择平台手动匹配歌词，结果临时缓存并优先展示逐字候选
-- [x] 一起听循环/随机模式同步、服务端时钟偏移估算与权威会话候选恢复
-- [x] 一起听按曲目时长推算位置、单曲循环位置回绕和最多三条会话候选
-- [x] 一起听邀请/成员密钥、控制事件顺序过滤和队列内曲目选择约束
 - [x] 32-bit 高解析普通输出、PCM float 声道平衡和响度均衡线程安全状态
 - [x] USB 独占前后台恢复、播放唤醒策略和比特完美音量设置
 - [x] USB 独占 UAC2 显式反馈、长调度间隙重捕获、协调式 AudioSink 重配和 Runtime Report v2
@@ -795,13 +720,12 @@ NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**�
 - [x] USB 独占 32-bit PCM、UAC2.0 Type I PCM 兼容路径、原地重配置、动态传输扩缩容和背压卡顿恢复
 - [x] GitHub/WebDAV 异常同步快照、缺字段歌曲和删除记录兼容清洗
 - [x] GitHub/WebDAV JSON、原始 GZIP 与历史 Base64 同步格式兼容读取
-- [x] 播放器、下载存储、启动流程、歌词组件和一起听客户端按职责拆分子包
+- [x] 播放器、下载存储、启动流程和歌词组件按职责拆分子包
 - [x] 本地歌单显示顺序版本化及 GitHub/WebDAV 旧同步数据兼容迁移
 - [x] USB 独占播放的设备选择、质量策略、后台运行提醒和多层自动恢复
 - [x] 本地扫描快速预览、后台元信息补全与封面回退
 - [x] 本地扫描按已有元信息过滤预览，以及长音频进度记忆与完成清零
 - [x] BilibiliSponsorBlock 可选自动跳过和 Now Playing 紧凑布局/歌词范围选择
-- [x] 一起听会话候选共享开关、异步播放候选解析和更稳的房间同步
 - [x] 歌词长按选择、复制、歌曲分享和歌词卡片生成
 - [x] 歌词音译显示与歌词行为面板
 - [x] Lyricon/SuperLyric 独立 200 ms 进度推送、歌词翻译匹配和 Super Island 分享链接
@@ -842,7 +766,7 @@ NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**�
 
 ---
 
-感谢使用 NeriPlayer。由于项目功能较多且用户运行环境复杂，
+感谢使用 Lyra。由于项目功能较多且用户运行环境复杂，
 可能会出现符合预期的差异或异常情况。若您在运行中遇到任何问题，
 欢迎随时提交反馈，我们将持续优化。
 
@@ -852,15 +776,15 @@ NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**�
 
 - 反馈前建议先开启开发者模式（设置页点击 **版本号** 7 次）。
 - 开发者模式开启后，应用会启用普通文件日志；崩溃日志会单独落盘。
-- 前往 [Issues](https://github.com/cwuom/NeriPlayer/issues)，提供：
+- 前往本仓库的 Issues 页面，提供：
   系统版本、机型、应用版本、复现步骤与关键日志。
 - Windows 可使用以下命令过滤日志：
   ```bash
-  adb logcat | findstr NeriPlayer
+  adb logcat | findstr lyra.player
   ```
 - Linux / macOS 可使用：
   ```bash
-  adb logcat | grep NeriPlayer
+  adb logcat | grep lyra.player
   ```
 
 ---
@@ -896,13 +820,13 @@ NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**�
 - GitHub 同步通过仓库 Git Data API 提交二进制正文；并发分支更新失败时会报告冲突，
   不会强制覆盖远端提交。
 - 长音频进度记忆不覆盖显式播放位置，也不会代替第三方平台的播放历史；
-  BilibiliSponsorBlock 需要访问公开接口，且一起听期间保持关闭。
+  BilibiliSponsorBlock 需要访问公开接口。
 
 ---
 
 ## 隐私与数据 / Privacy
 
-- NeriPlayer 不提供自己的公共云端媒体分发服务，也不接入广告 SDK、
+- Lyra 不提供自己的公共云端媒体分发服务，也不接入广告 SDK、
   第三方统计或崩溃分析 SDK。
 - 项目采用去中心化的数据策略：同步目标由用户自己选择和保管，
   不会把个人媒体数据汇聚到维护者控制的中心化平台。
@@ -956,6 +880,9 @@ NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**�
 </tr>
 </table>
 
+本项目由 [NeriPlayer](https://github.com/cwuom/NeriPlayer) 改名而来，
+原项目及社区的探索与积累是 Lyra 的起点。
+
 ---
 
 ## 更新周期 / Update Cycle
@@ -975,13 +902,13 @@ NeriPlayer 支持将本地元数据同步到 **用户自己的 GitHub 仓库**�
 
 ## 许可证 / License
 
-NeriPlayer 使用 **GPL-3.0** 开源许可证发布。
+Lyra 使用 **GPL-3.0** 开源许可证发布。
 
 这意味着：
 
 - ✅ 你可以自由使用、修改和分发本软件。
 - ⚠️ 按根目录 GPL-3.0 分发修改版时，须继续遵守 GPL-3.0。
-- 🧩 `app/src/main/cpp/README.md` 仅为其中列出的 NeriPlayer 自有 Native 源码
+- 🧩 `app/src/main/cpp/README.md` 仅为其中列出的原 NeriPlayer 项目自有 Native 源码
   提供附带署名条件的替代授权；第三方源码和未列入范围的仓库内容不适用。
 - ✍️ 外部 Native 贡献不会因提交 PR 自动进入替代授权范围，
   只有贡献者明确记录双授权同意时才适用。
@@ -989,16 +916,6 @@ NeriPlayer 使用 **GPL-3.0** 开源许可证发布。
 
 ---
 
-# Contributing to NeriPlayer / 贡献指南
+# Contributing to Lyra / 贡献指南
 
 贡献前请先阅读完整的 [CONTRIBUTING.md](./CONTRIBUTING.md)。
-
----
-
-<p align="center">
-  <img src="https://moe-counter.lxchapu.com/:neriplayer?theme=moebooru" alt="访问计数 (Moe Counter)">
-  <br/>
-  <a href="https://starchart.cc/cwuom/NeriPlayer">
-    <img src="https://starchart.cc/cwuom/NeriPlayer.svg" alt="Star 历史趋势图">
-  </a>
-</p>
