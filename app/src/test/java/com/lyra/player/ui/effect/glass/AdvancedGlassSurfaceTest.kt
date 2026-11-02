@@ -63,7 +63,7 @@ class AdvancedGlassSurfaceTest {
     }
 
     @Test
-    fun prewarmedInactiveNavigationOwnerSuppressesItsGlassSurfaceDuringOnboarding() {
+    fun prewarmedInactiveNavigationOwnerSuppressesItsGlassSurface() {
         assertTrue(
             shouldSuppressAdvancedGlassSurfaceForInactiveNavigationOwner(
                 suppressInactiveNavigationSurface = true,
