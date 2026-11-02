@@ -114,7 +114,7 @@ class ConfigTransferViewModel : ViewModel() {
     }
 
     fun generateBackupFileName(): String {
-        return configFileManager?.generateBackupFileName() ?: "neriplayer_config.json"
+        return configFileManager?.generateBackupFileName() ?: "lyra_config.json"
     }
 
     fun generateConfigFileName(): String = generateBackupFileName()

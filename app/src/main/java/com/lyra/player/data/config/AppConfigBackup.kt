@@ -11,7 +11,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import com.lyra.player.data.sync.DEFAULT_SYNC_AUTO_ENABLED
 
-private const val CONFIG_FILE_PREFIX = "neriplayer_config"
+private const val CONFIG_FILE_PREFIX = "lyra_config"
 private const val CONFIG_FILE_EXTENSION = ".json"
 private const val CONFIG_KIND = "moe.ouom.neriplayer.config"
 private const val CONFIG_FORMAT_VERSION = 1

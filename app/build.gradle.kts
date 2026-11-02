@@ -70,7 +70,7 @@ android {
         applicationId = "com.lyra.player"
 
         buildConfigField("String", "BUILD_UUID", "\"${buildUUID}\"")
-        buildConfigField("String", "TAG", "\"[NeriPlayer]\"")
+        buildConfigField("String", "TAG", "\"LyraPlayer\"")
         buildConfigField("long", "BUILD_TIMESTAMP", "${System.currentTimeMillis()}L")
 
         // 自定义渠道搜索的易失效 / 敏感配置，允许在构建时通过 Gradle 属性覆盖：

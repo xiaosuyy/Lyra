@@ -101,11 +101,6 @@ reviews:
         thread safety, undefined behavior, JNI lifetime rules, and Android ABI
         compatibility. Ignore stylistic C/C++ preferences and refactors unless
         they fix a demonstrated correctness or safety defect.
-    - path: "np-submodule/NeriPlayer-LTW/**"
-      instructions: |
-        Review only protocol compatibility, authorization, input validation,
-        state consistency, cache invalidation, and async error handling.
-        Do not report JavaScript style preferences or request broad rewrites.
     - path: ".github/workflows/**"
       instructions: |
         Flag only trigger gaps, permission escalation, secret exposure,

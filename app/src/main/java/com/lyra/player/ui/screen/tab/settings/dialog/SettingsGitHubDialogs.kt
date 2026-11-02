@@ -75,7 +75,7 @@ internal fun SettingsGitHubDialogs(
         val githubState by githubVm.uiState.collectAsStateWithLifecycleCompat()
         var githubToken by remember(showGitHubConfigDialog) { mutableStateOf("") }
         var githubRepoName by remember(showGitHubConfigDialog) {
-            mutableStateOf("neriplayer-backup")
+            mutableStateOf("lyra-backup")
         }
         var useExistingRepo by remember(showGitHubConfigDialog) { mutableStateOf(false) }
         var existingRepoName by remember(showGitHubConfigDialog) { mutableStateOf("") }

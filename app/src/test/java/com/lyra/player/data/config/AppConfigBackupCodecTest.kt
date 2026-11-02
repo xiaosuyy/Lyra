@@ -67,7 +67,7 @@ class AppConfigBackupCodecTest {
     fun `generated filename uses config prefix and json suffix`() {
         val fileName = AppConfigBackupCodec.generateFileName(0L)
 
-        assertTrue(fileName.startsWith("neriplayer_config_"))
+        assertTrue(fileName.startsWith("lyra_config_"))
         assertTrue(fileName.endsWith(".json"))
     }
 
