@@ -9,7 +9,7 @@
 
     <style name="Theme.Lyra.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#FF121212</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_neriplayer_splash</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_lyra_splash</item>
         <item name="postSplashScreenTheme">@style/Theme.Lyra</item>
     </style>
 </resources>
