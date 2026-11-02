@@ -1,19 +1,19 @@
 "use strict";
 
 /*
- * NeriPlayer 自定义源（音源脚本）运行环境
+ * LyraPlayer 自定义源（音源脚本）运行环境
  *
  * 这里对齐 lx-music 的自定义源 API：
  *   globalThis.lx = { EVENT_NAMES, request, send, on, utils, currentScriptInfo, version, env }
  * 脚本通过 send(EVENT_NAMES.inited, { sources }) 声明音源，
  * 通过 on(EVENT_NAMES.request, handler) 响应 musicUrl 等请求。
  *
- * 与原生（Kotlin）之间通过 window.NeriSource 同步桥接：网络请求、md5 由原生完成。
+ * 与原生（Kotlin）之间通过 window.LyraSource 同步桥接：网络请求、md5 由原生完成。
  */
 (function () {
-    var bridge = window.NeriSource
+    var bridge = window.LyraSource
     if (!bridge) {
-        console.log('NeriSource bridge missing')
+        console.log('LyraSource bridge missing')
         return
     }
     console.log('preload starting, bridge ready')

@@ -1,0 +1,30 @@
+package com.lyra.player.core.player.model
+
+/*
+ * LyraPlayer - A unified Android player for streaming music and videos from multiple online platforms.
+ * Copyright (C) 2025-2025 LyraPlayer developers
+ * https://github.com/cwuom/Lyra
+ *
+ * This software is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This software is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this software.
+ * If not, see <https://www.gnu.org/licenses/>.
+ *
+ * File: com.lyra.player.core.player.model/PlayerEvent
+ * Updated: 2026/3/23
+ */
+
+/** 用于封装播放器需要通知 UI 的事件 */
+sealed class PlayerEvent {
+    data class ShowLoginPrompt(val message: String) : PlayerEvent()
+    data class ShowError(val message: String) : PlayerEvent()
+}

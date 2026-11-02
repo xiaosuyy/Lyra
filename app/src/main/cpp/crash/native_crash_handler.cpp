@@ -21,7 +21,7 @@
 
 namespace {
 
-constexpr char kLogTag[] = "NeriNativeCrash";
+constexpr char kLogTag[] = "LyraNativeCrash";
 constexpr char kPendingStartupCrashFlag[] = "pending_startup_crash.flag";
 constexpr size_t kAltStackSize = 64 * 1024;
 constexpr size_t kMaxPathLength = 1024;
@@ -1004,7 +1004,7 @@ static void NativeCrashHandlerTriggerTestCrash(jint crash_type) {
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_util_crash_NativeCrashHandler_nativeInstall(
+Java_com_lyra_player_util_crash_NativeCrashHandler_nativeInstall(
     JNIEnv* env,
     jclass,
     jstring crash_directory,
@@ -1032,7 +1032,7 @@ Java_moe_ouom_neriplayer_util_crash_NativeCrashHandler_nativeInstall(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_moe_ouom_neriplayer_util_crash_NativeCrashHandler_nativeTriggerTestCrash(
+Java_com_lyra_player_util_crash_NativeCrashHandler_nativeTriggerTestCrash(
     JNIEnv*,
     jclass,
     jint crash_type

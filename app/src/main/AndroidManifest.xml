@@ -39,13 +39,13 @@
         android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.NeriPlayer.Starting"
-        android:name=".NeriPlayerApplication"
+        android:theme="@style/Theme.Lyra.Starting"
+        android:name=".LyraApplication"
         tools:targetApi="33">
 
         <meta-data android:name="lyricon_module" android:value="true" />
-        <meta-data android:name="lyricon_module_author" android:value="NeriPlayer" />
-        <meta-data android:name="lyricon_module_description" android:value="NeriPlayer Lyricon Provider" />
+        <meta-data android:name="lyricon_module_author" android:value="Lyra" />
+        <meta-data android:name="lyricon_module_description" android:value="LyraPlayer Lyricon Provider" />
         <meta-data
             android:name="lyricon_module_tags"
             android:resource="@array/lyricon_module_tags" />
@@ -104,7 +104,7 @@
             android:process=":netease_login"
         >
             <intent-filter>
-                <action android:name="moe.ouom.neriplayer.action.CLEAR_WEBVIEW_LOGIN_STATE" />
+                <action android:name="com.lyra.player.action.CLEAR_WEBVIEW_LOGIN_STATE" />
             </intent-filter>
         </receiver>
         <activity
@@ -125,7 +125,7 @@
             android:process=":bili_web_login"
         >
             <intent-filter>
-                <action android:name="moe.ouom.neriplayer.action.CLEAR_WEBVIEW_LOGIN_STATE" />
+                <action android:name="com.lyra.player.action.CLEAR_WEBVIEW_LOGIN_STATE" />
             </intent-filter>
         </receiver>
         <activity
@@ -140,11 +140,11 @@
             android:process=":youtube_web_login"
         >
             <intent-filter>
-                <action android:name="moe.ouom.neriplayer.action.CLEAR_WEBVIEW_LOGIN_STATE" />
+                <action android:name="com.lyra.player.action.CLEAR_WEBVIEW_LOGIN_STATE" />
             </intent-filter>
         </receiver>
         <service
-            android:name="moe.ouom.neriplayer.core.player.service.AudioPlayerService"
+            android:name="com.lyra.player.core.player.service.AudioPlayerService"
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="mediaPlayback">
@@ -162,7 +162,7 @@
         </receiver>
 
         <receiver
-            android:name=".widget.NeriPlayerPlaybackWidgetProvider"
+            android:name=".widget.LyraPlayerPlaybackWidgetProvider"
             android:exported="false"
             android:label="@string/widget_playback_4x2_label">
             <intent-filter>
@@ -175,7 +175,7 @@
         </receiver>
 
         <receiver
-            android:name=".widget.NeriPlayerCompactWidgetProvider"
+            android:name=".widget.LyraPlayerCompactWidgetProvider"
             android:exported="false"
             android:label="@string/widget_playback_2x2_label">
             <intent-filter>

@@ -38,7 +38,7 @@ val DEFAULT_CUSTOM_CHANNEL_MOBILE_USER_AGENT =
         "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
 android {
-    namespace = "moe.ouom.neriplayer"
+    namespace = "com.lyra.player"
     val buildUUID = UUID.randomUUID()
     val buildAllReleaseAbis = (project.findProperty("buildAllReleaseAbis") as String?)?.toBoolean() == true
     val defaultReleaseAbiFilters = listOf("arm64-v8a")
@@ -67,7 +67,7 @@ android {
     println("buildUUID: $buildUUID")
 
     defaultConfig {
-        applicationId = "moe.ouom.neriplayer"
+        applicationId = "com.lyra.player"
 
         buildConfigField("String", "BUILD_UUID", "\"${buildUUID}\"")
         buildConfigField("String", "TAG", "\"[NeriPlayer]\"")
@@ -275,7 +275,7 @@ androidComponents {
                 ?: ""
             output.outputFileName.set(
                 output.versionName.orElse("dev").map { versionName ->
-                    "NeriPlayer-${versionName}${abiSuffix}.apk"
+                    "Lyra-${versionName}${abiSuffix}.apk"
                 }
             )
         }

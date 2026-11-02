@@ -1,13 +1,13 @@
-package moe.ouom.neriplayer.testing
+package com.lyra.player.testing
 
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Base64
-import moe.ouom.neriplayer.core.di.AppContainer
-import moe.ouom.neriplayer.data.auth.common.parseRawCookieText
-import moe.ouom.neriplayer.data.auth.youtube.YouTubeAuthBundle
+import com.lyra.player.core.di.AppContainer
+import com.lyra.player.data.auth.common.parseRawCookieText
+import com.lyra.player.data.auth.youtube.YouTubeAuthBundle
 
 class DebugCookieImportReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -119,8 +119,8 @@ class DebugCookieImportReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_IMPORT_AUTH = "moe.ouom.neriplayer.debug.IMPORT_AUTH"
-        const val ACTION_CLEAR_AUTH = "moe.ouom.neriplayer.debug.CLEAR_AUTH"
+        const val ACTION_IMPORT_AUTH = "com.lyra.player.debug.IMPORT_AUTH"
+        const val ACTION_CLEAR_AUTH = "com.lyra.player.debug.CLEAR_AUTH"
 
         const val EXTRA_PLATFORM = "platform"
         const val EXTRA_COOKIE = "cookie"

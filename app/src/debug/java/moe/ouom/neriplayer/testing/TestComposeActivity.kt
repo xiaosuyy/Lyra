@@ -1,4 +1,4 @@
-package moe.ouom.neriplayer.testing
+package com.lyra.player.testing
 
 import android.annotation.SuppressLint
 import android.app.KeyguardManager

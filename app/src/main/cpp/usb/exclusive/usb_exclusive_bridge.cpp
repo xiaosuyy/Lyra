@@ -40,7 +40,7 @@
 #include "usb/uac2/usb_uac2_feedback_profile.h"
 #include "usb/uac2/usb_uac2_format.h"
 
-#define LOG_TAG "NeriUsbExclusive"
+#define LOG_TAG "LyraUsbExclusive"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
@@ -4902,7 +4902,7 @@ bool closeHandleInternal(const std::shared_ptr<UsbExclusiveHandle>& handle) {
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeOpen(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeOpen(
     JNIEnv* env,
     jclass /*clazz*/,
     jint fd,
@@ -5307,7 +5307,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeStartGeneratedTone(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeStartGeneratedTone(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5328,7 +5328,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeConfigurePlayerBufferDuration(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeConfigurePlayerBufferDuration(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue,
@@ -5390,7 +5390,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeConfigurePlayerTransferWindow(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeConfigurePlayerTransferWindow(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue,
@@ -5437,7 +5437,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativePreparePlayerPcm(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativePreparePlayerPcm(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue,
@@ -5530,7 +5530,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jint JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeWritePlayerPcm(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeWritePlayerPcm(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue,
@@ -5628,7 +5628,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeReconfigurePlayerPcmOutput(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeReconfigurePlayerPcmOutput(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue,
@@ -5671,7 +5671,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativePlayPlayerPcm(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativePlayPlayerPcm(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5720,12 +5720,12 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeStartPlayerPcm(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeStartPlayerPcm(
     JNIEnv* env,
     jclass clazz,
     jlong handleValue
 ) {
-    return Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativePlayPlayerPcm(
+    return Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativePlayPlayerPcm(
         env,
         clazz,
         handleValue
@@ -5734,7 +5734,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativePausePlayerPcm(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativePausePlayerPcm(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5784,7 +5784,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeFlushPlayerPcm(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeFlushPlayerPcm(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5842,7 +5842,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeSetPlayerVolume(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeSetPlayerVolume(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue,
@@ -5861,7 +5861,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeSetPlayerFocusMuted(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeSetPlayerFocusMuted(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue,
@@ -5882,7 +5882,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeGetCompletedAudioFrames(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeGetCompletedAudioFrames(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5894,7 +5894,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeGetQueuedPlayerFrames(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeGetQueuedPlayerFrames(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5911,7 +5911,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeGetPlayerPcmFreeBytes(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeGetPlayerPcmFreeBytes(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5926,7 +5926,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeStop(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeStop(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5952,7 +5952,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeMarkDeviceDetached(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeMarkDeviceDetached(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -5972,7 +5972,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeClose(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeClose(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -6004,7 +6004,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeRuntimeReport(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeRuntimeReport(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue
@@ -6393,7 +6393,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeAcknowledgeRecoveryAction(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeAcknowledgeRecoveryAction(
     JNIEnv* env,
     jclass /*clazz*/,
     jlong handleValue,
@@ -6439,7 +6439,7 @@ Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nati
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_moe_ouom_neriplayer_core_player_usb_transport_UsbExclusiveNativeBridge_nativeLastOpenError(
+Java_com_lyra_player_core_player_usb_transport_UsbExclusiveNativeBridge_nativeLastOpenError(
     JNIEnv* env,
     jclass /*clazz*/
 ) {
