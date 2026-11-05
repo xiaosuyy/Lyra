@@ -791,7 +791,6 @@ fun HomeScreen(
                             title = stringResource(titleRes),
                             trailing = null,
                             modifier = Modifier
-                                .padding(horizontal = 20.dp)
                                 .animateItem()
                         )
                     }
@@ -801,7 +800,7 @@ fun HomeScreen(
                     ) {
                         when {
                             items.isNotEmpty() -> LazyRow(
-                                contentPadding = PaddingValues(horizontal = 20.dp),
+                                contentPadding = PaddingValues(horizontal = 0.dp),
                                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                                 modifier = Modifier
                                     .animateItem()
@@ -855,7 +854,6 @@ fun HomeScreen(
                             title = stringResource(titleRes),
                             trailing = null,
                             modifier = Modifier
-                                .padding(horizontal = 20.dp)
                                 .animateItem()
                         )
                     }
@@ -892,7 +890,7 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f),
                             modifier = Modifier
                                 .padding(
-                                    horizontal = 20.dp,
+                                    horizontal = 0.dp,
                                     vertical = gridContentPadding
                                 )
                                 .animateItem()
@@ -904,7 +902,7 @@ fun HomeScreen(
                     ) {
                         MeloxQuickActionRow(
                             actions = meloxQuickActions,
-                            contentPadding = 20.dp,
+                            contentPadding = 0.dp,
                             onAction = { action ->
                                 when {
                                     action.playlist != null -> onItemClick(action.playlist)
@@ -955,7 +953,6 @@ fun HomeScreen(
                                     title = stringResource(R.string.home_all_recent_trending),
                                     trailing = null,
                                     modifier = Modifier
-                                        .padding(horizontal = 20.dp)
                                         .animateItem()
                                 )
                             }
@@ -1220,7 +1217,7 @@ private fun MeloxSongCarousel(
     val columnWidth = if (isTabletLayout) 390.dp else 320.dp
     val columns = songs.chunked(3)
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 20.dp),
+        contentPadding = PaddingValues(horizontal = 0.dp),
         horizontalArrangement = Arrangement.spacedBy(18.dp),
         modifier = modifier.fillMaxWidth()
     ) {
@@ -1239,7 +1236,7 @@ private fun MeloxSongCarousel(
                             .fillMaxWidth()
                             .height(66.dp)
                             .clickable { onSongClick(songs, songIndex) }
-                            .padding(horizontal = 10.dp),
+                            .padding(end = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
