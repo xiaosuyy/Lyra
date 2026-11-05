@@ -13,7 +13,16 @@ internal const val NETEASE_PRIVATE_RADAR_PLAYLIST_ID = 3_136_952_023L
 internal const val NETEASE_TOPLIST_SOARING_ID = 19_723_756L
 internal const val NETEASE_TOPLIST_NEW_ID = 3_779_629L
 internal const val NETEASE_TOPLIST_HOT_ID = 3_778_678L
+internal const val NETEASE_TOPLIST_ORIGINAL_ID = 2_884_035L
 internal const val NETEASE_FAN_RADAR_PLAYLIST_ID = 5_327_906_368L
+
+/** 首页「排行榜」只展示网易云主榜，避免混入大量海外/细分榜单。 */
+internal val NeteaseHomeChartPlaylistIds = listOf(
+    NETEASE_TOPLIST_SOARING_ID,
+    NETEASE_TOPLIST_NEW_ID,
+    NETEASE_TOPLIST_HOT_ID,
+    NETEASE_TOPLIST_ORIGINAL_ID
+)
 
 internal class ApiCodeException(val code: Int) : IllegalStateException("api_code=$code")
 

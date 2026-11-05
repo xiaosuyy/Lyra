@@ -888,7 +888,7 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f),
                             modifier = Modifier
                                 .padding(
-                                    horizontal = gridContentPadding + 4.dp,
+                                    horizontal = gridContentPadding,
                                     vertical = gridContentPadding
                                 )
                                 .animateItem()
@@ -1176,7 +1176,6 @@ private fun MeloxQuickActionRow(
             Column(
                 modifier = Modifier
                     .width(300.dp)
-                    .clip(RoundedCornerShape(20.dp))
                     .clickable { onAction(action) }
             ) {
                 Text(

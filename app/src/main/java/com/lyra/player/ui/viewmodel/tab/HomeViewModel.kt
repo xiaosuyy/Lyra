@@ -1242,7 +1242,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
-        return parseRecommendOnWorker(raw)
+        val playlists = parseRecommendOnWorker(raw)
+        return if (source == NeteaseHomePlaylistSource.CHARTS) {
+            val byId = playlists.associateBy { it.id }
+            val mainCharts = NeteaseHomeChartPlaylistIds.mapNotNull(byId::get)
+            if (mainCharts.isNotEmpty()) mainCharts else playlists.take(8)
+        } else {
+            playlists
+        }
     }
 
     private suspend fun loadRadarPlaylistSummaries(
