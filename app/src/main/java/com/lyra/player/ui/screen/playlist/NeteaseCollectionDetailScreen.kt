@@ -71,12 +71,12 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -568,10 +568,12 @@ fun DetailScreen(
                                     }
                                 },
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(34.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.22f))
-                                ) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search_songs), modifier = Modifier.size(21.dp)) }
+                                        .background(Color.Black.copy(alpha = 0.16f))
+                                ) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search_songs), modifier = Modifier.size(18.dp)) }
+
+                                Spacer(Modifier.width(8.dp))
 
                                 // 收藏按钮
                                 HapticIconButton(onClick = {
@@ -593,30 +595,31 @@ fun DetailScreen(
                                     }
                                 },
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(34.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.22f))
+                                        .background(Color.Black.copy(alpha = 0.16f))
                                 ) {
                                     Icon(
-                                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                        imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
                                         contentDescription = if (isFavorite) stringResource(R.string.action_unfavorite) else stringResource(R.string.action_favorite_playlist),
                                         tint = playlistTopBarContentColor,
-                                        modifier = Modifier.size(21.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
 
                                 if (hasDownloadManagerEntry) {
+                                    Spacer(Modifier.width(8.dp))
                                     HapticIconButton(onClick = { showDownloadManager = true },
                                         modifier = Modifier
-                                            .size(40.dp)
+                                            .size(34.dp)
                                             .clip(CircleShape)
-                                            .background(Color.Black.copy(alpha = 0.22f))
+                                            .background(Color.Black.copy(alpha = 0.16f))
                                     ) {
                                         Icon(
                                             Icons.Outlined.Download,
                                             contentDescription = stringResource(R.string.cd_download_manager),
                                             tint = playlistTopBarContentColor,
-                                            modifier = Modifier.size(21.dp)
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
@@ -1276,9 +1279,9 @@ private fun SongRow(
                         leadingIcon = {
                             Icon(
                                 imageVector = if (isFavorite) {
-                                    Icons.Filled.Favorite
+                                    Icons.Filled.Star
                                 } else {
-                                    Icons.Outlined.FavoriteBorder
+                                    Icons.Outlined.StarOutline
                                 },
                                 contentDescription = null
                             )
