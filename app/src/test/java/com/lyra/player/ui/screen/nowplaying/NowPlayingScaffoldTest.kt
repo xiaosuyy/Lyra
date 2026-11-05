@@ -30,25 +30,37 @@ import org.junit.Test
 class NowPlayingScaffoldTest {
 
     @Test
-    fun portraitCoverUsesSeventyFourPercentOfWidthOnTallScreen() {
-        // 360 x 800：高度足够，宽度是限制项 -> 360 * 0.74
+    fun portraitCoverFillsWidthOnTallScreen() {
+        // 360 x 800：高度充足 -> 封面吃满宽度
         val size = resolveNowPlayingCoverSizeDp(
             availableWidthDp = 360f,
             availableHeightDp = 800f,
             isLandscape = false
         )
-        assertEquals(360f * 0.74f, size, 0.01f)
+        assertEquals(360f, size, 0.01f)
     }
 
     @Test
-    fun portraitCoverIsLimitedByHeightOnShortScreen() {
-        // 360 x 400：高度是限制项 -> 400 * 0.50
+    fun portraitCoverIsLimitedByHeightMinusReservedOnShortScreen() {
+        // 360 x 400，为其下方的标题/进度/控件预留 340 -> 60
         val size = resolveNowPlayingCoverSizeDp(
             availableWidthDp = 360f,
             availableHeightDp = 400f,
-            isLandscape = false
+            isLandscape = false,
+            reservedHeightDp = 340f
         )
-        assertEquals(400f * 0.50f, size, 0.01f)
+        assertEquals(60f, size, 0.01f)
+    }
+
+    @Test
+    fun portraitReservedHeightNeverMakesCoverNegative() {
+        val size = resolveNowPlayingCoverSizeDp(
+            availableWidthDp = 360f,
+            availableHeightDp = 200f,
+            isLandscape = false,
+            reservedHeightDp = 340f
+        )
+        assertEquals(0f, size, 0.01f)
     }
 
     @Test
@@ -87,11 +99,11 @@ class NowPlayingScaffoldTest {
 
     @Test
     fun landscapeAndPortraitPoliciesDoNotShareFractions() {
-        // 1000x1000：landscape 宽度受限=420；portrait 高度受限=500 -> 两者不会互相套用
+        // 1000x1000：landscape 宽度受限=420；portrait 吃满宽度 -> 两者不会互相套用
         val landscape = resolveNowPlayingCoverSizeDp(1000f, 1000f, isLandscape = true)
         val portrait = resolveNowPlayingCoverSizeDp(1000f, 1000f, isLandscape = false)
         assertEquals(1000f * 0.42f, landscape, 0.01f)
-        assertEquals(1000f * 0.50f, portrait, 0.01f)
+        assertEquals(1000f, portrait, 0.01f)
     }
 
     @Test

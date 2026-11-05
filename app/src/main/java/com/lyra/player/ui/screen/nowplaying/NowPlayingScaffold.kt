@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -57,20 +58,25 @@ import com.lyra.player.ui.theme.designsystem.neriTextStylesFrom/*
 /**
  * 计算封面边长（Dp）。
  *
- * 响应式：竖屏时封面占可用宽度/高度的较大比例，横屏时更小以避免挤压控制区。
+ * 竖屏沿用参考播放器的口径：封面尽量铺满可用宽度，只在高度不足时按
+ * 「剩余高度 − [reservedHeightDp]」收缩；横屏保持较小的比例以免挤压控制区。
  * 仅做尺寸推导，不涉及任何播放业务。
  */
 internal fun resolveNowPlayingCoverSizeDp(
     availableWidthDp: Float,
     availableHeightDp: Float,
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    reservedHeightDp: Float = 0f
 ): Float {
-    val widthFraction = if (isLandscape) 0.42f else 0.74f
-    val heightFraction = if (isLandscape) 0.58f else 0.50f
-    return minOf(
-        availableWidthDp.coerceAtLeast(0f) * widthFraction,
-        availableHeightDp.coerceAtLeast(0f) * heightFraction
-    )
+    if (isLandscape) {
+        return minOf(
+            availableWidthDp.coerceAtLeast(0f) * 0.42f,
+            availableHeightDp.coerceAtLeast(0f) * 0.58f
+        )
+    }
+    val width = availableWidthDp.coerceAtLeast(0f)
+    val height = (availableHeightDp - reservedHeightDp).coerceAtLeast(0f)
+    return minOf(width, height)
 }
 
 /**
@@ -121,7 +127,7 @@ fun NowPlayingAmbientBackground(modifier: Modifier = Modifier) {
                 Brush.verticalGradient(
                     colors = listOf(
                         animatedAccent.copy(alpha = 0.10f),
-                        colors.background
+                        Color.Transparent
                     )
                 )
             )
@@ -135,13 +141,15 @@ fun NowPlayingAmbientBackground(modifier: Modifier = Modifier) {
 fun NowPlayingCoverSlot(
     modifier: Modifier = Modifier,
     isLandscape: Boolean = false,
+    reservedHeightDp: Dp = 0.dp,
     content: @Composable (size: Dp) -> Unit
 ) {
     BoxWithConstraints(modifier = modifier) {
         val sizeDp = resolveNowPlayingCoverSizeDp(
             availableWidthDp = maxWidth.value,
             availableHeightDp = maxHeight.value,
-            isLandscape = isLandscape
+            isLandscape = isLandscape,
+            reservedHeightDp = reservedHeightDp.value
         ).dp
         Box(
             modifier = Modifier.size(sizeDp),

@@ -2,9 +2,13 @@
 <resources>
     <!-- Settings / Theme & Appearance -->
     <string name="settings_theme">主题设置</string>
-    <string name="settings_theme_desc">深浅色、动态取色和主题调色</string>
+    <string name="settings_theme_desc">深浅色模式与强调色</string>
     <string name="settings_theme_color">主题色</string>
     <string name="settings_theme_color_desc">选择一个你喜欢的颜色作为主色调</string>
+    <string name="settings_accent_color">强调色</string>
+    <string name="settings_accent_color_desc">设置页图标与底栏选中图标</string>
+    <string name="settings_accent_color_section">强调色</string>
+    <string name="settings_accent_color_section_desc">自定义设置页图标和底栏选中图标的颜色</string>
     <string name="settings_theme_palette_hint">关闭动态取色后会使用这里选择的主题色，也可以把常用颜色加入取色盘。</string>
     <string name="settings_dynamic_color">动态取色</string>
     <string name="settings_dynamic_color_desc">跟随封面主题色</string>
@@ -65,10 +69,10 @@
     <string name="settings_playback_control_size_small">小</string>
     <string name="settings_playback_control_size_medium">中</string>
     <string name="settings_playback_control_size_large">大</string>
-    <string name="settings_nowplaying_progress_audio_codec">进度条上方显示解码格式</string>
-    <string name="settings_nowplaying_progress_audio_codec_desc">显示在进度条上方，如 FLAC、AAC、E-AC-3</string>
-    <string name="settings_nowplaying_progress_audio_spec">进度条上方显示音源规格</string>
-    <string name="settings_nowplaying_progress_audio_spec_desc">显示在进度条上方，包括采样率、位深、码率</string>
+    <string name="settings_nowplaying_progress_audio_codec">进度条下方显示解码格式</string>
+    <string name="settings_nowplaying_progress_audio_codec_desc">显示在进度条下方，如 FLAC、AAC、E-AC-3</string>
+    <string name="settings_nowplaying_progress_audio_spec">进度条下方显示音源规格</string>
+    <string name="settings_nowplaying_progress_audio_spec_desc">显示在进度条下方，包括采样率、位深、码率</string>
     <string name="settings_select_color">选择主题色</string>
     <string name="settings_apply_color">应用颜色</string>
     <string name="settings_add_to_palette">添加到取色盘</string>

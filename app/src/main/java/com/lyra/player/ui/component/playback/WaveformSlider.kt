@@ -42,7 +42,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -94,7 +96,8 @@ fun WaveformSlider(
     activeTint: Color = MaterialTheme.colorScheme.primary,
     durationMs: Long = 0L,
     playbackSpeed: Float = 1f,
-    playbackSessionKey: String? = null
+    playbackSessionKey: String? = null,
+    meloxStyle: Boolean = false
 ) {
     val clampedValue = normalizeWaveProgress(value)
     val activeColor = activeTint.copy(alpha = if (enabled) 1f else 0.55f)
@@ -123,7 +126,7 @@ fun WaveformSlider(
     val animationsEnabled = ValueAnimator.areAnimatorsEnabled()
     val isWaitingPulseAnimating = animationsEnabled && isPlaybackWaiting && !isDragging
     val isWaveAnimating =
-        animationsEnabled && enabled && isPlaying && !isPlaybackWaiting && !isDragging
+        animationsEnabled && !meloxStyle && enabled && isPlaying && !isPlaybackWaiting && !isDragging
     val isProgressPredicting = shouldPredictWaveProgress(
         isWaveAnimating = isWaveAnimating,
         isProgressStalled = isProgressStalled,
@@ -211,6 +214,36 @@ fun WaveformSlider(
         Modifier
     }
     val wavePath = remember { Path() }
+
+    if (meloxStyle) {
+        val flatProgress = if (isProgressPredicting) waveProgress.currentValue else clampedValue
+        val trackColor = Color.White.copy(alpha = if (enabled) 0.20f else 0.10f)
+        val fillColor = Color.White.copy(alpha = if (enabled) 0.96f else 0.40f)
+        Canvas(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .then(dragModifier)
+        ) {
+            val centerY = size.height / 2
+            val trackHeightPx = if (isDragging) 6.dp.toPx() else 4.dp.toPx()
+            val corner = CornerRadius(trackHeightPx / 2)
+            val top = centerY - trackHeightPx / 2
+            drawRoundRect(
+                color = trackColor,
+                topLeft = Offset(0f, top),
+                size = Size(size.width, trackHeightPx),
+                cornerRadius = corner
+            )
+            drawRoundRect(
+                color = fillColor,
+                topLeft = Offset(0f, top),
+                size = Size(size.width * flatProgress, trackHeightPx),
+                cornerRadius = corner
+            )
+        }
+        return
+    }
 
     Canvas(
         modifier = modifier

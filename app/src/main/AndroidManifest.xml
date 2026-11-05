@@ -86,18 +86,6 @@
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_audio_device_filter" />
         </activity-alias>
-        <activity
-            android:name=".activity.auth.NeteaseWebLoginActivity"
-            android:exported="false"
-            android:process=":netease_login"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-        />
-        <activity
-            android:name=".activity.auth.NeteaseQrLoginActivity"
-            android:exported="false"
-            android:process=":netease_login"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-        />
         <receiver
             android:name=".data.auth.web.NeteaseWebViewLoginStateClearReceiver"
             android:exported="false"

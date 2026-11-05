@@ -42,7 +42,12 @@ internal fun buildSettingsSearchEntries(context: Context): List<SettingsSearchEn
 
     val settingEntries = AutoSettingsMetadata.settings
         // YouTube 渠道已从 Lyra 移除，相关设置不再出现在搜索结果里
-        .filter { it.ui != SettingUiType.None && it.titleRes != 0 && !it.isRemovedYouTubeSetting() }
+        .filter {
+            it.ui != SettingUiType.None &&
+                it.titleRes != 0 &&
+                !it.isRemovedYouTubeSetting() &&
+                !it.isRemovedLyraSetting()
+        }
         .mapNotNull { setting ->
             val page = setting.settingsPage() ?: return@mapNotNull null
             val title = context.safeString(setting.titleRes)
@@ -92,6 +97,34 @@ internal fun searchSettingsEntries(
 internal fun AutoSettingInfo.isRemovedYouTubeSetting(): Boolean =
     keyName.contains("youtube", ignoreCase = true)
 
+/** 已从设置页移除的旧开关，仅保留数据键以兼容历史配置。 */
+private val RemovedLyraSettingKeys = setOf(
+    "dynamic_color",
+    "home_card_continue",
+    "always_use_new_tab_style",
+    // 已从设置页移除的开关与滑块，仅保留数据键以兼容历史配置。
+    "haptic_feedback_enabled",
+    "bili_skip_segment_prompt_enabled",
+    "show_cover_source_badge",
+    "nowplaying_show_title",
+    "nowplaying_cover_lyrics_enabled",
+    "nowplaying_progress_show_quality_switch",
+    "nowplaying_toolbar_dock_enabled",
+    "nowplaying_control_placement",
+    "nowplaying_control_size",
+    "bili_sponsor_block_enabled",
+    "netease_local_source_fallback",
+    "netease_auto_source_switch",
+    "cloud_music_lyric_default_offset_ms",
+    "qq_music_lyric_default_offset_ms",
+    "nowplaying_cover_lyric_font_scale",
+    "nowplaying_cover_translation_font_scale",
+    "lyric_font_scale"
+)
+
+internal fun AutoSettingInfo.isRemovedLyraSetting(): Boolean =
+    keyName in RemovedLyraSettingKeys
+
 internal fun AutoSettingInfo.settingsPage(): SettingsPage? {
     if (keyName in LyricAppearanceSettingKeys) {
         return SettingsPage.Lyrics
@@ -112,7 +145,8 @@ internal fun settingsPageForSection(section: String): SettingsPage? {
     return when (section) {
         AutoSettingsSections.general -> SettingsPage.General
         AutoSettingsSections.theme -> SettingsPage.Theme
-        AutoSettingsSections.audioQuality -> SettingsPage.AudioQuality
+        // 音质设置页已整体移除
+        AutoSettingsSections.audioQuality -> null
         AutoSettingsSections.personalization -> SettingsPage.Personalization
         AutoSettingsSections.display -> SettingsPage.Personalization
         AutoSettingsSections.motion -> SettingsPage.Motion
@@ -157,7 +191,6 @@ internal fun AutoSettingInfo.searchTargetId(): String {
         "nowplaying_cover_blur_darken" -> "nowplaying_cover_blur_background_enabled"
         "lyric_blur_amount" -> "lyric_blur_enabled"
         "standardized_lyric_embedding_enabled" -> "download_metadata_post_processing_enabled"
-        "lyric_font_scale" -> "nowplaying_cover_lyric_font_scale"
         else -> keyName
     }
     return "setting:$targetKey"
@@ -165,14 +198,10 @@ internal fun AutoSettingInfo.searchTargetId(): String {
 
 internal fun resolveSettingsSearchHighlightTarget(
     entry: SettingsSearchEntry,
-    dynamicColor: Boolean,
     mobileDataFollowDefaultAudioQuality: Boolean = false,
     hasCustomBackground: Boolean = true
 ): String {
     return when {
-        dynamicColor &&
-            entry.page == SettingsPage.Theme &&
-            entry.targetId in DynamicColorHiddenSearchTargets -> "setting:dynamic_color"
         mobileDataFollowDefaultAudioQuality &&
             entry.targetId in MobileDataQualityHiddenSearchTargets -> {
             "setting:mobile_data_follow_default_audio_quality"
@@ -195,8 +224,6 @@ internal fun settingsSearchScrollAnchor(
     return when (page) {
         SettingsPage.Theme -> when (targetId) {
             "manual:theme_mode" -> SettingsSearchScrollAnchor(itemIndex = 1)
-            "manual:theme_palette_style" -> SettingsSearchScrollAnchor(itemIndex = 3)
-            "manual:theme_color_spec" -> SettingsSearchScrollAnchor(itemIndex = 4)
             else -> SettingsSearchScrollAnchor(itemIndex = 2)
         }
         SettingsPage.Motion -> SettingsSearchScrollAnchor(
@@ -224,9 +251,7 @@ internal fun settingsSearchScrollAnchor(
 private fun lyricsCardIndex(targetId: String): Int {
     return when (targetId) {
         "setting:floating_lyrics_enabled" -> 0
-        "setting:cloud_music_lyric_default_offset_ms",
-        "setting:qq_music_lyric_default_offset_ms" -> 2
-        in LyricAppearanceSearchTargets -> 3
+        in LyricAppearanceSearchTargets -> 2
         else -> 1
     }
 }
@@ -288,10 +313,6 @@ private fun motionCardIndex(targetId: String): Int {
     }
 }
 
-private val DynamicColorHiddenSearchTargets = setOf(
-    "manual:theme_seed_color"
-)
-
 private val MobileDataQualityHiddenSearchTargets = setOf(
     "setting:mobile_data_netease_audio_quality",
     "setting:mobile_data_bili_audio_quality"
@@ -319,28 +340,19 @@ private val PersonalizationStartTargets = setOf(
 )
 
 private val PersonalizationHomeTargets = setOf(
-    "setting:home_card_continue",
     "setting:home_card_trending",
     "setting:home_card_radar",
     "setting:home_card_recommended"
 )
 
 private val PersonalizationPlaybackInfoTargets = setOf(
-    "setting:show_cover_source_badge",
-    "setting:nowplaying_show_title",
     "setting:nowplaying_song_title_marquee_enabled",
-    "setting:nowplaying_cover_lyrics_enabled",
-    "setting:nowplaying_progress_show_quality_switch",
     "setting:nowplaying_progress_show_audio_codec",
     "setting:nowplaying_progress_show_audio_spec"
 )
 
 private val PersonalizationPlaybackControlTargets = setOf(
-    "setting:always_use_new_tab_style",
     "setting:nowplaying_keep_screen_on",
-    "setting:nowplaying_toolbar_dock_enabled",
-    "setting:nowplaying_control_placement",
-    "setting:nowplaying_control_size",
     "setting:lyrics_control_size"
 )
 
@@ -348,16 +360,12 @@ private val LyricAppearanceSettingKeys = setOf(
     "show_lyric_translation",
     "lyric_translation_use_phonetic",
     "lyric_font_scale",
-    "nowplaying_cover_lyric_font_scale",
-    "nowplaying_cover_translation_font_scale",
     "lyrics_page_lyric_font_scale",
     "lyrics_page_translation_font_scale"
 )
 
 private val LyricAppearanceSearchTargets = setOf(
     "setting:lyric_font_scale",
-    "setting:nowplaying_cover_lyric_font_scale",
-    "setting:nowplaying_cover_translation_font_scale",
     "setting:lyrics_page_lyric_font_scale",
     "setting:lyrics_page_translation_font_scale",
     "setting:show_lyric_translation",
@@ -458,57 +466,18 @@ internal fun manualSettingsSearchEntries(context: Context): List<SettingsSearchE
         ),
         entry(
             page = SettingsPage.Theme,
-            titleRes = R.string.settings_theme_palette_style,
-            descriptionRes = R.string.settings_theme_palette_style_desc,
-            id = "theme_palette_style",
-            aliases = listOf("palette", "color", "kolor", "monet", "seban", "quse")
-        ),
-        entry(
-            page = SettingsPage.Theme,
-            titleRes = R.string.settings_theme_color_spec,
-            descriptionRes = R.string.settings_theme_color_spec_desc,
-            id = "theme_color_spec",
-            aliases = listOf("color spec", "material", "2021", "2025", "secai", "guifan")
-        ),
-        entry(
-            page = SettingsPage.Theme,
-            titleRes = R.string.settings_theme_color,
-            descriptionRes = R.string.settings_theme_color_desc,
-            id = "theme_seed_color",
-            aliases = listOf("accent", "seed", "custom color", "zhutise", "yanse")
-        ),
-        entry(
-            page = SettingsPage.Personalization,
-            titleRes = R.string.settings_nowplaying_control_placement,
-            descriptionRes = R.string.settings_nowplaying_control_placement_desc,
-            id = "nowplaying_control_placement",
+            titleRes = R.string.settings_accent_color,
+            descriptionRes = R.string.settings_accent_color_desc,
+            id = "accent_color",
             aliases = listOf(
-                "播放按钮位置",
-                "循环随机位置",
-                "底部播放控件",
-                "进度条移到底部",
-                "playback controls position",
-                "shuffle repeat position",
-                "progress at bottom",
-                "bofangweizhi"
-            ),
-            targetId = "setting:nowplaying_control_placement",
-            order = SettingsPage.Personalization.ordinal * 100 + 32
-        ),
-        entry(
-            page = SettingsPage.Personalization,
-            titleRes = R.string.settings_nowplaying_control_size,
-            descriptionRes = R.string.settings_nowplaying_control_size_desc,
-            id = "nowplaying_control_size",
-            aliases = listOf(
-                "播放按钮大小",
-                "播放页控件大小",
-                "playback controls size",
-                "now playing button size",
-                "bofanganniu"
-            ),
-            targetId = "setting:nowplaying_control_size",
-            order = SettingsPage.Personalization.ordinal * 100 + 34
+                "accent",
+                "color",
+                "theme color",
+                "custom color",
+                "qiangdiao se",
+                "zhutise",
+                "yanse"
+            )
         ),
         entry(
             page = SettingsPage.Personalization,
@@ -699,7 +668,6 @@ private val PageSearchAliases = mapOf(
     SettingsPage.Playback to listOf("playback", "audio", "queue", "volume", "fade", "crossfade", "bofang"),
     SettingsPage.UsbExclusive to listOf("usb", "dac", "pcm", "uac", "exclusive", "bit perfect", "dizhan"),
     SettingsPage.PlaybackSource to listOf("source", "fallback", "bili", "netease", "yinyuan", "huanyuan"),
-    SettingsPage.AudioQuality to listOf("quality", "lossless", "hires", "dolby", "bitrate", "yinzhi"),
     SettingsPage.Storage to listOf(
         "storage",
         "cache",
@@ -725,7 +693,6 @@ private val PageSearchAliases = mapOf(
 )
 
 private val SettingSearchAliases = mapOf(
-    "dynamic_color" to listOf("material you", "monet", "auto color", "quse", "xitongquse"),
     "haptic_feedback_enabled" to listOf("vibration", "touch", "zhendong", "chugan"),
     "playback_service_idle_shutdown_minutes" to listOf("notification", "foreground", "idle", "tuichu"),
     "always_record_logs_enabled" to listOf("log", "crash", "diagnostic", "rizhi"),
@@ -736,7 +703,6 @@ private val SettingSearchAliases = mapOf(
     "mobile_data_bili_audio_quality" to listOf("cellular bili", "哔哩哔哩流量", "bzhan liuliang"),
     "default_start_destination" to listOf("start page", "home", "tab", "qidongye"),
     "auto_show_keyboard" to listOf("keyboard", "input", "shurufa", "jianpan"),
-    "home_card_continue" to listOf("continue", "recent", "jixu"),
     "home_card_trending" to listOf(
         "trending",
         "charts",
@@ -766,9 +732,6 @@ private val SettingSearchAliases = mapOf(
         "more recommendations",
         "更多推荐"
     ),
-    "show_cover_source_badge" to listOf("badge", "source", "cover", "biaoshi"),
-    "always_use_new_tab_style" to listOf("tab", "bottom bar", "new ui"),
-    "nowplaying_show_title" to listOf("title", "song name", "geming"),
     "nowplaying_song_title_marquee_enabled" to listOf(
         "marquee",
         "scrolling title",
@@ -777,14 +740,9 @@ private val SettingSearchAliases = mapOf(
         "chang geming"
     ),
     "nowplaying_keep_screen_on" to listOf("screen on", "wakelock", "changliang"),
-    "nowplaying_toolbar_dock_enabled" to listOf("toolbar", "dock", "controls"),
-    "nowplaying_cover_lyrics_enabled" to listOf("cover lyrics", "fengmian geci", "lrc"),
-    "nowplaying_progress_show_quality_switch" to listOf("quality switch", "progress", "jindutiao"),
     "nowplaying_progress_show_audio_codec" to listOf("codec", "aac", "flac", "bianma"),
     "nowplaying_progress_show_audio_spec" to listOf("sample rate", "bit depth", "guige"),
     "lyric_font_scale" to listOf("font", "size", "geci daxiao", "ziti"),
-    "nowplaying_cover_lyric_font_scale" to listOf("cover lyric font", "font", "size", "fengmian geci"),
-    "nowplaying_cover_translation_font_scale" to listOf("cover translation font", "translation", "fanyi"),
     "lyrics_page_lyric_font_scale" to listOf("lyrics page font", "full screen lyric", "geciye"),
     "lyrics_page_translation_font_scale" to listOf("lyrics page translation", "translation", "fanyi"),
     "ui_density_scale" to listOf("dpi", "scale", "zoom", "suofang"),
@@ -858,28 +816,6 @@ private val SettingSearchAliases = mapOf(
     "playback_volume_balance" to listOf("balance", "left right", "shengdao"),
     "keep_last_playback_progress" to listOf("resume", "progress", "jindu"),
     "remember_long_form_playback_progress" to listOf("podcast", "audiobook", "long form", "changyinpin"),
-    "netease_auto_source_switch" to listOf(
-        "auto source",
-        "bili fallback",
-        "网易云自动换源",
-        "自动还原",
-        "自动换源",
-        "还原",
-        "huanyuan"
-    ),
-    "netease_local_source_fallback" to listOf(
-        "local fallback",
-        "本地音源",
-        "本地还原",
-        "bendi yinyuan"
-    ),
-    "bili_sponsor_block_enabled" to listOf(
-        "哔哩哔哩",
-        "sponsorblock",
-        "skip intro",
-        "自动跳过",
-        "tiaoguo"
-    ),
     "keep_playback_mode_state" to listOf("repeat", "shuffle", "mode", "suiji", "xunhuan"),
     "stop_on_bluetooth_disconnect" to listOf("bluetooth", "headset", "car", "lanyadukai"),
     "usb_exclusive_playback" to listOf("usb", "dac", "exclusive", "pcm", "bit perfect", "uac"),

@@ -254,32 +254,6 @@ internal fun SettingsPlaybackSection(
                 )
 
                 PlaybackSwitchItem(
-                    setting = AutoSettingsMetadata.requireSetting(
-                        AutoSettingsKeys.BILI_SPONSOR_BLOCK_ENABLED
-                    ),
-                    checked = biliSponsorBlockEnabled,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.FastForward,
-                            contentDescription = stringResource(R.string.settings_bili_sponsor_block),
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    },
-                    onToggle = {
-                        scope.launch {
-                            autoSettingsRepository.setBiliSponsorBlockEnabled(!biliSponsorBlockEnabled)
-                        }
-                    },
-                    onCheckedChange = { enabled ->
-                        scope.launch { autoSettingsRepository.setBiliSponsorBlockEnabled(enabled) }
-                    },
-                    highlightTargetId = highlightTargetId,
-                    highlightPulse = highlightPulse,
-                    onHighlightFinished = onHighlightFinished
-                )
-
-                PlaybackSwitchItem(
                     setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.KEEP_PLAYBACK_MODE_STATE),
                     checked = keepPlaybackModeState,
                     icon = {

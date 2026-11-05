@@ -1,0 +1,26 @@
+Lyra - third-party UI attribution
+==================================
+
+Portions of the user interface are adapted from:
+
+  MeloX-Android
+  https://github.com/lladlam/MeloX-Android
+  Reference commit: 4af356f
+  License: GNU General Public License v3.0
+
+  The adapted portions are limited to visual layout, interaction and design
+  tokens. MeloX-Android's music providers, account system, synchronization,
+  plugin runtime and other data-layer code are not included.
+
+Liquid glass components are built on:
+
+  Kyant0/AndroidLiquidGlass
+  https://github.com/Kyant0/AndroidLiquidGlass
+  License: Apache License 2.0
+  Libraries: io.github.kyant0:backdrop, shapes, capsule
+
+Fonts:
+
+  This project does not include Apple's SF Pro font. The reference project
+  uses SF Pro only for SF Symbols glyphs and explicitly excludes it from its
+  GPLv3 grant. Lyra maps the same icon names to Material Symbols instead.

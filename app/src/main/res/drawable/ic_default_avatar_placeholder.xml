@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pink circular placeholder avatar with a transparent area outside the circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFFF9DBB"
+        android:pathData="M54,1 A53,53 0 1,1 53.99,1 Z" />
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,31 A15,15 0 1,1 53.99,31 Z" />
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,50 C36.3,50 24,61.8 24,78 L24,88 L84,88 L84,78 C84,61.8 71.7,50 54,50 Z" />
+</vector>

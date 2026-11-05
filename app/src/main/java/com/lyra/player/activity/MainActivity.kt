@@ -585,8 +585,10 @@ class MainActivity : ComponentActivity() {
                                     PlayerManager.playerEventFlow.collect { event ->
                                         when (event) {
                                             is PlayerEvent.ShowLoginPrompt -> {
-                                                dialogMessage = event.message
-                                                showDialog = true
+                                                AppFeedback.showToast(
+                                                    context = this@MainActivity,
+                                                    message = event.message
+                                                )
                                             }
 
                                             is PlayerEvent.ShowError -> {

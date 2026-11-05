@@ -251,7 +251,6 @@ private fun YouTubeMusicCreatorItemsContent(
                     val (item, song) = pair
                     CreatorItemsSongRow(
                         song = song,
-                        index = index + 1,
                         offlineMode = offlineMode,
                         enabled = !uiState.playbackQueueLoading && !uiState.loadingMore,
                         onClick = { onSongClick(item) }
@@ -307,7 +306,6 @@ private fun YouTubeMusicCreatorItemsContent(
 @Composable
 private fun CreatorItemsSongRow(
     song: SongItem,
-    index: Int,
     offlineMode: Boolean,
     enabled: Boolean,
     onClick: () -> Unit
@@ -324,12 +322,6 @@ private fun CreatorItemsSongRow(
             .padding(vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = index.toString(),
-            modifier = Modifier.width(28.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         Box(
             modifier = Modifier
                 .size(48.dp)

@@ -8,7 +8,7 @@
     <string name="settings_search_result_context">%1$s · %2$s</string>
     <string name="settings_general">通用</string>
     <string name="settings_general_desc">语言、触感和全局行为</string>
-    <string name="settings_accounts_desc">管理网易云和哔哩哔哩登录状态</string>
+    <string name="settings_accounts_desc">管理哔哩哔哩和 YouTube 登录状态</string>
     <string name="settings_personalization">个性化</string>
     <string name="settings_network">网络设置</string>
     <string name="settings_bypass_proxy">绕过系统代理</string>
@@ -97,6 +97,14 @@
     <string name="settings_custom_source_section">自定义源（音源脚本）</string>
     <string name="settings_custom_source_section_desc">加载 lx-music 格式的 JS 音源脚本，用于解析歌曲直链；内置脚本会随应用更新，可在此单独启停或导入自定义脚本</string>
     <string name="settings_custom_source_import">导入音源脚本</string>
+    <string name="settings_custom_source_import_from_local">从本地文件导入</string>
+    <string name="settings_custom_source_import_url_label">脚本 URL</string>
+    <string name="settings_custom_source_import_url_placeholder">https://example.com/source.js</string>
+    <string name="settings_custom_source_import_url_hint">输入在线音源脚本地址，将自动下载并导入</string>
+    <string name="settings_custom_source_import_or">或</string>
+    <string name="settings_custom_source_import_confirm">导入</string>
+    <string name="settings_custom_source_importing">正在导入…</string>
+    <string name="settings_custom_source_import_invalid_url">请输入有效的 http(s) 脚本地址</string>
     <string name="settings_custom_source_reload">重新加载内置音源</string>
     <string name="settings_custom_source_empty">还没有音源脚本</string>
     <string name="settings_custom_source_imported">已导入音源脚本</string>

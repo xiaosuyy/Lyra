@@ -49,9 +49,6 @@ class SettingsPageTest {
         listOf(
             "show_lyric_translation",
             "lyric_translation_use_phonetic",
-            "lyric_font_scale",
-            "nowplaying_cover_lyric_font_scale",
-            "nowplaying_cover_translation_font_scale",
             "lyrics_page_lyric_font_scale",
             "lyrics_page_translation_font_scale"
         ).forEach { keyName ->
@@ -63,8 +60,8 @@ class SettingsPageTest {
     }
 
     @Test
-    fun accountsPageIsPinnedAsTheFirstHomeItem() {
-        assertEquals(SettingsPage.Accounts, SettingsHomePageGroups.first().first())
+    fun generalPageIsPinnedAsTheFirstHomeItem() {
+        assertEquals(SettingsPage.General, SettingsHomePageGroups.first().first())
     }
 
     @Test
@@ -136,39 +133,7 @@ class SettingsPageTest {
     }
 
     @Test
-    fun dynamicColorOnlyRedirectsHiddenThemeColorHighlight() {
-        fun themeEntry(targetId: String): SettingsSearchEntry {
-            return SettingsSearchEntry(
-                id = targetId,
-                page = SettingsPage.Theme,
-                title = "主题",
-                description = "主题",
-                tokens = listOf(targetId),
-                targetId = targetId,
-                order = 0
-            )
-        }
-
-        assertEquals(
-            "manual:theme_palette_style",
-            resolveSettingsSearchHighlightTarget(themeEntry("manual:theme_palette_style"), dynamicColor = true)
-        )
-        assertEquals(
-            "manual:theme_color_spec",
-            resolveSettingsSearchHighlightTarget(themeEntry("manual:theme_color_spec"), dynamicColor = true)
-        )
-        assertEquals(
-            "setting:dynamic_color",
-            resolveSettingsSearchHighlightTarget(themeEntry("manual:theme_seed_color"), dynamicColor = true)
-        )
-        assertEquals(
-            "manual:theme_seed_color",
-            resolveSettingsSearchHighlightTarget(themeEntry("manual:theme_seed_color"), dynamicColor = false)
-        )
-    }
-
-    @Test
-    fun themeSearchUsesSeparateColorCardAnchors() {
+    fun themeSearchUsesModeAndAccentCardAnchors() {
         assertEquals(
             1,
             settingsSearchScrollAnchor(
@@ -180,52 +145,8 @@ class SettingsPageTest {
             2,
             settingsSearchScrollAnchor(
                 page = SettingsPage.Theme,
-                targetId = "setting:dynamic_color"
+                targetId = "manual:accent_color"
             ).itemIndex
-        )
-        assertEquals(
-            3,
-            settingsSearchScrollAnchor(
-                page = SettingsPage.Theme,
-                targetId = "manual:theme_palette_style"
-            ).itemIndex
-        )
-        assertEquals(
-            4,
-            settingsSearchScrollAnchor(
-                page = SettingsPage.Theme,
-                targetId = "manual:theme_color_spec"
-            ).itemIndex
-        )
-    }
-
-    @Test
-    fun mobileDataQualitySearchHighlightsItsRequiredControlWhenHidden() {
-        val entry = SettingsSearchEntry(
-            id = "setting:mobile_data_bili_audio_quality",
-            page = SettingsPage.AudioQuality,
-            title = "哔哩哔哩流量音质",
-            description = "",
-            tokens = listOf("流量音质"),
-            targetId = "setting:mobile_data_bili_audio_quality",
-            order = 0
-        )
-
-        assertEquals(
-            "setting:mobile_data_bili_audio_quality",
-            resolveSettingsSearchHighlightTarget(
-                entry = entry,
-                dynamicColor = false,
-                mobileDataFollowDefaultAudioQuality = false
-            )
-        )
-        assertEquals(
-            "setting:mobile_data_follow_default_audio_quality",
-            resolveSettingsSearchHighlightTarget(
-                entry = entry,
-                dynamicColor = false,
-                mobileDataFollowDefaultAudioQuality = true
-            )
         )
     }
 
@@ -245,7 +166,6 @@ class SettingsPageTest {
             "setting:background_image_alpha",
             resolveSettingsSearchHighlightTarget(
                 entry = entry,
-                dynamicColor = false,
                 hasCustomBackground = true
             )
         )
@@ -253,7 +173,6 @@ class SettingsPageTest {
             "setting:background_image_uri",
             resolveSettingsSearchHighlightTarget(
                 entry = entry,
-                dynamicColor = false,
                 hasCustomBackground = false
             )
         )
@@ -293,13 +212,6 @@ class SettingsPageTest {
             4,
             settingsSearchScrollAnchor(
                 page = SettingsPage.Personalization,
-                targetId = "setting:nowplaying_toolbar_dock_enabled"
-            ).itemIndex
-        )
-        assertEquals(
-            4,
-            settingsSearchScrollAnchor(
-                page = SettingsPage.Personalization,
                 targetId = "setting:lyrics_control_size"
             ).itemIndex
         )
@@ -317,12 +229,11 @@ class SettingsPageTest {
         listOf(
             "setting:show_lyric_translation",
             "setting:lyric_translation_use_phonetic",
-            "setting:lyric_font_scale",
             "setting:lyrics_page_lyric_font_scale",
             "setting:lyrics_page_translation_font_scale"
         ).forEach { targetId ->
             assertEquals(
-                4,
+                3,
                 settingsSearchScrollAnchor(
                     page = SettingsPage.Lyrics,
                     targetId = targetId
@@ -626,13 +537,6 @@ class SettingsPageTest {
             settingsSearchScrollAnchor(
                 page = SettingsPage.Lyrics,
                 targetId = "setting:floating_lyrics_enabled"
-            ).itemIndex
-        )
-        assertEquals(
-            3,
-            settingsSearchScrollAnchor(
-                page = SettingsPage.Lyrics,
-                targetId = "setting:cloud_music_lyric_default_offset_ms"
             ).itemIndex
         )
         assertEquals(

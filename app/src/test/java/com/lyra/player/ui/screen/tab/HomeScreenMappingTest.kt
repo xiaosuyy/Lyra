@@ -14,7 +14,6 @@ class HomeScreenMappingTest {
     fun continueSectionStaysMountedWhileUsageRepositoryLoads() {
         assertTrue(
             shouldShowHomeContinueSection(
-                showContinueCard = true,
                 usageLoaded = false,
                 hasUsage = false
             )
@@ -25,20 +24,8 @@ class HomeScreenMappingTest {
     fun continueSectionHidesOnlyAfterAnEmptyUsageResultIsLoaded() {
         assertFalse(
             shouldShowHomeContinueSection(
-                showContinueCard = true,
                 usageLoaded = true,
                 hasUsage = false
-            )
-        )
-    }
-
-    @Test
-    fun continueSectionRespectsDisabledCardSettingWhileUsageLoads() {
-        assertFalse(
-            shouldShowHomeContinueSection(
-                showContinueCard = false,
-                usageLoaded = false,
-                hasUsage = true
             )
         )
     }

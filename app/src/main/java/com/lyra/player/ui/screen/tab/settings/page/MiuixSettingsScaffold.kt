@@ -30,21 +30,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +49,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -67,20 +64,21 @@ import kotlinx.coroutines.delay
 import com.lyra.player.R
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.effect.glass.AdvancedGlassNavigationHandoff
-import com.lyra.player.ui.effect.glass.AdvancedGlassRole
 import com.lyra.player.ui.effect.glass.AdvancedGlassScene
-import com.lyra.player.ui.effect.glass.AdvancedGlassSurface
-import com.lyra.player.ui.effect.glass.LocalAdvancedGlassBackdropRegistrationEnabled
 import com.lyra.player.ui.effect.glass.LocalAdvancedGlassController
 import com.lyra.player.ui.effect.glass.isolatedAdvancedGlassHorizontalTransition
+import com.lyra.player.ui.melox.theme.MeloxShapes
+import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.ui.util.currentWindowWidthDp
 import com.lyra.player.ui.util.shouldAllowCollapsingTopAppBar
 
-private val MiuixCardShape = RoundedCornerShape(16.dp)
 private val MiuixHighlightShape = RoundedCornerShape(18.dp)
-private val MiuixSettingsContentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+private val MiuixSettingsContentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
 private val MiuixPageRowPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
 private val MiuixSettingsTabletMaxWidth = 920.dp
+
+@Composable
+private fun settingsCardSurface(): Color = MaterialTheme.colorScheme.surface
 
 private fun shouldAnimateSettingsDetailTransition(
     initialPage: SettingsPage,
@@ -117,10 +115,9 @@ internal fun MiuixSettingsHomeScaffold(
             )
         }
     )
-    val showExpandedTitleMask = scrollBehavior.state.collapsedFraction < 0.5f
     val miniPlayerHeight = LocalMiniPlayerHeight.current
     val isTabletLayout = currentWindowWidthDp() >= 720.dp
-    val horizontalPadding = if (isTabletLayout) 28.dp else 18.dp
+    val horizontalPadding = if (isTabletLayout) 28.dp else 20.dp
 
     Scaffold(
         modifier = modifier
@@ -129,27 +126,24 @@ internal fun MiuixSettingsHomeScaffold(
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    // large top app bars compose both title slots, but only one is visible
-                    val isExpandedTitleSlot = LocalTextStyle.current.fontSize.value > 24f
-                    CompositionLocalProvider(
-                        LocalAdvancedGlassBackdropRegistrationEnabled provides
-                            if (isExpandedTitleSlot) {
-                                showExpandedTitleMask
-                            } else {
-                                !showExpandedTitleMask
-                            }
-                    ) {
-                        title()
+            val appBarScrim = MaterialTheme.colorScheme.background
+            Box(
+                modifier = Modifier.drawBehind {
+                    val fraction = topAppBarState.collapsedFraction
+                    if (fraction > 0f) {
+                        drawRect(appBarScrim.copy(alpha = 0.94f * fraction))
                     }
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent
+                }
+            ) {
+                LargeTopAppBar(
+                    title = { title() },
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    )
                 )
-            )
+            }
         }
     ) { innerPadding ->
         Box(
@@ -230,18 +224,18 @@ internal fun MiuixSettingsSectionIntro(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+            .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary
+            style = MeloxType.caption,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f)
         )
         Text(
             text = description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.76f)
+            style = MeloxType.caption,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.36f)
         )
     }
 }
@@ -257,38 +251,18 @@ internal fun MiuixSettingsPageGroupCard(
         return
     }
 
-    val fallbackColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
-
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = MiuixCardShape,
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = Color.Transparent
-        ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(settingsCardSurface(), MeloxShapes.largeCard)
     ) {
-        AdvancedGlassSurface(
-            role = AdvancedGlassRole.SettingsGroup,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MiuixCardShape,
-            fallbackColor = fallbackColor,
-            tintColor = MaterialTheme.colorScheme.surfaceContainerHighest
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                pages.forEachIndexed { index, page ->
-                    MiuixSettingsPageRow(
-                        page = page,
-                        selected = selectedPage == page,
-                        onClick = { onPageClick(page) }
-                    )
-                    if (index != pages.lastIndex) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 74.dp, end = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                    }
-                }
-            }
+        pages.forEachIndexed { index, page ->
+            MiuixSettingsPageRow(
+                page = page,
+                selected = selectedPage == page,
+                showTopSeparator = index != 0,
+                onClick = { onPageClick(page) }
+            )
         }
     }
 }
@@ -297,19 +271,32 @@ internal fun MiuixSettingsPageGroupCard(
 private fun MiuixSettingsPageRow(
     page: SettingsPage,
     selected: Boolean,
+    showTopSeparator: Boolean,
     onClick: () -> Unit
 ) {
+    val accent = MaterialTheme.colorScheme.primary
+    val separator = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 76.dp)
+            .heightIn(min = 64.dp)
             .testTag(settingsPageRowTestTag(page))
             .semantics {
                 this.selected = selected
             }
+            .drawBehind {
+                if (showTopSeparator) {
+                    drawLine(
+                        color = separator,
+                        start = Offset(48.dp.toPx(), 0f),
+                        end = Offset(size.width - 16.dp.toPx(), 0f),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+            }
             .background(
                 if (selected) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.04f)
                 } else {
                     Color.Transparent
                 }
@@ -317,41 +304,32 @@ private fun MiuixSettingsPageRow(
             .clickable(onClick = onClick)
             .padding(MiuixPageRowPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
-            modifier = Modifier
-                .size(42.dp),
+            modifier = Modifier.size(24.dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = page.icon,
                 contentDescription = stringResource(page.titleRes),
                 modifier = Modifier.size(22.dp),
-                tint = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.86f)
-                }
+                tint = accent
             )
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
                 text = stringResource(page.titleRes),
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                }
+                style = MeloxType.body,
+                color = MaterialTheme.colorScheme.onBackground
             )
             Text(
                 text = stringResource(page.descriptionRes),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MeloxType.subheadline,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -359,8 +337,8 @@ private fun MiuixSettingsPageRow(
         Icon(
             imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
             contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.64f)
+            modifier = Modifier.size(20.dp),
+            tint = accent.copy(alpha = 0.88f)
         )
     }
 }
@@ -388,7 +366,7 @@ internal fun MiuixSettingsDetailScaffold(
     )
     val miniPlayerHeight = LocalMiniPlayerHeight.current
     val isTabletLayout = currentWindowWidthDp() >= 720.dp
-    val horizontalPadding = if (isTabletLayout) 28.dp else 18.dp
+    val horizontalPadding = if (isTabletLayout) 28.dp else 20.dp
 
     Scaffold(
         modifier = modifier
@@ -397,24 +375,42 @@ internal fun MiuixSettingsDetailScaffold(
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-            LargeTopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    if (showBackButton) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                contentDescription = stringResource(R.string.action_back)
-                            )
-                        }
+            val appBarScrim = MaterialTheme.colorScheme.background
+            Box(
+                modifier = Modifier.drawBehind {
+                    val fraction = topAppBarState.collapsedFraction
+                    if (fraction > 0f) {
+                        drawRect(appBarScrim.copy(alpha = 0.94f * fraction))
                     }
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent
+                }
+            ) {
+                LargeTopAppBar(
+                    title = {
+                        Text(
+                            text = title,
+                            style = MeloxType.largeTitle,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    navigationIcon = {
+                        if (showBackButton) {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                    contentDescription = stringResource(R.string.action_back)
+                                )
+                            }
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    )
                 )
-            )
+            }
         }
     ) { innerPadding ->
         Box(
@@ -568,47 +564,31 @@ internal fun MiuixSettingsHeader(
     description: String,
     modifier: Modifier = Modifier
 ) {
-    val fallbackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
-
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = MiuixCardShape,
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = Color.Transparent
-        ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(settingsCardSurface(), MeloxShapes.largeCard)
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        AdvancedGlassSurface(
-            role = AdvancedGlassRole.SettingsHeader,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MiuixCardShape,
-            fallbackColor = fallbackColor,
-            tintColor = MaterialTheme.colorScheme.primaryContainer
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 22.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            modifier = Modifier.size(26.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                text = title,
+                style = MeloxType.headline,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = description,
+                style = MeloxType.subheadline,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f)
+            )
         }
     }
 }
@@ -622,7 +602,6 @@ internal fun MiuixSettingsSectionCard(
     onHighlightFinished: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    val fallbackColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.56f)
     var highlightActive by remember { mutableStateOf(false) }
 
     LaunchedEffect(highlighted, highlightPulse) {
@@ -640,37 +619,25 @@ internal fun MiuixSettingsSectionCard(
 
     val highlightColor by animateColorAsState(
         targetValue = if (highlightActive) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)
         } else {
             Color.Transparent
         },
         label = "settings_section_highlight"
     )
 
-    ElevatedCard(
+    Column(
         modifier = modifier
-            .fillMaxWidth(),
-        shape = MiuixCardShape,
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = Color.Transparent
-        ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+            .fillMaxWidth()
+            .background(settingsCardSurface(), MeloxShapes.largeCard),
     ) {
-        AdvancedGlassSurface(
-            role = AdvancedGlassRole.SettingsSection,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MiuixCardShape,
-            fallbackColor = fallbackColor,
-            tintColor = MaterialTheme.colorScheme.surfaceContainerHighest
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(highlightColor)
+                .padding(MiuixSettingsContentPadding)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(highlightColor)
-                    .padding(MiuixSettingsContentPadding)
-            ) {
-                content()
-            }
+            content()
         }
     }
 }

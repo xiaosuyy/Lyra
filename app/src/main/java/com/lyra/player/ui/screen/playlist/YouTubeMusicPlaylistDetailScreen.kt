@@ -807,7 +807,6 @@ fun YouTubeMusicPlaylistDetailScreen(
                                     offlineMode = offlineMode
                                 ) {
                                     YouTubeMusicSongRow(
-                                        index = index + 1,
                                         song = song,
                                         isCurrentSong = isCurrent,
                                         animatePlayingIndicator = isCurrent && isPlaying,
@@ -1095,7 +1094,6 @@ private fun EmptyBlock(text: String) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun YouTubeMusicSongRow(
-    index: Int,
     song: SongItem,
     isCurrentSong: Boolean,
     animatePlayingIndicator: Boolean,
@@ -1134,21 +1132,14 @@ private fun YouTubeMusicSongRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.width(48.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (selectionMode) {
+        if (selectionMode) {
+            Box(
+                modifier = Modifier.width(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 androidx.compose.material3.Checkbox(
                     checked = selected,
                     onCheckedChange = { onToggleSelect() }
-                )
-            } else {
-                Text(
-                    text = index.toString(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = playlistModernListTertiaryContentColor(),
-                    maxLines = 1
                 )
             }
         }

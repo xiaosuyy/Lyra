@@ -64,12 +64,25 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
+import com.lyra.player.ui.melox.components.MeloxBottomChrome
+import com.lyra.player.ui.melox.components.MeloxMiniPlayer
+import com.lyra.player.ui.melox.components.MeloxTabItem
 import com.lyra.player.ui.component.overlay.DensityScaledAlertDialog as AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -96,7 +109,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -133,8 +145,6 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
 import com.google.gson.Gson
-import com.materialkolor.PaletteStyle
-import com.materialkolor.dynamiccolor.ColorSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -172,6 +182,7 @@ import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
 import com.lyra.player.data.playlist.usage.UsageEntry
+import com.lyra.player.data.profile.UserProfileStore
 import com.lyra.player.data.settings.DEFAULT_ENHANCED_ADVANCED_BLUR_RADIUS_DP
 import com.lyra.player.data.settings.AdvancedBlurQualityPreference
 import com.lyra.player.data.settings.FloatingLyricsPreferences
@@ -189,10 +200,6 @@ import com.lyra.player.navigation.Destinations
 import com.lyra.player.navigation.LauncherShortcutAction
 import com.lyra.player.navigation.LauncherShortcutRequest
 import com.lyra.player.navigation.launcherShortcutMainTabRoute
-import com.lyra.player.ui.component.navigation.LyraBottomBar
-import com.lyra.player.ui.component.navigation.resolveBottomBarSelectionAlpha
-import com.lyra.player.ui.component.playback.LyraMiniPlayer
-import com.lyra.player.ui.component.playback.LyraMiniPlayerDefaults
 import com.lyra.player.ui.component.playback.resolvePlaybackWaiting
 import com.lyra.player.ui.component.common.ThemeRevealOverlay
 import com.lyra.player.ui.component.common.blockUnderlyingTouches
@@ -217,6 +224,8 @@ import com.lyra.player.ui.screen.DownloadProgressScreen
 import com.lyra.player.ui.screen.NowPlayingScreen
 import com.lyra.player.ui.screen.RecentScreen
 import com.lyra.player.ui.screen.PlaybackStatsScreen
+import com.lyra.player.ui.screen.account.AccountScreen
+import com.lyra.player.ui.screen.account.CloudPlaylistsScreen
 import com.lyra.player.ui.screen.debug.BiliApiProbeScreen
 import com.lyra.player.ui.screen.debug.CrashLogListScreen
 import com.lyra.player.ui.screen.debug.DebugCrashTestType
@@ -255,19 +264,21 @@ import com.lyra.player.ui.viewmodel.tab.PlaylistSummary
 import com.lyra.player.ui.viewmodel.tab.YouTubeMusicPlaylist
 import com.lyra.player.util.crash.AnrWatchdog
 import com.lyra.player.util.media.CoverArtColorCache
-import com.lyra.player.util.media.normalizeCoverArtColorCacheKey
 import com.lyra.player.core.crash.ExceptionHandler
 import com.lyra.player.util.crash.NativeCrashHandler
 import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.util.media.adjustedAccentColorArgb
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.lyra.player.ui.melox.glass.LocalMeloxBackdrop
 import com.lyra.player.ui.haptic.HapticTextButton
+import com.lyra.player.ui.haptic.performHapticFeedback
 import com.lyra.player.util.platform.openAppBackgroundSettings
 import com.lyra.player.util.platform.readBackgroundBehaviorAllowance
 import com.lyra.player.util.platform.requestIgnoreBatteryOptimizationsCompat
 import com.lyra.player.util.platform.LanguageManager
 import com.lyra.player.util.format.formatFileSize
 import com.lyra.player.util.media.isRemoteImageSource
-import com.lyra.player.util.media.offlineCachedImageRequest
 import com.lyra.player.ui.network.rememberOfflineModeState
 import com.lyra.player.ui.haptic.syncHapticFeedbackSetting
 import kotlin.coroutines.resume
@@ -297,6 +308,8 @@ private val TRANSPARENT_MAIN_TAB_DETAIL_ROUTES = setOf(
     Destinations.LocalPlaylistDetail.route,
     Destinations.Recent.route,
     Destinations.PlaybackStats.route,
+    Destinations.Account.route,
+    Destinations.CloudPlaylists.route,
     Destinations.DownloadManager.route,
     Destinations.DownloadProgress.route
 )
@@ -1215,34 +1228,6 @@ private suspend fun awaitStableDraw(view: View) {
     }
 }
 
-private const val COVER_SEED_WARMUP_DELAY_MS = 180L
-
-private data class PlaybackCoverSeed(
-    val coverUrl: String,
-    val seedHex: String
-)
-
-internal fun resolveActiveCoverSeedHex(
-    visualCoverUrl: String?,
-    sampledCoverUrl: String?,
-    sampledSeedHex: String?
-): String? {
-    val visualCacheKey = normalizeCoverArtColorCacheKey(visualCoverUrl) ?: return null
-    val sampledCacheKey = normalizeCoverArtColorCacheKey(sampledCoverUrl) ?: return null
-    return sampledSeedHex?.takeIf { visualCacheKey == sampledCacheKey }
-}
-
-internal fun resolveCoverSeedWarmupDelayMillis(
-    showNowPlaying: Boolean,
-    dynamicColorEnabled: Boolean,
-    hasCachedSample: Boolean
-): Long {
-    if (!dynamicColorEnabled || showNowPlaying || hasCachedSample) {
-        return 0L
-    }
-    return COVER_SEED_WARMUP_DELAY_MS
-}
-
 /**
  * 根据封面提取播放界面强调色
  */
@@ -1435,13 +1420,11 @@ private fun LyraAppContent(
     val startupPlaybackPreferences = remember(application) {
         readPlaybackPreferenceSnapshotCached(application) ?: PlaybackPreferenceSnapshot()
     }
-    val coverArtImageLoader = remember(context) { Coil.imageLoader(context) }
+    val profileStore = remember(context) { UserProfileStore.getInstance(context) }
+    val userProfile by profileStore.profileFlow.collectAsStateWithLifecycle()
 
     val storedFollowSystemDark by repo.followSystemDarkFlow.collectAsStateWithLifecycle(
         initialValue = initialThemeSnapshot.followSystemDark
-    )
-    val dynamicColorEnabled by repo.dynamicColorFlow.collectAsStateWithLifecycle(
-        initialValue = initialThemeSnapshot.dynamicColor
     )
     val storedForceDark by repo.forceDarkFlow.collectAsStateWithLifecycle(
         initialValue = initialThemeSnapshot.forceDark
@@ -1455,18 +1438,6 @@ private fun LyraAppContent(
     val alwaysRecordLogsEnabled by repo.alwaysRecordLogsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
     val themeSeedColor by repo.themeSeedColorFlow.collectAsStateWithLifecycle(initialValue = ThemeDefaults.DEFAULT_SEED_COLOR_HEX)
     val themeColorPalette by repo.themeColorPaletteFlow.collectAsStateWithLifecycle(initialValue = ThemeDefaults.PRESET_COLORS)
-    val themePaletteStyleValue by repo.themePaletteStyleFlow.collectAsStateWithLifecycle(
-        initialValue = ThemeDefaults.DEFAULT_PALETTE_STYLE
-    )
-    val themeColorSpecValue by repo.themeColorSpecFlow.collectAsStateWithLifecycle(
-        initialValue = ThemeDefaults.DEFAULT_COLOR_SPEC
-    )
-    val themePaletteStyle = remember(themePaletteStyleValue) {
-        PaletteStyle.valueOf(ThemeDefaults.normalizePaletteStyle(themePaletteStyleValue))
-    }
-    val themeColorSpec = remember(themeColorSpecValue) {
-        ColorSpec.SpecVersion.valueOf(ThemeDefaults.normalizeColorSpec(themeColorSpecValue))
-    }
     val lyricBlurEnabled by repo.lyricBlurEnabledFlow.collectAsStateWithLifecycle(initialValue = true)
     val lyricBlurAmount by repo.lyricBlurAmountFlow.collectAsStateWithLifecycle(initialValue = 1.5f)
     val cloudMusicLyricDefaultOffsetMs by repo.cloudMusicLyricDefaultOffsetMsFlow
@@ -1521,9 +1492,6 @@ private fun LyraAppContent(
     val showLyricTranslation by repo.showLyricTranslationFlow.collectAsStateWithLifecycle(initialValue = true)
     val defaultStartDestination: String? by repo.defaultStartDestinationFlow
         .collectAsStateWithLifecycle(initialValue = null)
-    val alwaysUseNewTabStyle by repo.alwaysUseNewTabStyleFlow
-        .collectAsStateWithLifecycle(initialValue = true)
-    val showHomeContinueCard by repo.homeCardContinueFlow.collectAsStateWithLifecycle(initialValue = true)
     val showHomeTrendingCard by repo.homeCardTrendingFlow.collectAsStateWithLifecycle(initialValue = true)
     val showHomeRadarCard by repo.homeCardRadarFlow.collectAsStateWithLifecycle(initialValue = true)
     val showHomeRecommendedCard by repo.homeCardRecommendedFlow.collectAsStateWithLifecycle(initialValue = true)
@@ -1591,7 +1559,6 @@ private fun LyraAppContent(
     }
     val showHomeTab =
         shouldShowHomeContinueSection(
-            showContinueCard = showHomeContinueCard,
             usageLoaded = homeUsageSnapshot.isLoaded,
             hasUsage = homeUsageSnapshot.entries.isNotEmpty()
         ) ||
@@ -1706,7 +1673,6 @@ private fun LyraAppContent(
     }
 
     // 缓存当前封面的取色结果, 避免开关动态取色时先闪到默认种子色
-    var coverSeed by remember { mutableStateOf<PlaybackCoverSeed?>(null) }
     val currentSong by PlayerManager.currentSongFlow.collectAsStateWithLifecycle()
     val displayCoverUrl = rememberSongDisplayCoverUrl(currentSong)
     val currentSongKey = remember(currentSong) { currentSong?.stableKey() }
@@ -1829,48 +1795,6 @@ private fun LyraAppContent(
         }
     }
 
-    LaunchedEffect(playbackVisualCoverUrl, coverArtRefreshToken, showNowPlaying, dynamicColorEnabled, offlineMode) {
-        if (playbackVisualCoverUrl.isNullOrBlank() || !dynamicColorEnabled) {
-            coverSeed = null
-            return@LaunchedEffect
-        }
-        val cachedSample = CoverArtColorCache.peek(playbackVisualCoverUrl)
-        coverSeed = cachedSample?.let { sample ->
-            PlaybackCoverSeed(
-                coverUrl = playbackVisualCoverUrl,
-                seedHex = sample.seedHex
-            )
-        }
-
-        if (showNowPlaying && isRemoteImageSource(playbackVisualCoverUrl)) {
-            coverArtImageLoader.enqueue(
-                offlineCachedImageRequest(
-                    context = context,
-                    data = playbackVisualCoverUrl,
-                    sizePx = 256,
-                    allowHardware = false,
-                    offlineMode = offlineMode
-                )
-            )
-        }
-
-        val warmupDelayMillis = resolveCoverSeedWarmupDelayMillis(
-            showNowPlaying = showNowPlaying,
-            dynamicColorEnabled = dynamicColorEnabled,
-            hasCachedSample = cachedSample != null
-        )
-        if (warmupDelayMillis > 0L) {
-            delay(warmupDelayMillis)
-        }
-
-        CoverArtColorCache.preload(context, playbackVisualCoverUrl, offlineMode)?.let { sample ->
-            coverSeed = PlaybackCoverSeed(
-                coverUrl = playbackVisualCoverUrl,
-                seedHex = sample.seedHex
-            )
-        }
-    }
-
     // 同步触感反馈设置
     LaunchedEffect(hapticFeedbackEnabled) {
         syncHapticFeedbackSetting(hapticFeedbackEnabled)
@@ -1898,6 +1822,7 @@ private fun LyraAppContent(
         defaultStartDestination ?: initialMainStartDestination
     val backgroundGlassBackdrop = rememberAdvancedGlassBackdrop()
     val contentGlassBackdrop = rememberAdvancedGlassBackdrop()
+    val meloxBackdrop = rememberLayerBackdrop()
     val advancedGlassController = remember(
         advancedBlurEnabled,
         enhancedAdvancedBlurEnabled,
@@ -1932,6 +1857,13 @@ private fun LyraAppContent(
         ) {
             startupGlassGateReleased = true
         }
+    }
+    // Some GPUs never report a ready blur effect; never keep the shell covered
+    // behind the startup gate after the first frames.
+    LaunchedEffect(advancedGlassController.isBaseBlurEnabled, startupGlassGateReleased) {
+        if (!advancedGlassController.isBaseBlurEnabled || startupGlassGateReleased) return@LaunchedEffect
+        delay(1200)
+        startupGlassGateReleased = true
     }
     val preferredQuality by repo.audioQualityFlow.collectAsStateWithLifecycle(initialValue = "exhigh")
     val youtubePreferredQuality by repo.youtubeAudioQualityFlow.collectAsStateWithLifecycle(initialValue = "high")
@@ -2145,8 +2077,6 @@ private fun LyraAppContent(
                 startIndex = index
             )
         }
-        // 先提交当前歌曲, 播放页首帧不能继续绘制上一首封面
-        showNowPlaying = true
         scheduleAudioServiceStart(
             "play_songs_and_open_now_playing",
             true
@@ -2163,8 +2093,6 @@ private fun LyraAppContent(
             source = "ui_click_preserve_queue_before_play"
         )
         PlayerManager.replaceCurrentInQueueAndPlay(song)
-        // 先提交当前歌曲, 播放页首帧不能继续绘制上一首封面
-        showNowPlaying = true
         scheduleAudioServiceStart(
             "play_search_result_preserve_queue",
             true
@@ -2251,26 +2179,10 @@ private fun LyraAppContent(
         return "local_playlist_detail/$id"
     }
 
-    val activeCoverSeedHex = resolveActiveCoverSeedHex(
-        visualCoverUrl = playbackVisualCoverUrl,
-        sampledCoverUrl = coverSeed?.coverUrl,
-        sampledSeedHex = coverSeed?.seedHex
-    )
-        val effectiveSeedHex = if (dynamicColorEnabled) {
-            activeCoverSeedHex ?: themeSeedColor
-        } else {
-            themeSeedColor
-        }
-        val useSystemDynamic =
-            dynamicColorEnabled && activeCoverSeedHex == null && playbackVisualCoverUrl == null
-
     LyraTheme(
             followSystemDark = followSystemDark,
             forceDark = forceDark,
-            dynamicColor = useSystemDynamic,
-            seedColorHex = effectiveSeedHex,
-            paletteStyle = themePaletteStyle,
-            colorSpec = themeColorSpec,
+            accentColorHex = themeSeedColor,
             systemDark = systemDark
     ) {
             // changing NavHost's start destination rebuilds its graph and clears the live stack
@@ -2376,6 +2288,15 @@ private fun LyraAppContent(
             var pendingMainTabRoute by remember(navHostStartDestination) {
                 mutableStateOf<String?>(null)
             }
+            // 搜索页时底栏收起层要显示"最后进入的那个标签"，所以单独记住它。
+            var lastContentTabRoute by rememberSaveable(navHostStartDestination) {
+                mutableStateOf(navHostStartDestination)
+            }
+            LaunchedEffect(selectedMainTabRoute) {
+                if (selectedMainTabRoute != Destinations.Explore.route) {
+                    lastContentTabRoute = selectedMainTabRoute
+                }
+            }
             val mainTabTransitionState = rememberMainTabLayerTransitionState(
                 selectedMainTabRoute
             )
@@ -2422,6 +2343,11 @@ private fun LyraAppContent(
                     return
                 }
                 pendingMainTabRoute = route
+                // 下载等非主标签页面可能叠在主标签之上：先弹回目标标签，
+                // 弹不到再走常规导航，避免"点首页仍停留在下载页"。
+                if (navController.popBackStack(route, inclusive = false)) {
+                    return
+                }
                 navController.navigate(route) {
                     popUpTo(navController.graph.startDestinationId) {
                         saveState = true
@@ -2651,13 +2577,12 @@ private fun LyraAppContent(
             val bottomBarItems = remember(showHomeTab, devModeEnabled) {
                 buildList {
                     if (showHomeTab) add(Destinations.Home to Icons.Outlined.Home)
-                    add(Destinations.Explore to Icons.Outlined.Search)
                     add(Destinations.Library to Icons.Outlined.LibraryMusic)
-                    // 设置入口已移到首页右上角；仅当首页被隐藏时保留底栏入口，避免设置无处可进
-                    if (!showHomeTab) add(Destinations.Settings to Icons.Outlined.Settings)
+                    add(Destinations.Settings to Icons.Outlined.Settings)
                     if (devModeEnabled) add(Destinations.Debug to Icons.Outlined.BugReport)
                 }
             }
+            val searchDockActive = selectedMainTabRoute == Destinations.Explore.route
 
             val snackbarHostState = remember { SnackbarHostState() }
             val homeHostRuntimeState = rememberHomeHostRuntimeState()
@@ -2763,7 +2688,6 @@ private fun LyraAppContent(
             fun RenderMainTabRoute(route: String) {
                 when (route) {
                     Destinations.Home.route -> HomeHostScreen(
-                        showContinueCard = showHomeContinueCard,
                         showTrendingCard = showHomeTrendingCard,
                         showRadarCard = showHomeRadarCard,
                         showRecommendedCard = showHomeRecommendedCard,
@@ -2780,6 +2704,8 @@ private fun LyraAppContent(
                         biliPlaylistSourceRoute = ::biliPlaylistSourceRoute,
                         localPlaylistSourceRoute = ::localPlaylistSourceRoute,
                         onOpenSettings = { navigateToMainTab(Destinations.Settings.route) },
+                        avatarUri = userProfile.avatarUri,
+                        onOpenAccount = { navController.navigate(Destinations.Account.route) },
                         coherentFeedbackEnabled = coherentFeedbackEnabled,
                         renderScene = { revealTop, translationY, scale, sceneDepth, sceneContent ->
                             RenderMainTabNavigationScene(
@@ -2829,6 +2755,9 @@ private fun LyraAppContent(
                         onOpenStats = {
                             navController.navigate(Destinations.PlaybackStats.route)
                         },
+                        onOpenDownloads = {
+                            navController.navigate(Destinations.DownloadManager.route)
+                        },
                         offlineMode = offlineMode,
                         coherentFeedbackEnabled = coherentFeedbackEnabled,
                         renderScene = { revealTop, translationY, scale, sceneDepth, sceneContent ->
@@ -2843,8 +2772,6 @@ private fun LyraAppContent(
                     )
 
                     Destinations.Settings.route -> SettingsHostScreen(
-                        dynamicColor = dynamicColorEnabled,
-                        onDynamicColorChange = { scope.launch { repo.setDynamicColor(it) } },
                         isDarkTheme = isDark,
                         themeMode = themeMode,
                         onThemeToggleRequest = ::requestThemeToggle,
@@ -2882,8 +2809,8 @@ private fun LyraAppContent(
                                 repo.setMobileDataBiliAudioQuality(quality)
                             }
                         },
-                        seedColorHex = themeSeedColor,
-                        onSeedColorChange = { hex ->
+                        accentColorHex = themeSeedColor,
+                        onAccentColorChange = { hex ->
                             scope.launch { repo.setThemeSeedColor(hex) }
                         },
                         themeColorPalette = themeColorPalette,
@@ -2892,14 +2819,6 @@ private fun LyraAppContent(
                         },
                         onRemoveColorFromPalette = { hex ->
                             scope.launch { repo.removeThemePaletteColor(hex) }
-                        },
-                        themePaletteStyle = themePaletteStyleValue,
-                        onThemePaletteStyleChange = { style ->
-                            scope.launch { repo.setThemePaletteStyle(style) }
-                        },
-                        themeColorSpec = themeColorSpecValue,
-                        onThemeColorSpecChange = { spec ->
-                            scope.launch { repo.setThemeColorSpec(spec) }
                         },
                         devModeEnabled = devModeEnabled,
                         onDevModeChange = { enabled ->
@@ -3050,10 +2969,6 @@ private fun LyraAppContent(
                         defaultStartDestination = currentDefaultStartDestination,
                         onDefaultStartDestinationChange = { route ->
                             scope.launch { repo.setDefaultStartDestination(route) }
-                        },
-                        showHomeContinueCard = showHomeContinueCard,
-                        onShowHomeContinueCardChange = { enabled ->
-                            scope.launch { repo.setHomeCardContinue(enabled) }
                         },
                         showHomeTrendingCard = showHomeTrendingCard,
                         onShowHomeTrendingCardChange = { enabled ->
@@ -3361,12 +3276,38 @@ private fun LyraAppContent(
 
                 val containerColor = Color.Transparent
 
-                val selectAlpha = resolveBottomBarSelectionAlpha(
-                    hasCustomBackground = backgroundImageUri != null,
-                    alwaysUseNewTabStyle = alwaysUseNewTabStyle
-                )
-
                 val isMiniPlayerVisible = currentSong != null && !showNowPlaying
+                // 下拉/上滑联动底栏：内容向下滚动时收起成图标+迷你播放器。
+                var chromeCollapsed by rememberSaveable { mutableStateOf(false) }
+                val chromeCollapseConnection = remember {
+                    object : NestedScrollConnection {
+                        override fun onPreScroll(
+                            available: Offset,
+                            source: NestedScrollSource
+                        ): Offset {
+                            if (source == NestedScrollSource.UserInput) {
+                                if (available.y < -6f && !chromeCollapsed) {
+                                    chromeCollapsed = true
+                                } else if (available.y > 6f && chromeCollapsed) {
+                                    chromeCollapsed = false
+                                }
+                            }
+                            return Offset.Zero
+                        }
+
+                        override suspend fun onPostFling(
+                            consumed: Velocity,
+                            available: Velocity
+                        ): Velocity {
+                            if (consumed.y < -800f || available.y < -800f) {
+                                chromeCollapsed = true
+                            } else if (consumed.y > 800f || available.y > 800f) {
+                                chromeCollapsed = false
+                            }
+                            return Velocity.Zero
+                        }
+                    }
+                }
                 val isPlaybackControlPlaying by PlayerManager.playbackControlPlayingFlow.collectAsStateWithLifecycle()
                 val isAudioRouteMuted by PlayerManager.audioRouteMuteSuppressedFlow
                     .collectAsStateWithLifecycle()
@@ -3378,11 +3319,21 @@ private fun LyraAppContent(
                     isPlaying = isPlaying,
                     usbPlaybackPreparing = usbPlaybackPreparing
                 )
-                val reservedMiniPlayerHeightDp = if (isMiniPlayerVisible) {
-                    LyraMiniPlayerDefaults.Height
-                } else {
-                    0.dp
-                }
+                // The mini player lives inside the bottom bar, so the bar's own
+                // measured height already reserves the space it occupies.
+                val reservedMiniPlayerHeightDp = 0.dp
+
+                // 播放器展开时页面层下沉：0.83 缩放 / 30dp 下移 / 0.24 压暗，
+                // 与参考播放器同一口径；只作用于页面层，底部 chrome 不随之缩放。
+                val playerRecedeProgress by animateFloatAsState(
+                    targetValue = if (showNowPlaying) 1f else 0f,
+                    animationSpec = tween(
+                        durationMillis = if (showNowPlaying) 350 else 320,
+                        easing = FastOutSlowInEasing
+                    ),
+                    label = "player_recede_progress"
+                )
+                val playerRecedeShape = remember { RoundedCornerShape(36.dp) }
 
                 LaunchedEffect(currentRoute, showHomeTab, effectiveStartDestination) {
                     if (!showHomeTab && currentRoute == Destinations.Home.route) {
@@ -3396,7 +3347,16 @@ private fun LyraAppContent(
                     }
                 }
 
-                CompositionLocalProvider(LocalMiniPlayerHeight provides reservedMiniPlayerHeightDp) {
+                CompositionLocalProvider(
+                    LocalMiniPlayerHeight provides reservedMiniPlayerHeightDp,
+                    LocalMeloxBackdrop provides if (
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    ) {
+                        meloxBackdrop
+                    } else {
+                        null
+                    }
+                ) {
                     AppFeedbackHostEffect(snackbarHostState)
                     Scaffold(
                         containerColor = containerColor,
@@ -3441,13 +3401,73 @@ private fun LyraAppContent(
                                         OfflineModeBottomBanner()
                                     }
 
-                                    LyraBottomBar(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        selectAlpha = selectAlpha,
-                                        items = bottomBarItems,
-                                        currentDestination = backEntry?.destination,
-                                        onItemSelected = { dest ->
-                                            navigateToMainTab(dest.route)
+                                    MeloxBottomChrome(
+                                        items = bottomBarItems.map { (dest, icon) ->
+                                            MeloxTabItem(
+                                                route = dest.route,
+                                                label = stringResource(dest.labelResId),
+                                                icon = icon,
+                                                selectedIcon = when (dest) {
+                                                    Destinations.Home -> Icons.Filled.Home
+                                                    Destinations.Library -> Icons.Filled.LibraryMusic
+                                                    Destinations.Settings -> Icons.Filled.Settings
+                                                    Destinations.Debug -> Icons.Filled.BugReport
+                                                    else -> null
+                                                }
+                                            )
+                                        },
+                                        selectedRoute = if (searchDockActive) {
+                                            null
+                                        } else {
+                                            selectedMainTabRoute
+                                        },
+                                        searchActive = searchDockActive,
+                                        compactRoute = lastContentTabRoute,
+                                        collapsed = chromeCollapsed,
+                                        onSelect = { route ->
+                                            context.performHapticFeedback()
+                                            chromeCollapsed = false
+                                            navigateToMainTab(route)
+                                        },
+                                        onSearchClick = {
+                                            context.performHapticFeedback()
+                                            chromeCollapsed = false
+                                            navigateToMainTab(Destinations.Explore.route)
+                                        },
+                                        miniPlayerVisible = isMiniPlayerVisible,
+                                        miniPlayer = { compactProgress ->
+                                            AnimatedVisibility(
+                                                visible = isMiniPlayerVisible,
+                                                enter = slideInVertically(
+                                                    animationSpec = tween(
+                                                        durationMillis = 220,
+                                                        easing = FastOutSlowInEasing
+                                                    ),
+                                                    initialOffsetY = { it / 2 }
+                                                ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+                                                exit = slideOutVertically(
+                                                    animationSpec = tween(
+                                                        durationMillis = 180,
+                                                        easing = FastOutSlowInEasing
+                                                    ),
+                                                    targetOffsetY = { it / 2 }
+                                                ) + fadeOut(animationSpec = tween(durationMillis = 120))
+                                            ) {
+                                                MeloxMiniPlayer(
+                                                    title = currentSong?.displayName()
+                                                        ?: composeResources.getString(
+                                                            R.string.nowplaying_no_playback
+                                                        ),
+                                                    artist = currentSong?.displayArtist() ?: "",
+                                                    coverUrl = displayCoverUrl,
+                                                    isPlaying = isPlaybackControlPlaying,
+                                                    playPauseEnabled = !usbPlaybackPreparing,
+                                                    onPlayPause = { PlayerManager.togglePlayPause() },
+                                                    onNext = { PlayerManager.next() },
+                                                    onExpand = { showNowPlaying = true },
+                                                    compactProgress = compactProgress
+                                                )
+                                            }
                                         }
                                     )
                                 }
@@ -3471,11 +3491,45 @@ private fun LyraAppContent(
                                         bottom = bottomBarLayoutInsets.navContentBottomPadding
                                     )
                                     .clipToBounds()
+                                    .then(
+                                        if (
+                                            Build.VERSION.SDK_INT >=
+                                            Build.VERSION_CODES.TIRAMISU
+                                        ) {
+                                            Modifier.layerBackdrop(meloxBackdrop)
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                                    .graphicsLayer {
+                                        val progress = playerRecedeProgress
+                                        if (progress > 0.0005f) {
+                                            scaleX = 1f - 0.17f * progress
+                                            scaleY = 1f -
+                                                (0.17f * size.width / size.height) * progress
+                                            translationY = 30.dp.toPx() * progress
+                                            transformOrigin = TransformOrigin.Center
+                                            shape = playerRecedeShape
+                                            clip = true
+                                        } else {
+                                            clip = false
+                                        }
+                                    }
+                                    .drawWithContent {
+                                        drawContent()
+                                        val progress = playerRecedeProgress
+                                        if (progress > 0.0005f) {
+                                            drawRect(
+                                                Color.Black.copy(alpha = 0.24f * progress)
+                                            )
+                                        }
+                                    }
                             ) {
                                 // Keep the effect on a stable layer outside NavHost transitions
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
+                                        .nestedScroll(chromeCollapseConnection)
                                         .captureAdvancedGlassBackdrop(contentGlassBackdrop)
                                 ) {
                                     MainTabLayerHost(
@@ -3930,6 +3984,63 @@ private fun LyraAppContent(
                                 }
 
                                 composable(
+                                    route = Destinations.Account.route,
+                                    enterTransition = {
+                                        transparentDetailEnterTransition(coherentFeedbackEnabled)
+                                    },
+                                    exitTransition = {
+                                        transparentDetailExitTransition(coherentFeedbackEnabled)
+                                    },
+                                    popEnterTransition = {
+                                        transparentDetailPopEnterTransition(coherentFeedbackEnabled)
+                                    },
+                                    popExitTransition = {
+                                        transparentDetailPopExitTransition(coherentFeedbackEnabled)
+                                    }
+                                ) {
+                                    RenderNavHostScene(Destinations.Account.route) {
+                                        AccountScreen(
+                                            onBack = { navController.popBackStack() },
+                                            onOpenHistory = {
+                                                navController.navigate(Destinations.Recent.route)
+                                            },
+                                            onOpenCloudPlaylists = {
+                                                navController.navigate(
+                                                    Destinations.CloudPlaylists.route
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+
+                                composable(
+                                    route = Destinations.CloudPlaylists.route,
+                                    enterTransition = {
+                                        transparentDetailEnterTransition(coherentFeedbackEnabled)
+                                    },
+                                    exitTransition = {
+                                        transparentDetailExitTransition(coherentFeedbackEnabled)
+                                    },
+                                    popEnterTransition = {
+                                        transparentDetailPopEnterTransition(coherentFeedbackEnabled)
+                                    },
+                                    popExitTransition = {
+                                        transparentDetailPopExitTransition(coherentFeedbackEnabled)
+                                    }
+                                ) {
+                                    RenderNavHostScene(Destinations.CloudPlaylists.route) {
+                                        CloudPlaylistsScreen(
+                                            onBack = { navController.popBackStack() },
+                                            onOpenPlaylist = { playlistId ->
+                                                navController.navigate(
+                                                    localPlaylistSourceRoute(playlistId)
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+
+                                composable(
                                     route = Destinations.PlaybackStats.route,
                                     enterTransition = {
                                         transparentDetailEnterTransition(coherentFeedbackEnabled)
@@ -3996,7 +4107,8 @@ private fun LyraAppContent(
                                                 )
                                             },
                                             listState = downloadManagerListState,
-                                            offlineMode = offlineMode
+                                            offlineMode = offlineMode,
+                                            asTabRoot = true
                                         )
                                     }
                                 }
@@ -4218,43 +4330,6 @@ private fun LyraAppContent(
                                         }
                                     }
                                 }
-
-                                AnimatedVisibility(
-                                    visible = currentSong != null && !showNowPlaying,
-                                    modifier = Modifier
-                                        .align(Alignment.BottomStart)
-                                        .padding(
-                                            bottom = bottomBarLayoutInsets.miniPlayerBottomPadding
-                                        )
-                                        .zIndex(MINI_PLAYER_OVERLAY_Z_INDEX),
-                                enter = slideInVertically(
-                                    animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-                                    initialOffsetY = { it / 2 }
-                                ) + fadeIn(animationSpec = tween(durationMillis = 180)),
-                                exit = slideOutVertically(
-                                    animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                                    targetOffsetY = { it / 2 }
-                                ) + fadeOut(animationSpec = tween(durationMillis = 120))
-                                ) {
-                                    LyraMiniPlayer(
-                                    title = currentSong?.displayName()
-                                        ?: composeResources.getString(R.string.nowplaying_no_playback),
-                                    artist = currentSong?.displayArtist() ?: "",
-                                    coverUrl = displayCoverUrl,
-                                    isPlaying = isPlaybackControlPlaying,
-                                    playPauseEnabled = !usbPlaybackPreparing,
-                                    modifier = Modifier,
-                                    onPlayPause = { PlayerManager.togglePlayPause() },
-                                    onPrevious = { PlayerManager.previous() },
-                                    onNext = { PlayerManager.next() },
-                                    onExpand = { showNowPlaying = true },
-                                    enableBlur = effectiveAdvancedBlurEnabled,
-                                    offlineMode = offlineMode,
-                                    isPlaybackWaiting = isPlaybackWaiting,
-                                    isAudioRouteMuted = isAudioRouteMuted,
-                                    showProgress = true
-                                    )
-                                }
                             }
                         }
                     }
@@ -4263,13 +4338,13 @@ private fun LyraAppContent(
                 AnimatedVisibility(
                     visible = showNowPlaying,
                     enter = slideInVertically(
-                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                        animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
                         initialOffsetY = { fullHeight -> fullHeight }
-                    ) + fadeIn(animationSpec = tween(durationMillis = 150)),
+                    ) + fadeIn(animationSpec = tween(durationMillis = 180)),
                     exit = slideOutVertically(
-                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+                        animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
                         targetOffsetY = { fullHeight -> fullHeight }
-                    ) + fadeOut(animationSpec = tween(durationMillis = 150))
+                    ) + fadeOut(animationSpec = tween(durationMillis = 180))
                 ) {
                     DisposableEffect(Unit) {
                         latestOnNowPlayingVisibilityChanged(true)
@@ -4278,21 +4353,11 @@ private fun LyraAppContent(
                         }
                     }
                     val currentCoverUrl = playbackVisualCoverUrl
-                    val effectiveSeedHex = if (dynamicColorEnabled) {
-                        activeCoverSeedHex ?: themeSeedColor
-                    } else {
-                        themeSeedColor
-                    }
-                    val useSystemDynamic =
-                        dynamicColorEnabled && activeCoverSeedHex == null && currentCoverUrl == null
 
                     LyraTheme(
                         followSystemDark = false,
                         forceDark = true,
-                        dynamicColor = useSystemDynamic,
-                        seedColorHex = effectiveSeedHex,
-                        paletteStyle = themePaletteStyle,
-                        colorSpec = themeColorSpec
+                        accentColorHex = themeSeedColor
                     ) {
                         BackHandler { showNowPlaying = false }
 

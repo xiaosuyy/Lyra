@@ -372,4 +372,9 @@ dependencies {
     implementation(libs.androidx.palette.ktx)
 
     implementation(libs.superlyricapi)
+
+    // MeloX-style liquid glass (same Kyant0 libraries as the reference UI).
+    implementation(libs.kyant.backdrop)
+    implementation(libs.kyant.shapes)
+    implementation(libs.kyant.capsule)
 }

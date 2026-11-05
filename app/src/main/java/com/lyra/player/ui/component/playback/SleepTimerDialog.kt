@@ -34,6 +34,8 @@ import com.lyra.player.ui.component.overlay.DensityScaledAlertDialog as AlertDia
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -41,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.player.timer.SleepTimerMode
+import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.R
 
 @Composable
@@ -69,8 +72,9 @@ fun SleepTimerDialog(
                 if (timerState.isActive) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                            containerColor = Color.White.copy(alpha = 0.10f)
                         )
                     ) {
                         Column(
@@ -119,8 +123,8 @@ fun SleepTimerDialog(
                 // 倒计时滑块
                 Text(
                     text = stringResource(R.string.sleep_timer_countdown),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    style = MeloxType.subheadline,
+                    color = Color.White.copy(alpha = 0.60f)
                 )
 
                 Text(
@@ -138,10 +142,19 @@ fun SleepTimerDialog(
                     onValueChange = { sliderValue = (it / 5f).toInt() * 5f },
                     valueRange = 5f..120f,
                     steps = 22,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color.White,
+                        activeTrackColor = Color.White.copy(alpha = 0.96f),
+                        inactiveTrackColor = Color.White.copy(alpha = 0.20f)
+                    )
                 )
 
-                OutlinedButton(
+                Button(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.12f),
+                        contentColor = Color.White
+                    ),
                     onClick = {
                         PlayerManager.sleepTimerManager.startCountdown(
                             minutes = sliderValue.toInt(),
@@ -159,11 +172,15 @@ fun SleepTimerDialog(
                 // 其他模式
                 Text(
                     text = stringResource(R.string.sleep_timer_other_modes),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    style = MeloxType.subheadline,
+                    color = Color.White.copy(alpha = 0.60f)
                 )
 
-                OutlinedButton(
+                Button(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.12f),
+                        contentColor = Color.White
+                    ),
                     onClick = {
                         PlayerManager.sleepTimerManager.startFinishCurrent()
                         onDismiss()
@@ -179,7 +196,11 @@ fun SleepTimerDialog(
                     Text(stringResource(R.string.sleep_timer_finish_current))
                 }
 
-                OutlinedButton(
+                Button(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.12f),
+                        contentColor = Color.White
+                    ),
                     onClick = {
                         PlayerManager.sleepTimerManager.startFinishPlaylist()
                         onDismiss()

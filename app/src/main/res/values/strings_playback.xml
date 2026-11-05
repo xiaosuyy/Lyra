@@ -134,6 +134,10 @@
     <string name="nowplaying_bluetooth_device">蓝牙设备</string>
     <string name="nowplaying_wired_headset">有线耳机</string>
     <string name="nowplaying_phone_speaker">手机扬声器</string>
+    <string name="nowplaying_cast_title">播放设备</string>
+    <string name="nowplaying_cast_local">本机</string>
+    <string name="nowplaying_cast_dlna">局域网音箱/电视 (DLNA)</string>
+    <string name="nowplaying_cast_no_dlna">未发现设备，请确认音箱或电视已连接同一 Wi-Fi。</string>
     <string name="nowplaying_no_search_result">无搜索结果</string>
     <string name="nowplaying_quality_switch_title">切换当前音质</string>
     <string name="nowplaying_share_song">分享歌曲：%1$s - %2$s\n%3$s</string>

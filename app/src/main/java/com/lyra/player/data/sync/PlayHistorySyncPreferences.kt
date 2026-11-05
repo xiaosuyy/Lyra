@@ -33,6 +33,7 @@ class PlayHistorySyncPreferences(private val context: Context) {
 
     enum class UpdateMode(val intervalMinutes: Int?) {
         IMMEDIATE(null),
+        EVERY_2_MINUTES(2),
         EVERY_10_MINUTES(10),
         EVERY_15_MINUTES(15),
         EVERY_30_MINUTES(30);
@@ -42,7 +43,7 @@ class PlayHistorySyncPreferences(private val context: Context) {
 
         companion object {
             val selectableModes: List<UpdateMode> = listOf(
-                IMMEDIATE,
+                EVERY_2_MINUTES,
                 EVERY_10_MINUTES,
                 EVERY_15_MINUTES,
                 EVERY_30_MINUTES
@@ -51,6 +52,7 @@ class PlayHistorySyncPreferences(private val context: Context) {
             fun fromStoredName(name: String?): UpdateMode? {
                 return when (name?.trim()?.uppercase(Locale.ROOT)) {
                     IMMEDIATE.name -> IMMEDIATE
+                    EVERY_2_MINUTES.name -> EVERY_2_MINUTES
                     EVERY_10_MINUTES.name, LEGACY_BATCHED_MODE, "BATCHED_10" -> EVERY_10_MINUTES
                     EVERY_15_MINUTES.name, "BATCHED_15" -> EVERY_15_MINUTES
                     EVERY_30_MINUTES.name, "BATCHED_30" -> EVERY_30_MINUTES
@@ -69,7 +71,7 @@ class PlayHistorySyncPreferences(private val context: Context) {
             }
         }
         return UpdateMode.fromStoredName(prefs.getString(KEY_UPDATE_MODE, null))
-            ?: UpdateMode.IMMEDIATE
+            ?: DEFAULT_UPDATE_MODE
     }
 
     fun setUpdateMode(mode: UpdateMode) {
@@ -97,5 +99,6 @@ class PlayHistorySyncPreferences(private val context: Context) {
         private const val KEY_UPDATE_MODE = "play_history_update_mode"
         private const val LEGACY_BATCHED_MODE = "BATCHED"
         private const val MINUTE_MILLIS = 60_000L
+        private val DEFAULT_UPDATE_MODE = UpdateMode.EVERY_2_MINUTES
     }
 }

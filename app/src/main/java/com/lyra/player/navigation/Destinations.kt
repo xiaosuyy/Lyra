@@ -44,6 +44,18 @@ sealed class Destinations(val route: String, val labelResId: Int) {
             get() = ROUTE
     }
 
+    object Account {
+        const val ROUTE = "account"
+        val route: String
+            get() = ROUTE
+    }
+
+    object CloudPlaylists {
+        const val ROUTE = "cloud_playlists"
+        val route: String
+            get() = ROUTE
+    }
+
     // DEBUG
     data object Debug : Destinations("debug", com.lyra.player.R.string.nav_debug)
     data object DebugUsbExclusive : Destinations("debug/usb_exclusive", com.lyra.player.R.string.debug_usb_exclusive_title)

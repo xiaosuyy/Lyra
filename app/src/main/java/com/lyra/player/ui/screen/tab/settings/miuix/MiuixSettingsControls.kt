@@ -2,13 +2,13 @@ package com.lyra.player.ui.screen.tab.settings.miuix
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,8 +40,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.lyra.player.ui.haptic.performHapticFeedback
+import com.lyra.player.ui.melox.theme.MeloxSystemColors
+import com.lyra.player.ui.melox.theme.isMeloxDarkTheme
 
 private val MiuixControlShape = RoundedCornerShape(16.dp)
 private val MiuixDialogShape = RoundedCornerShape(28.dp)
@@ -87,7 +89,7 @@ internal fun MiuixSettingsDialog(
         title = title,
         text = text,
         shape = MiuixDialogShape,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        containerColor = MaterialTheme.colorScheme.surface,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         tonalElevation = 0.dp,
@@ -130,7 +132,7 @@ internal fun MiuixSettingsOutlinedButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val context = LocalContext.current
-    OutlinedButton(
+    Button(
         onClick = {
             context.performHapticFeedback()
             onClick()
@@ -138,12 +140,11 @@ internal fun MiuixSettingsOutlinedButton(
         modifier = modifier.height(44.dp),
         enabled = enabled,
         shape = MiuixControlShape,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.10f),
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            disabledContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f),
+            disabledContentColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
         ),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         content = content
@@ -206,7 +207,20 @@ internal fun MiuixSettingsTextField(
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         visualTransformation = visualTransformation,
-        shape = MiuixControlShape
+        shape = MiuixControlShape,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f),
+            disabledContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.04f),
+            focusedBorderColor = Color.Transparent,
+            unfocusedBorderColor = Color.Transparent,
+            disabledBorderColor = Color.Transparent,
+            focusedTextColor = MaterialTheme.colorScheme.onBackground,
+            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+            cursorColor = MaterialTheme.colorScheme.primary
+        )
     )
 }
 
@@ -280,20 +294,26 @@ internal fun MiuixSettingsSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val checkedTrack = if (isMeloxDarkTheme()) MeloxSystemColors.GreenDark else MeloxSystemColors.Green
+    val uncheckedTrack = if (isMeloxDarkTheme()) {
+        Color(0xFF787880).copy(alpha = 0.36f)
+    } else {
+        Color(0xFF787878).copy(alpha = 0.20f)
+    }
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
         modifier = modifier,
         enabled = enabled,
         colors = SwitchDefaults.colors(
-            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-            checkedTrackColor = MaterialTheme.colorScheme.primary,
-            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            disabledCheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            disabledCheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-            disabledUncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            disabledUncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            checkedThumbColor = Color.White,
+            checkedTrackColor = checkedTrack,
+            uncheckedThumbColor = Color.White,
+            uncheckedTrackColor = uncheckedTrack,
+            disabledCheckedThumbColor = Color.White.copy(alpha = 0.70f),
+            disabledCheckedTrackColor = checkedTrack.copy(alpha = 0.40f),
+            disabledUncheckedThumbColor = Color.White.copy(alpha = 0.70f),
+            disabledUncheckedTrackColor = uncheckedTrack.copy(alpha = 0.60f)
         )
     )
 }
@@ -318,11 +338,11 @@ internal fun MiuixSettingsSlider(
         steps = steps,
         onValueChangeFinished = onValueChangeFinished,
         colors = SliderDefaults.colors(
-            thumbColor = MaterialTheme.colorScheme.onPrimary,
+            thumbColor = Color.White,
             activeTrackColor = MaterialTheme.colorScheme.primary,
-            inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            activeTickColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f),
-            inactiveTickColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+            inactiveTrackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.16f),
+            activeTickColor = Color.White.copy(alpha = 0.55f),
+            inactiveTickColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.30f)
         )
     )
 }
@@ -344,7 +364,7 @@ internal fun MiuixSettingsSegmentedTabs(
         modifier = modifier
             .fillMaxWidth()
             .clip(MiuixControlShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f))
             .height(48.dp)
             .padding(4.dp)
     ) {
@@ -361,7 +381,7 @@ internal fun MiuixSettingsSegmentedTabs(
                 .fillMaxHeight()
                 .fillMaxWidth(1f / labels.size)
                 .clip(MiuixInnerShape)
-                .background(MaterialTheme.colorScheme.primary)
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.18f))
         )
 
         Row(
@@ -372,9 +392,9 @@ internal fun MiuixSettingsSegmentedTabs(
                 val selected = index == safeSelectedIndex
                 val contentColor by animateColorAsState(
                     targetValue = if (selected) {
-                        MaterialTheme.colorScheme.onPrimary
+                        MaterialTheme.colorScheme.onBackground
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
                     },
                     animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
                     label = "miuix_segmented_tab_content"
@@ -447,28 +467,19 @@ internal fun MiuixSettingsChoiceRow(
             }
         }
         Box(
-            modifier = Modifier
-                .widthIn(min = 28.dp)
-                .height(28.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(
-                    if (selected) {
-                        if (enabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHighest
-                    }
-                ),
+            modifier = Modifier.size(24.dp),
             contentAlignment = Alignment.Center
         ) {
             if (selected) {
-                Text(
-                    text = "✓",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    style = MaterialTheme.typography.labelMedium
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (enabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
+                    }
                 )
             }
         }

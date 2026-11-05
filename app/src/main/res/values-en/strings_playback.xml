@@ -134,6 +134,10 @@
     <string name="nowplaying_bluetooth_device">Bluetooth Device</string>
     <string name="nowplaying_wired_headset">Wired Headset</string>
     <string name="nowplaying_phone_speaker">Phone Speaker</string>
+    <string name="nowplaying_cast_title">Playback Output</string>
+    <string name="nowplaying_cast_local">This Device</string>
+    <string name="nowplaying_cast_dlna">Speakers &amp; TVs on your network (DLNA)</string>
+    <string name="nowplaying_cast_no_dlna">No devices found. Make sure your speaker or TV is on the same Wi-Fi network.</string>
     <string name="nowplaying_no_search_result">No Search Results</string>
     <string name="nowplaying_quality_switch_title">Switch Current Quality</string>
     <string name="nowplaying_share_song">Share song: %1$s - %2$s\\n%3$s</string>

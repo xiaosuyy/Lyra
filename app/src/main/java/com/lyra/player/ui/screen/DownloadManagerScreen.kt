@@ -58,6 +58,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil.compose.AsyncImage
 import com.lyra.player.R
+import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.core.download.DownloadedSong
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.effect.glass.AdvancedGlassRole
@@ -76,7 +77,8 @@ fun DownloadManagerScreen(
     onBack: () -> Unit,
     onOpenDownloadProgress: () -> Unit,
     listState: LazyListState,
-    offlineMode: Boolean = false
+    offlineMode: Boolean = false,
+    asTabRoot: Boolean = false
 ) {
     val context = LocalContext.current
     val viewModel: DownloadManagerViewModel = viewModel(
@@ -115,21 +117,34 @@ fun DownloadManagerScreen(
         // 顶部栏
         TopAppBar(
             title = {
-                Column {
+                if (asTabRoot) {
                     Text(
-                        stringResource(R.string.download_manager_title),
-                        style = MaterialTheme.typography.titleLarge
+                        stringResource(R.string.nav_downloads),
+                        style = MeloxType.title2,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
-                    Text(
-                        stringResource(R.string.download_manager_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                } else {
+                    Column {
+                        Text(
+                            stringResource(R.string.download_manager_title),
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            stringResource(R.string.download_manager_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             },
             navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                if (!asTabRoot) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
+                    }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -244,14 +259,11 @@ fun DownloadManagerScreen(
         }
 
         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-            val shape = RoundedCornerShape(16.dp)
-            val baseColor = MaterialTheme.colorScheme.surfaceVariant
-            AdvancedGlassSurface(
-                role = AdvancedGlassRole.SemanticCard,
-                modifier = Modifier.fillMaxWidth(),
-                shape = shape,
-                fallbackColor = baseColor.copy(alpha = 0.3f),
-                tintColor = baseColor
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
             ) {
                 Row(
                     modifier = Modifier
@@ -263,13 +275,13 @@ fun DownloadManagerScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = downloadedSongs.size.toString(),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            style = MeloxType.title2,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = stringResource(R.string.downloaded_songs),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MeloxType.caption,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.50f)
                         )
                     }
 
@@ -277,19 +289,19 @@ fun DownloadManagerScreen(
                         modifier = Modifier
                             .height(32.dp)
                             .width(1.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
                     )
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = formatFileSize(totalSize),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            style = MeloxType.title2,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = stringResource(R.string.download_space_used),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MeloxType.caption,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.50f)
                         )
                     }
                 }
@@ -305,12 +317,30 @@ fun DownloadManagerScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            placeholder = { Text(stringResource(R.string.download_search_hint)) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.action_search)) },
+            placeholder = {
+                Text(
+                    stringResource(R.string.download_search_hint),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.40f)
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = stringResource(R.string.action_search),
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                )
+            },
             singleLine = true,
+            shape = RoundedCornerShape(999.dp),
+            textStyle = MeloxType.body,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                focusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.10f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                cursorColor = MaterialTheme.colorScheme.primary
             )
         )
 

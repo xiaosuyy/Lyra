@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -38,12 +39,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import com.lyra.player.R
 import com.lyra.player.core.customsource.CustomSourceManager
+import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsButton
+import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsDialog
+import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsOutlinedButton
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsSwitch
+import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsTextButton
+import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsTextField
 import com.lyra.player.ui.screen.tab.settings.page.MiuixSettingsSectionIntro
 
 /**
@@ -55,6 +62,10 @@ internal fun SettingsCustomSourceSection() {
     val scope = rememberCoroutineScope()
     val states by CustomSourceManager.states.collectAsStateWithLifecycle()
     var message by remember { mutableStateOf<String?>(null) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importUrl by remember { mutableStateOf("") }
+    var isImporting by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -81,6 +92,118 @@ internal fun SettingsCustomSourceSection() {
 
     LaunchedEffect(Unit) {
         CustomSourceManager.ensureLoaded(context)
+    }
+
+    if (showImportDialog) {
+        val isValidUrl = importUrl.trim().let {
+            it.startsWith("http://") || it.startsWith("https://")
+        }
+        MiuixSettingsDialog(
+            onDismissRequest = {
+                if (!isImporting) showImportDialog = false
+            },
+            title = { Text(stringResource(R.string.settings_custom_source_import)) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                ) {
+                    MiuixSettingsOutlinedButton(
+                        onClick = {
+                            if (!isImporting) {
+                                showImportDialog = false
+                                message = null
+                                importLauncher.launch(arrayOf("*/*"))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.settings_custom_source_import_from_local))
+                    }
+                    Text(
+                        text = stringResource(R.string.settings_custom_source_import_or),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    MiuixSettingsTextField(
+                        value = importUrl,
+                        onValueChange = {
+                            importUrl = it
+                            importError = null
+                        },
+                        label = { Text(stringResource(R.string.settings_custom_source_import_url_label)) },
+                        placeholder = {
+                            Text(stringResource(R.string.settings_custom_source_import_url_placeholder))
+                        },
+                        singleLine = true,
+                        enabled = !isImporting,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_custom_source_import_url_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    importError?.let { error ->
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                MiuixSettingsButton(
+                    onClick = {
+                        if (!isValidUrl) {
+                            importError = context.getString(
+                                R.string.settings_custom_source_import_invalid_url
+                            )
+                        } else {
+                            isImporting = true
+                            importError = null
+                            scope.launch {
+                                val importedId = CustomSourceManager.importScriptFromUrl(
+                                    context = context,
+                                    url = importUrl
+                                )
+                                isImporting = false
+                                if (importedId != null) {
+                                    message = context.getString(R.string.settings_custom_source_imported)
+                                    showImportDialog = false
+                                    importUrl = ""
+                                } else {
+                                    importError = context.getString(
+                                        R.string.settings_custom_source_import_failed
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    enabled = importUrl.isNotBlank() && !isImporting
+                ) {
+                    Text(
+                        if (isImporting) {
+                            stringResource(R.string.settings_custom_source_importing)
+                        } else {
+                            stringResource(R.string.settings_custom_source_import_confirm)
+                        }
+                    )
+                }
+            },
+            dismissButton = {
+                MiuixSettingsTextButton(
+                    onClick = {
+                        if (!isImporting) showImportDialog = false
+                    },
+                    enabled = !isImporting
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 
     MiuixSettingsSectionIntro(
@@ -142,7 +265,8 @@ internal fun SettingsCustomSourceSection() {
         TextButton(
             onClick = {
                 message = null
-                importLauncher.launch(arrayOf("*/*"))
+                importError = null
+                showImportDialog = true
             }
         ) {
             Text(stringResource(R.string.settings_custom_source_import))

@@ -824,6 +824,7 @@ private fun buildUiFile(packageName: String, settings: List<SettingSpec>): Strin
         appendLine("    repository: AutoSettingsRepository,")
         appendLine("    scope: CoroutineScope,")
         appendLine("    sectionScope: AutoSettingsSectionScope,")
+        appendLine("    excludedKeys: Set<String> = emptySet(),")
         appendLine("    highlightTargetId: String? = null,")
         appendLine("    highlightPulse: Int = 0,")
         appendLine("    onHighlightFinished: (() -> Unit)? = null")
@@ -832,6 +833,7 @@ private fun buildUiFile(packageName: String, settings: List<SettingSpec>): Strin
         appendLine("        repository = repository,")
         appendLine("        scope = scope,")
         appendLine("        section = sectionScope.key,")
+        appendLine("        excludedKeys = excludedKeys,")
         appendLine("        highlightTargetId = highlightTargetId,")
         appendLine("        highlightPulse = highlightPulse,")
         appendLine("        onHighlightFinished = onHighlightFinished")
@@ -843,6 +845,7 @@ private fun buildUiFile(packageName: String, settings: List<SettingSpec>): Strin
         appendLine("    repository: AutoSettingsRepository,")
         appendLine("    scope: CoroutineScope,")
         appendLine("    section: String,")
+        appendLine("    excludedKeys: Set<String> = emptySet(),")
         appendLine("    highlightTargetId: String? = null,")
         appendLine("    highlightPulse: Int = 0,")
         appendLine("    onHighlightFinished: (() -> Unit)? = null")
@@ -851,6 +854,7 @@ private fun buildUiFile(packageName: String, settings: List<SettingSpec>): Strin
         switchSettings.groupBy { it.section }.forEach { (section, sectionSettings) ->
             appendLine("        ${section.toLiteral()} -> {")
             sectionSettings.forEach { setting ->
+                appendLine("            if (${setting.keyExpression} !in excludedKeys) {")
                 appendLine("            val ${setting.valueName} by repository.${setting.flowName}.collectAsState(initial = ${setting.defaultLiteral()})")
                 appendLine("            AutoSettingsSwitchItem(")
                 appendLine("                checked = ${setting.valueName},")
@@ -867,6 +871,7 @@ private fun buildUiFile(packageName: String, settings: List<SettingSpec>): Strin
                 appendLine("                    scope.launch { repository.${setting.setterName}(value) }")
                 appendLine("                }")
                 appendLine("            )")
+                appendLine("            }")
             }
             appendLine("        }")
         }

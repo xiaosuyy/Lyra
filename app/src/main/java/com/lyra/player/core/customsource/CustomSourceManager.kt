@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.logging.LyraLogger
+import okhttp3.Request
 import org.json.JSONObject
 
 private const val TAG = "CustomSourceManager"
@@ -133,6 +134,43 @@ internal object CustomSourceManager {
             ensureLoaded(context, forceReload = false)
         }
         return id
+    }
+
+    suspend fun importScriptText(
+        context: Context,
+        text: String,
+        displayName: String?
+    ): String? {
+        val id = CustomSourceStore.importScriptText(context, text, displayName)
+        if (id != null) {
+            ensureLoaded(context, forceReload = false)
+        }
+        return id
+    }
+
+    /**
+     * 从网络地址下载并导入音源脚本。
+     */
+    suspend fun importScriptFromUrl(context: Context, url: String): String? {
+        val trimmedUrl = url.trim()
+        if (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://")) {
+            return null
+        }
+        val text = withContext(Dispatchers.IO) {
+            runCatching {
+                val request = Request.Builder().url(trimmedUrl).build()
+                AppContainer.sharedOkHttpClient.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) response.body.string() else null
+                }
+            }.getOrNull()
+        } ?: return null
+        if (text.isBlank()) return null
+        val fileName = trimmedUrl
+            .substringAfterLast('/')
+            .substringBefore('?')
+            .substringBefore('#')
+            .ifBlank { "custom_source" }
+        return importScriptText(context = context, text = text, displayName = fileName)
     }
 
     suspend fun delete(context: Context, id: String) {

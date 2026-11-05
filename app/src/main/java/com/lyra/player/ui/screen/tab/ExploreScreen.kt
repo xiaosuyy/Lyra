@@ -45,6 +45,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +59,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.outlined.ErrorOutline
+import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.ui.theme.designsystem.LyraIconSize
 import com.lyra.player.ui.theme.designsystem.LyraRadius
 import com.lyra.player.ui.theme.designsystem.LocalNeriTextStyles
@@ -93,6 +96,7 @@ import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Clear
@@ -579,6 +583,7 @@ fun ExploreScreen(
     var selectedParts by remember { mutableStateOf<Set<Int>>(emptySet()) }
 
     var showExportSheet by remember { mutableStateOf(false) }
+    var showChannelMenu by remember { mutableStateOf(false) }
 
     val isInternational by AppContainer.settingsRepo.internationalizationEnabledFlow
         .collectAsStateWithLifecycle(initialValue = false)
@@ -640,10 +645,9 @@ fun ExploreScreen(
         history = visibleSearchHistory,
         contentScrolled = isExploreContentScrolled
     )
-    // 搜索类型子标签由当前音源的 Provider 能力决定；单类型（如 Bilibili）不显示类型栏。
+    // 搜索类型子标签由当前音源的 Provider 能力决定；有结果类型可选时固定在搜索框下方。
     val searchTypeBarSource = when {
-        isExploreContentScrolled -> null
-        searchTypeBarTypes.size > 1 -> ui.selectedSearchSource
+        searchQuery.isNotEmpty() && searchTypeBarTypes.size > 1 -> ui.selectedSearchSource
         else -> null
     }
 
@@ -902,7 +906,13 @@ fun ExploreScreen(
         },
         topBar = {
             LargeTopAppBar(
-                title = { Text(stringResource(R.string.nav_explore)) },
+                title = {
+                    Text(
+                        stringResource(R.string.action_search),
+                        style = MeloxType.largeTitle,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                },
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
@@ -939,7 +949,65 @@ fun ExploreScreen(
                                 )
                             )
                         },
-                        leadingIcon = { Icon(Icons.Default.Search, "Search") },
+                        leadingIcon = {
+                            // 渠道选择并入搜索图标：点击展开可勾选的渠道列表。
+                            Box {
+                                HapticIconButton(
+                                    onClick = { showChannelMenu = true },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = stringResource(R.string.search_channel_select),
+                                        tint = if (showChannelMenu) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.70f)
+                                        }
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showChannelMenu,
+                                    onDismissRequest = { showChannelMenu = false }
+                                ) {
+                                    orderedSearchSources.forEach { source ->
+                                        val selected = source == ui.selectedSearchSource
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = searchSourceLabel(source),
+                                                    style = MeloxType.body,
+                                                    color = if (selected) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurface
+                                                    }
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                if (selected) {
+                                                    Icon(
+                                                        Icons.Filled.Check,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            },
+                                            onClick = {
+                                                showChannelMenu = false
+                                                val targetIndex =
+                                                    orderedSearchSources.indexOf(source)
+                                                if (targetIndex >= 0) {
+                                                    scope.launch {
+                                                        pagerState.animateScrollToPage(targetIndex)
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 HapticIconButton(onClick = {
@@ -953,14 +1021,26 @@ fun ExploreScreen(
                             submitExploreSearch()
                         }),
                         singleLine = true,
-                        shape = RoundedCornerShape(LyraRadius.Large),
+                        shape = RoundedCornerShape(LyraRadius.Full),
+                        textStyle = MeloxType.body,
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.10f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            focusedPlaceholderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.40f),
+                            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.40f),
+                            cursorColor = MaterialTheme.colorScheme.primary
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 56.dp)
+                            .heightIn(min = 46.dp)
                     )
                     ExploreSearchHistoryRow(
                         history = visibleSearchHistory,
-                        visible = shouldShowSearchHistory,
+                        visible = shouldShowSearchHistory && searchQuery.isBlank(),
                         query = searchQuery,
                         onHistoryClick = { item -> submitExploreSearch(item) },
                         onClearHistory = {
@@ -978,46 +1058,6 @@ fun ExploreScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    AdvancedGlassSurface(
-                        role = AdvancedGlassRole.ScreenTopTab,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(ExplorePrimaryTabShape),
-                        shape = ExplorePrimaryTabShape
-                    ) {
-                        PrimaryScrollableTabRow(
-                            // 音源列表会随搜索类型被 capability 过滤而变短；索引必须收敛到合法范围，
-                            // 否则 Material3 ScrollableTabRow 会内部 tabs[index] 越界（IndexOutOfBoundsException）。
-                            selectedTabIndex = resolveExploreSelectedTabIndex(
-                                currentPage = pagerState.currentPage,
-                                tabCount = orderedSearchSources.size
-                            ),
-                            edgePadding = 0.dp,
-                            containerColor = Color.Transparent,
-                            contentColor = MaterialTheme.colorScheme.primary
-                        ) {
-                            orderedSearchSources.forEachIndexed { index, source ->
-                                Tab(
-                                    selected = pagerState.currentPage == index,
-                                    onClick = {
-                                        scope.launch {
-                                            pagerState.animateScrollToPage(index)
-                                        }
-                                    },
-                                    text = {
-                                        Text(
-                                            text = searchSourceLabel(source),
-                                            style = LocalNeriTextStyles.current.caption,
-                                            maxLines = 1,
-                                            softWrap = false,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                )
-                            }
-                        }
                     }
                     ExploreSearchTypeBar(
                         source = searchTypeBarSource,
@@ -1048,7 +1088,6 @@ fun ExploreScreen(
                     .weight(1f)
                     .fillMaxWidth()
             ) { page ->
-                val currentSource = orderedSearchSources.getOrNull(page) ?: return@HorizontalPager
                 if (searchQuery.isNotEmpty()) {
                     if (shouldRenderExploreSearchResults(page, pagerState.currentPage)) {
                         when {
@@ -1185,7 +1224,6 @@ fun ExploreScreen(
                                             }.takeIf { it >= 0 } ?: index
                                             val isFavoriteSong = favoriteSongKeys.contains(song.stableKey())
                                             SongRow(
-                                                index = index + 1,
                                                 song = song,
                                                 isFavorite = isFavoriteSong,
                                                 favoriteActionEnabled = localPlaylistsReady,
@@ -1348,64 +1386,8 @@ fun ExploreScreen(
                         Box(Modifier.fillMaxSize())
                     }
                 } else {
-                    when (currentSource) {
-                        // 「全部」聚合入口在无关键词时与网易云默认页一致
-                        SearchSource.ALL,
-                        SearchSource.NETEASE -> {
-                            NeteaseDefaultContent(
-                                gridState = gridState,
-                                ui = ui,
-                                tagKeys = tagKeys,
-                                tagLabels = tagLabels,
-                                favoriteKeys = favoriteKeys,
-                                vm = vm,
-                                onPlay = onPlay,
-                                tagChipSelectedAlpha = tagChipSelectedAlpha,
-                                tagChipUnselectedAlpha = tagChipUnselectedAlpha,
-                                tagChipBorderAlpha = tagChipBorderAlpha,
-                                isTabletLayout = isTabletLayout
-                            )
-                        }
-                        SearchSource.BILIBILI -> {
-                            ExploreChannelDefaultContent(
-                                source = SearchSource.BILIBILI,
-                                onKeywordClick = { keyword -> submitExploreSearch(keyword) },
-                                isTabletLayout = isTabletLayout
-                            )
-                        }
-                        SearchSource.KUWO,
-                        SearchSource.KUGOU,
-                        SearchSource.MIGU,
-                        SearchSource.TENCENT -> {
-                            ExploreChannelDefaultContent(
-                                source = if (currentSource == SearchSource.KUWO) {
-                                    SearchSource.KUGOU
-                                } else {
-                                    currentSource
-                                },
-                                onKeywordClick = { keyword -> submitExploreSearch(keyword) },
-                                isTabletLayout = isTabletLayout
-                            )
-                        }
-                        SearchSource.YOUTUBE_MUSIC -> {
-                            YouTubeMusicExploreContent(
-                                ui = ui,
-                                vm = vm,
-                                onClick = onYouTubeMusicPlaylistClick,
-                                offlineMode = offlineMode,
-                                isTabletLayout = isTabletLayout,
-                                gridState = youtubeGridState
-                            )
-                        }
-                        SearchSource.LINK_RECOGNITION -> {
-                            Box(Modifier.fillMaxSize(), Alignment.Center) {
-                                Text(
-                                    text = stringResource(R.string.explore_link_recognition_placeholder),
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                        }
-                    }
+                    // 无关键词时只保留上方的搜索历史，不再展示分类与歌单推荐。
+                    Box(Modifier.fillMaxSize())
                 }
             }
         }
@@ -1637,7 +1619,6 @@ fun ExploreScreen(
                             key = { _, song -> song.stableKey() }
                         ) { index, song ->
                             SongRow(
-                                index = index + 1,
                                 song = song,
                                 isFavorite = favoriteSongKeys.contains(song.stableKey()),
                                 favoriteActionEnabled = localPlaylistsReady,
@@ -1726,7 +1707,13 @@ private fun ExploreOfflineContent(topAppBarState: TopAppBarState) {
         containerColor = Color.Transparent,
         topBar = {
             LargeTopAppBar(
-                title = { Text(stringResource(R.string.nav_explore)) },
+                title = {
+                    Text(
+                        stringResource(R.string.action_search),
+                        style = MeloxType.largeTitle,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                },
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
@@ -2791,7 +2778,6 @@ private fun SearchLoadMoreErrorRow(
 
 @Composable
 internal fun SongRow(
-    index: Int,
     song: SongItem,
     isFavorite: Boolean,
     favoriteActionEnabled: Boolean,
@@ -2820,17 +2806,6 @@ internal fun SongRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.width(48.dp), contentAlignment = Alignment.Center) {
-            Text(
-                text = index.toString(),
-                style = LocalNeriTextStyles.current.captionSecondary,
-                color = LocalNeriColors.current.tertiaryText,
-                maxLines = 1,
-                overflow = TextOverflow.Clip,
-                textAlign = TextAlign.Center
-            )
-        }
-
         if (!coverUrl.isNullOrBlank()) {
             AsyncImage(
                 model = fastScrollableImageRequest(

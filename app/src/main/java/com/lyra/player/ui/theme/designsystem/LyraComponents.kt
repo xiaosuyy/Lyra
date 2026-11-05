@@ -231,7 +231,7 @@ fun LyraSectionHeader(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     icon: ImageVector? = null,
-    iconTint: Color = LocalNeriColors.current.accent,
+    iconTint: Color = LocalNeriColors.current.primaryText.copy(alpha = 0.60f),
     moreText: String? = null,
     onMoreClick: (() -> Unit)? = null
 ) {

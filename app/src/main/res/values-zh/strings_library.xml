@@ -62,7 +62,7 @@
     <string name="library_favorite_source_format" formatted="false">%d首 · %s</string>
     <string name="library_favorite_sort_mode_title">收藏歌单排序</string>
     <string name="library_favorite_sort_mode_desc">长按歌单进入排序，拖动右侧手柄调整顺序</string>
-    <string name="library_title">媒体库</string>
+    <string name="library_title">曲库</string>
     <string name="library_coming_soon">敬请期待</string>
     <string name="library_recent_played">最近播放</string>
     <string name="library_delete_playlist_confirm">确定要删除歌单“%1$s”吗？</string>

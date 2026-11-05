@@ -2,9 +2,13 @@
 <resources>
     <!-- Settings / Theme & Appearance -->
     <string name="settings_theme">Theme</string>
-    <string name="settings_theme_desc">Dark mode, dynamic color, and accent colors</string>
+    <string name="settings_theme_desc">Dark mode and accent color</string>
     <string name="settings_theme_color">Theme Color</string>
     <string name="settings_theme_color_desc">Choose your favorite color</string>
+    <string name="settings_accent_color">Accent color</string>
+    <string name="settings_accent_color_desc">Settings icons and the selected tab icon</string>
+    <string name="settings_accent_color_section">Accent color</string>
+    <string name="settings_accent_color_section_desc">Customize the icons in Settings and the selected tab icon</string>
     <string name="settings_theme_palette_hint">When dynamic color is off, this accent color is used. You can also save frequent colors to the palette.</string>
     <string name="settings_dynamic_color">Dynamic Color</string>
     <string name="settings_dynamic_color_desc">Follow cover theme color</string>
@@ -65,10 +69,10 @@
     <string name="settings_playback_control_size_small">Small</string>
     <string name="settings_playback_control_size_medium">Medium</string>
     <string name="settings_playback_control_size_large">Large</string>
-    <string name="settings_nowplaying_progress_audio_codec">Show codec above progress bar</string>
-    <string name="settings_nowplaying_progress_audio_codec_desc">Shown above the progress bar, such as FLAC, AAC, or E-AC-3</string>
-    <string name="settings_nowplaying_progress_audio_spec">Show audio spec above progress bar</string>
-    <string name="settings_nowplaying_progress_audio_spec_desc">Shown above the progress bar, including sample rate, bit depth, and bitrate</string>
+    <string name="settings_nowplaying_progress_audio_codec">Show codec below progress bar</string>
+    <string name="settings_nowplaying_progress_audio_codec_desc">Shown below the progress bar, such as FLAC, AAC, or E-AC-3</string>
+    <string name="settings_nowplaying_progress_audio_spec">Show audio spec below progress bar</string>
+    <string name="settings_nowplaying_progress_audio_spec_desc">Shown below the progress bar, including sample rate, bit depth, and bitrate</string>
     <string name="settings_select_color">Select Color</string>
     <string name="settings_apply_color">Apply Color</string>
     <string name="settings_add_to_palette">Add to Palette</string>

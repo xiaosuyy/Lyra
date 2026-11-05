@@ -66,6 +66,13 @@
     <string name="library_coming_soon">Coming Soon</string>
     <string name="library_recent_played">Recent Plays</string>
     <string name="library_delete_playlist_confirm">Delete playlist \"%1$s\"?</string>
+    <string name="library_section_songs">Songs</string>
+    <string name="library_section_playlists">Playlists</string>
+    <string name="library_section_cloud">Cloud</string>
+    <string name="library_section_download">Downloads</string>
+    <string name="library_search_hint">Search library</string>
+    <string name="library_songs_empty">No songs</string>
+    <string name="library_songs_empty_hint">Import local audio and songs will appear here</string>
 
     <!-- Artist -->
     <string name="artist_detail">Artist Details</string>

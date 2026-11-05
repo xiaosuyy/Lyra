@@ -2,6 +2,7 @@
 <resources>
     <!-- Search -->
     <string name="search_keyword">Search Keyword</string>
+    <string name="search_channel_select">Choose search channel</string>
     <string name="search_keywords">Search Keywords</string>
     <string name="search_song">Search Songs</string>
     <string name="search_video">Search Videos</string>

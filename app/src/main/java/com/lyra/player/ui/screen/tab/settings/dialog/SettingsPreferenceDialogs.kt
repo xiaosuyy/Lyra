@@ -40,9 +40,9 @@ internal fun SettingsPreferenceDialogs(
     onDefaultStartDestinationChange: (String) -> Unit,
     showColorPickerDialog: Boolean,
     onShowColorPickerDialogChange: (Boolean) -> Unit,
-    seedColorHex: String,
+    accentColorHex: String,
     themeColorPalette: List<String>,
-    onSeedColorChange: (String) -> Unit,
+    onAccentColorChange: (String) -> Unit,
     onAddColorToPalette: (String) -> Unit,
     onRemoveColorFromPalette: (String) -> Unit,
     showDpiDialog: Boolean,
@@ -85,11 +85,11 @@ internal fun SettingsPreferenceDialogs(
 
     if (showColorPickerDialog) {
         ColorPickerDialog(
-            currentHex = seedColorHex,
+            currentHex = accentColorHex,
             palette = themeColorPalette,
             onDismiss = { onShowColorPickerDialogChange(false) },
             onColorSelected = { hex ->
-                onSeedColorChange(hex)
+                onAccentColorChange(hex)
                 onShowColorPickerDialogChange(false)
             },
             onAddColor = onAddColorToPalette,

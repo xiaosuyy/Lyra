@@ -23,33 +23,30 @@ package com.lyra.player.ui.theme
  * Created: 2025/8/8
  */
 
-import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.core.graphics.toColorInt
+import com.lyra.player.data.settings.ThemeDefaults
+import com.lyra.player.ui.melox.theme.MeloxDarkColors
+import com.lyra.player.ui.melox.theme.MeloxLightColors
+import com.lyra.player.ui.melox.theme.MeloxSystemColors
+import com.lyra.player.ui.melox.theme.MeloxTheme
+import com.lyra.player.ui.melox.theme.meloxColorSchemeWithAccent
 import com.lyra.player.ui.theme.designsystem.LocalNeriColors
 import com.lyra.player.ui.theme.designsystem.LocalNeriTextStyles
 import com.lyra.player.ui.theme.designsystem.neriColorsFrom
 import com.lyra.player.ui.theme.designsystem.neriTextStylesFrom
 import com.lyra.player.ui.theme.designsystem.neriTypography
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.graphics.toColorInt
-import com.materialkolor.PaletteStyle
-import com.materialkolor.dynamiccolor.ColorSpec
-import com.materialkolor.rememberDynamicColorScheme
-import com.lyra.player.data.settings.ThemeDefaults
 
 private const val ThemeColorTransitionDurationMs = 420
 
@@ -61,49 +58,37 @@ internal val LocalNeriTargetColorScheme = staticCompositionLocalOf<ColorScheme> 
 fun LyraTheme(
     followSystemDark: Boolean,
     forceDark: Boolean,
-    dynamicColor: Boolean,
-    seedColorHex: String,
-    paletteStyle: PaletteStyle = PaletteStyle.TonalSpot,
-    colorSpec: ColorSpec.SpecVersion = ColorSpec.SpecVersion.Default,
+    accentColorHex: String,
     systemDark: Boolean? = null,
     content: @Composable () -> Unit
 ) {
-    val context = LocalContext.current
-
     val isDark = when {
         forceDark -> true
         followSystemDark -> systemDark ?: isSystemInDarkTheme()
         else -> false
     }
 
-    val targetColorScheme: ColorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        else -> {
-            // 兜底非法 hex: 解析前归一, 避免坏值使 toColorInt 在主题组合期抛异常崩溃
-            val seed = Color(("#${ThemeDefaults.sanitizeSeedColorHex(seedColorHex)}").toColorInt())
-            rememberDynamicColorScheme(
-                seedColor = seed,
-                isDark = isDark,
-                style = paletteStyle,
-                specVersion = colorSpec
-            )
-        }
+    // MeloX keeps its fixed neutral surfaces; only the accent roles are user-tinted.
+    val accentColor = remember(accentColorHex) {
+        runCatching {
+            Color(("#${ThemeDefaults.sanitizeSeedColorHex(accentColorHex)}").toColorInt())
+        }.getOrDefault(MeloxSystemColors.Blue)
+    }
+    val targetColorScheme: ColorScheme = remember(isDark, accentColor) {
+        meloxColorSchemeWithAccent(
+            base = if (isDark) MeloxDarkColors else MeloxLightColors,
+            accent = accentColor
+        )
     }
     val colorScheme = animateColorScheme(targetColorScheme)
     val typography = remember { neriTypography() }
 
     CompositionLocalProvider(
         LocalNeriTargetColorScheme provides targetColorScheme,
-        LocalNeriColors provides neriColorsFrom(targetColorScheme, isDark),
+        LocalNeriColors provides neriColorsFrom(colorScheme, isDark),
         LocalNeriTextStyles provides neriTextStylesFrom(typography)
     ) {
-        MaterialTheme(
-            colorScheme = colorScheme,
-            typography = typography,
-            content = content
-        )
+        MeloxTheme(darkTheme = isDark, colorScheme = targetColorScheme, content = content)
     }
 }
 

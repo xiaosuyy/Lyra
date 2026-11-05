@@ -36,7 +36,6 @@ import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.lyra.player.BuildConfig
 import com.lyra.player.R
@@ -46,15 +45,13 @@ import com.lyra.player.util.format.convertTimestampToDate
 internal fun LazyListScope.settingsAboutSection(
     devModeEnabled: Boolean,
     onVersionClick: () -> Unit,
-    onCopyValue: (String) -> Unit = {},
-    onOpenGitHubRepo: () -> Unit
+    onCopyValue: (String) -> Unit = {}
 ) {
     item {
         SettingsAboutContent(
             devModeEnabled = devModeEnabled,
             onVersionClick = onVersionClick,
-            onCopyValue = onCopyValue,
-            onOpenGitHubRepo = onOpenGitHubRepo
+            onCopyValue = onCopyValue
         )
     }
 }
@@ -63,8 +60,7 @@ internal fun LazyListScope.settingsAboutSection(
 internal fun SettingsAboutContent(
     devModeEnabled: Boolean,
     onVersionClick: () -> Unit,
-    onCopyValue: (String) -> Unit,
-    onOpenGitHubRepo: () -> Unit
+    onCopyValue: (String) -> Unit
 ) {
     SettingsAboutIntroItem()
     SettingsBuildUuidItem(onCopyValue)
@@ -74,7 +70,6 @@ internal fun SettingsAboutContent(
         onCopyValue = onCopyValue
     )
     SettingsBuildTimeItem(onCopyValue)
-    SettingsGitHubItem(onOpenGitHubRepo = onOpenGitHubRepo)
 }
 
 @Composable
@@ -182,23 +177,6 @@ private fun SettingsBuildTimeItem(onCopyValue: (String) -> Unit) {
         modifier = androidx.compose.ui.Modifier.settingsItemClickable {
             onCopyValue(buildTime)
         },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
-}
-
-@Composable
-private fun SettingsGitHubItem(onOpenGitHubRepo: () -> Unit) {
-    ListItem(
-        leadingContent = {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_github),
-                contentDescription = stringResource(R.string.common_github),
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-        },
-        headlineContent = { Text(stringResource(R.string.common_github)) },
-        supportingContent = { Text(stringResource(R.string.settings_github_repo_url)) },
-        modifier = androidx.compose.ui.Modifier.settingsItemClickable(onClick = onOpenGitHubRepo),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }

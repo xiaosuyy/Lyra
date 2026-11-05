@@ -565,7 +565,6 @@ private fun YouTubeMusicCreatorSection(
             playableItems.forEachIndexed { index, (item, song) ->
                 CreatorPlayableRow(
                     song = song,
-                    index = index + 1,
                     offlineMode = offlineMode,
                     enabled = !isPlaybackQueueLoading,
                     onClick = {
@@ -614,7 +613,6 @@ private fun YouTubeMusicCreatorSection(
 @Composable
 private fun CreatorPlayableRow(
     song: SongItem,
-    index: Int,
     offlineMode: Boolean,
     enabled: Boolean,
     onClick: () -> Unit
@@ -631,12 +629,6 @@ private fun CreatorPlayableRow(
             .padding(vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = index.toString(),
-            modifier = Modifier.width(28.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         Box(
             modifier = Modifier
                 .size(48.dp)

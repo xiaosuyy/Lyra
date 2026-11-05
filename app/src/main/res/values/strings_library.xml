@@ -62,10 +62,17 @@
     <string name="library_favorite_source_format" formatted="false">%d首 · %s</string>
     <string name="library_favorite_sort_mode_title">收藏歌单排序</string>
     <string name="library_favorite_sort_mode_desc">长按歌单进入排序，拖动右侧手柄调整顺序</string>
-    <string name="library_title">媒体库</string>
+    <string name="library_title">曲库</string>
     <string name="library_coming_soon">敬请期待</string>
     <string name="library_recent_played">最近播放</string>
     <string name="library_delete_playlist_confirm">确定要删除歌单“%1$s”吗？</string>
+    <string name="library_section_songs">歌曲</string>
+    <string name="library_section_playlists">歌单</string>
+    <string name="library_section_cloud">云端</string>
+    <string name="library_section_download">下载</string>
+    <string name="library_search_hint">搜索曲库</string>
+    <string name="library_songs_empty">暂无歌曲</string>
+    <string name="library_songs_empty_hint">导入本地音频后，歌曲会显示在这里</string>
 
     <!-- Artist -->
     <string name="artist_detail">歌手详情</string>

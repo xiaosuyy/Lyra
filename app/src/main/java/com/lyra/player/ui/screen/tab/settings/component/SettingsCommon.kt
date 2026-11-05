@@ -80,8 +80,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.toColorInt
 import com.lyra.player.R
-import com.lyra.player.ui.effect.glass.AdvancedGlassRole
-import com.lyra.player.ui.effect.glass.AdvancedGlassSurface
 import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.ui.screen.tab.settings.page.settingsHighlightTarget
 
@@ -162,10 +160,10 @@ internal fun LazyAnimatedVisibility(
     }
 }
 
-/** 主题色预览行（当关闭系统动态取色时显示） */
+/** 强调色入口，影响设置页图标与底栏选中图标 */
 @Composable
-internal fun ThemeSeedListItem(
-    seedColorHex: String,
+internal fun AccentColorListItem(
+    accentColorHex: String,
     onClick: () -> Unit,
     highlightTargetId: String? = null,
     highlightPulse: Int = 0,
@@ -174,7 +172,7 @@ internal fun ThemeSeedListItem(
     ListItem(
         modifier = Modifier
             .settingsHighlightTarget(
-                targetId = "manual:theme_seed_color",
+                targetId = "manual:accent_color",
                 highlightTargetId = highlightTargetId,
                 highlightPulse = highlightPulse,
                 onHighlightFinished = onHighlightFinished
@@ -183,18 +181,18 @@ internal fun ThemeSeedListItem(
         leadingContent = {
             Icon(
                 imageVector = Icons.Outlined.ColorLens,
-                contentDescription = stringResource(R.string.settings_theme_color),
+                contentDescription = stringResource(R.string.settings_accent_color),
                 tint = MaterialTheme.colorScheme.onSurface
             )
         },
-        headlineContent = { Text(stringResource(R.string.settings_theme_color)) },
-        supportingContent = { Text(stringResource(R.string.settings_theme_color_desc)) },
+        headlineContent = { Text(stringResource(R.string.settings_accent_color)) },
+        supportingContent = { Text(stringResource(R.string.settings_accent_color_desc)) },
         trailingContent = {
             Box(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
-                    .background(Color(("#$seedColorHex").toColorInt()))
+                    .background(Color(("#$accentColorHex").toColorInt()))
             )
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -241,25 +239,16 @@ internal fun ThemeModeActionButton(
         label = "theme_toggle_icon_progress"
     )
     val containerColor by animateColorAsState(
-        targetValue = if (isDarkTheme) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-        },
+        targetValue = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
         animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
         label = "theme_toggle_container_color"
     )
 
-    AdvancedGlassSurface(
-        role = AdvancedGlassRole.ThemeModeToggle,
-        modifier = Modifier.size(36.dp),
-        shape = CircleShape,
-        fallbackColor = containerColor,
-        tintColor = if (isDarkTheme) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant
-        }
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(containerColor)
     ) {
         HapticIconButton(
             onClick = {

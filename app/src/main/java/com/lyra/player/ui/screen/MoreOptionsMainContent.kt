@@ -74,6 +74,9 @@ import com.lyra.player.data.model.stableKey
 import com.lyra.player.data.stats.TrackStat
 import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
 import com.lyra.player.ui.haptic.HapticTextButton
+import com.lyra.player.ui.melox.components.MeloxIosGroupedList
+import com.lyra.player.ui.melox.components.MeloxIosListIcon
+import com.lyra.player.ui.melox.components.MeloxIosListRow
 import com.lyra.player.ui.viewmodel.NowPlayingViewModel
 import com.lyra.player.ui.viewmodel.album.isNeteaseAlbumNavigationSource
 import com.lyra.player.ui.viewmodel.album.neteaseAlbumDisplayName
@@ -112,7 +115,8 @@ internal fun MoreOptionsMainContent(
         Modifier
             .bottomSheetScrollGuard { scrollState.value == 0 }
             .verticalScroll(scrollState)
-            .padding(bottom = 32.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         MetadataAndPlaybackActions(
             audioInfo = currentPlaybackAudioInfo,
@@ -138,11 +142,14 @@ internal fun MoreOptionsMainContent(
             snackbarHostState = snackbarHostState
         )
         if (PlayerManager.isBiliTrack(originalSong)) {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.bili_video_skip_manage)) },
-                leadingContent = { Icon(Icons.Outlined.SkipNext, null) },
-                modifier = Modifier.clickable(onClick = onOpenBiliVideoSkip)
-            )
+            MeloxIosGroupedList {
+                MeloxIosListRow(
+                    title = stringResource(R.string.bili_video_skip_manage),
+                    leading = { MeloxIosListIcon(Icons.Outlined.SkipNext) },
+                    showTopSeparator = false,
+                    onClick = onOpenBiliVideoSkip
+                )
+            }
         }
         ShareSongAction(
             song = originalSong,
@@ -163,35 +170,33 @@ private fun MetadataAndPlaybackActions(
     onOpenPlaybackSound: () -> Unit,
     onShowQualitySwitch: () -> Unit
 ) {
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.music_get_info)) },
-        leadingContent = { Icon(Icons.Outlined.Info, null) },
-        modifier = Modifier.clickable(
-            enabled = !isDismissing,
-            onClick = onOpenSearch
+    MeloxIosGroupedList {
+        MeloxIosListRow(
+            title = stringResource(R.string.music_get_info),
+            leading = { MeloxIosListIcon(Icons.Outlined.Info) },
+            showTopSeparator = false,
+            onClick = if (isDismissing) null else onOpenSearch
         )
-    )
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.music_edit_info)) },
-        leadingContent = { Icon(Icons.Outlined.Edit, null) },
-        modifier = Modifier.clickable(onClick = onOpenEditInfo)
-    )
-    if (audioInfo?.qualityOptions.orEmpty().size > 1) {
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.nowplaying_quality_switch_title)) },
-            leadingContent = { Icon(Icons.Outlined.MusicNote, null) },
-            supportingContent = audioInfo?.qualityLabel
-                ?.takeIf { it.isNotBlank() }
-                ?.let { label -> { Text(label) } },
-            modifier = Modifier.clickable(onClick = onShowQualitySwitch)
+        MeloxIosListRow(
+            title = stringResource(R.string.music_edit_info),
+            leading = { MeloxIosListIcon(Icons.Outlined.Edit) },
+            onClick = onOpenEditInfo
+        )
+        if (audioInfo?.qualityOptions.orEmpty().size > 1) {
+            MeloxIosListRow(
+                title = stringResource(R.string.nowplaying_quality_switch_title),
+                leading = { MeloxIosListIcon(Icons.Outlined.MusicNote) },
+                detail = audioInfo?.qualityLabel?.takeIf { it.isNotBlank() },
+                onClick = onShowQualitySwitch
+            )
+        }
+        MeloxIosListRow(
+            title = stringResource(R.string.nowplaying_audio_effects_title),
+            subtitle = stringResource(R.string.nowplaying_audio_effects_desc),
+            leading = { MeloxIosListIcon(Icons.Outlined.Tune) },
+            onClick = onOpenPlaybackSound
         )
     }
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.nowplaying_audio_effects_title)) },
-        leadingContent = { Icon(Icons.Outlined.Tune, null) },
-        supportingContent = { Text(stringResource(R.string.nowplaying_audio_effects_desc)) },
-        modifier = Modifier.clickable(onClick = onOpenPlaybackSound)
-    )
 }
 
 @Composable
@@ -202,11 +207,14 @@ private fun DownloadOrDetailsAction(
     onShowSongDetails: () -> Unit
 ) {
     if (isLocalSong) {
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.local_song_open_details)) },
-            leadingContent = { Icon(Icons.Outlined.Info, null) },
-            modifier = Modifier.clickable(onClick = onShowSongDetails)
-        )
+        MeloxIosGroupedList {
+            MeloxIosListRow(
+                title = stringResource(R.string.local_song_open_details),
+                leading = { MeloxIosListIcon(Icons.Outlined.Info) },
+                showTopSeparator = false,
+                onClick = onShowSongDetails
+            )
+        }
         return
     }
 
@@ -232,21 +240,30 @@ private fun DownloadOrDetailsAction(
             status != DownloadStatus.DOWNLOADING &&
             status != DownloadStatus.WAITING_NETWORK
         ) || canCancel
-    ListItem(
-        headlineContent = { Text(stringResource(downloadActionLabel(currentTask))) },
-        leadingContent = { Icon(Icons.Outlined.Download, null) },
-        supportingContent = { DownloadProgressContent(currentTask) },
-        modifier = Modifier.clickable(enabled = canClick) {
-            when (currentTask?.status) {
-                DownloadStatus.QUEUED,
-                DownloadStatus.WAITING_NETWORK,
-                DownloadStatus.DOWNLOADING -> viewModel.cancelDownload(downloadSongKey)
-                DownloadStatus.CANCELLED -> viewModel.resumeDownload(context, downloadSongKey)
-                DownloadStatus.FAILED -> viewModel.retryDownload(context, song)
-                else -> viewModel.downloadSong(context, song)
+    MeloxIosGroupedList {
+        MeloxIosListRow(
+            title = stringResource(downloadActionLabel(currentTask)),
+            leading = { MeloxIosListIcon(Icons.Outlined.Download) },
+            showTopSeparator = false,
+            onClick = if (canClick) {
+                {
+                    when (currentTask?.status) {
+                        DownloadStatus.QUEUED,
+                        DownloadStatus.WAITING_NETWORK,
+                        DownloadStatus.DOWNLOADING -> viewModel.cancelDownload(downloadSongKey)
+                        DownloadStatus.CANCELLED -> viewModel.resumeDownload(context, downloadSongKey)
+                        DownloadStatus.FAILED -> viewModel.retryDownload(context, song)
+                        else -> viewModel.downloadSong(context, song)
+                    }
+                }
+            } else null
+        )
+        if (currentTask != null) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                DownloadProgressContent(currentTask)
             }
         }
-    )
+    }
 }
 
 private fun downloadActionLabel(task: DownloadTask?): Int {
@@ -308,25 +325,24 @@ private fun LyricsAndAlbumActions(
     onEnterAlbum: (AlbumSummary) -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.lyrics_adjust_behavior)) },
-        leadingContent = { Icon(Icons.Outlined.Timer, null) },
-        modifier = Modifier.clickable(onClick = onOpenLyricBehavior)
-    )
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.lyrics_font_size)) },
-        leadingContent = { Icon(Icons.Outlined.FormatSize, null) },
-        supportingContent = {
-            Text(
-                stringResource(
-                    R.string.settings_lyrics_font_scale_pair_value,
-                    (lyricFontScale * 100).roundToInt(),
-                    (translationFontScale * 100).roundToInt()
-                )
-            )
-        },
-        modifier = Modifier.clickable(onClick = onOpenFontSize)
-    )
+    MeloxIosGroupedList {
+        MeloxIosListRow(
+            title = stringResource(R.string.lyrics_adjust_behavior),
+            leading = { MeloxIosListIcon(Icons.Outlined.Timer) },
+            showTopSeparator = false,
+            onClick = onOpenLyricBehavior
+        )
+        MeloxIosListRow(
+            title = stringResource(R.string.lyrics_font_size),
+            leading = { MeloxIosListIcon(Icons.Outlined.FormatSize) },
+            detail = stringResource(
+                R.string.settings_lyrics_font_scale_pair_value,
+                (lyricFontScale * 100).roundToInt(),
+                (translationFontScale * 100).roundToInt()
+            ),
+            onClick = onOpenFontSize
+        )
+    }
     if (!isNeteaseAlbumNavigationSource(song)) return
 
     val albumName = neteaseAlbumDisplayName(song)
@@ -353,23 +369,28 @@ private fun LyricsAndAlbumActions(
         }
     }
 
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.music_view_album, albumName)) },
-        leadingContent = {
-            if (resolvingAlbum) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Icon(Icons.Outlined.LibraryMusic, null)
+    MeloxIosGroupedList {
+        MeloxIosListRow(
+            title = stringResource(R.string.music_view_album, albumName),
+            leading = {
+                if (resolvingAlbum) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    MeloxIosListIcon(Icons.Outlined.LibraryMusic)
+                }
+            },
+            showTopSeparator = false,
+            onClick = if (resolvingAlbum) null else {
+                {
+                    resolvingAlbum = true
+                    albumResolveRequest++
+                }
             }
-        },
-        modifier = Modifier.clickable(enabled = !resolvingAlbum) {
-            resolvingAlbum = true
-            albumResolveRequest++
-        }
-    )
+        )
+    }
 }
 
 @Composable
@@ -382,10 +403,12 @@ private fun ShareSongAction(
     val context = LocalContext.current
     val composeResources = LocalResources.current
     val coroutineScope = rememberCoroutineScope()
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.action_share)) },
-        leadingContent = { Icon(Icons.Outlined.Share, null) },
-        modifier = Modifier.clickable {
+    MeloxIosGroupedList {
+        MeloxIosListRow(
+            title = stringResource(R.string.action_share),
+            leading = { MeloxIosListIcon(Icons.Outlined.Share) },
+            showTopSeparator = false,
+            onClick = {
             if (song.isLocalSong()) {
                 coroutineScope.launch {
                     val shared = runCatching {
@@ -399,7 +422,7 @@ private fun ShareSongAction(
                         )
                     }
                 }
-                return@clickable
+                return@MeloxIosListRow
             }
 
             val shareUrl = buildRemoteSongShareUrl(song, queue)
@@ -419,8 +442,9 @@ private fun ShareSongAction(
             }
             val shareIntent = Intent.createChooser(sendIntent, null)
             onDismissSheet { context.startActivity(shareIntent) }
-        }
-    )
+            }
+        )
+    }
 }
 
 @Composable
@@ -433,11 +457,14 @@ private fun PlaybackStatsAction(song: SongItem) {
     }
     val resolvedTrackStat = trackStat ?: return
     var showDialog by remember { mutableStateOf(false) }
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.stats_title)) },
-        leadingContent = { Icon(Icons.Outlined.BarChart, null) },
-        modifier = Modifier.clickable { showDialog = true }
-    )
+    MeloxIosGroupedList {
+        MeloxIosListRow(
+            title = stringResource(R.string.stats_title),
+            leading = { MeloxIosListIcon(Icons.Outlined.BarChart) },
+            showTopSeparator = false,
+            onClick = { showDialog = true }
+        )
+    }
     if (!showDialog) return
 
     val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()) }

@@ -3,7 +3,6 @@ package com.lyra.player.ui.screen.tab.settings.page
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Download
@@ -70,10 +69,6 @@ internal enum class SettingsPage(
         descriptionRes = R.string.settings_playback_source_desc,
         icon = Icons.Outlined.LibraryMusic
     ),
-    AudioQuality(
-        AutoSettingsSchema.audioQuality.metadata,
-        Icons.Filled.Audiotrack
-    ),
     Storage(
         AutoSettingsSchema.storage.metadata,
         Icons.Outlined.Storage
@@ -109,10 +104,6 @@ internal enum class SettingsPage(
 }
 
 internal val SettingsHomePageGroups: List<List<SettingsPage>> = listOf(
-    // 登录平台置顶，方便直接进入账号页
-    listOf(
-        SettingsPage.Accounts
-    ),
     listOf(
         SettingsPage.General
     ),
@@ -123,7 +114,6 @@ internal val SettingsHomePageGroups: List<List<SettingsPage>> = listOf(
     ),
     listOf(
         SettingsPage.Playback,
-        SettingsPage.AudioQuality,
         SettingsPage.PlaybackSource,
         SettingsPage.Lyrics
     ),
@@ -134,7 +124,6 @@ internal val SettingsHomePageGroups: List<List<SettingsPage>> = listOf(
         SettingsPage.TrafficManagement
     ),
     listOf(
-        SettingsPage.Backup,
         SettingsPage.About
     )
 )

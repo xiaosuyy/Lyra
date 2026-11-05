@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -249,9 +249,8 @@ fun PlaybackStatsScreen(
                         }
 
                         // 歌曲列表
-                        itemsIndexed(sortedStats, key = { _, stat -> stat.identityKey }) { index, stat ->
+                        items(sortedStats, key = { stat -> stat.identityKey }) { stat ->
                             StatTrackRow(
-                                rank = index + 1,
                                 stat = stat,
                                 offlineMode = offlineMode,
                                 onClick = {

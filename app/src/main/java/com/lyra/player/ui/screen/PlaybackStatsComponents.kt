@@ -264,7 +264,6 @@ internal fun TopTracksBarChart(
 
 @Composable
 internal fun StatTrackRow(
-    rank: Int,
     stat: TrackStat,
     offlineMode: Boolean = false,
     onClick: () -> Unit
@@ -281,14 +280,6 @@ internal fun StatTrackRow(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             leadingContent = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "$rank",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = if (rank <= 3) FontWeight.Bold else FontWeight.Normal,
-                        color = if (rank <= 3) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(32.dp)
-                    )
                     val coverUrl = stat.customCoverUrl ?: stat.coverUrl
                     if (coverUrl != null) {
                         AsyncImage(

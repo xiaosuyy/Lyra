@@ -749,7 +749,6 @@ fun BiliPlaylistDetailScreen(
                                         offlineMode = offlineMode
                                     ) {
                                         VideoRow(
-                                            index = index + 1,
                                             video = item,
                                             songItem = songItem,
                                             isFavorite = isFavoriteSong,
@@ -1160,7 +1159,6 @@ private fun BiliVideoItem.toSongItem(): SongItem {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VideoRow(
-    index: Int,
     video: BiliVideoItem,
     songItem: SongItem,
     isFavorite: Boolean,
@@ -1208,21 +1206,14 @@ private fun VideoRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.width(40.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (selectionMode) {
+        if (selectionMode) {
+            Box(
+                modifier = Modifier.width(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Checkbox(
                     checked = selected,
                     onCheckedChange = { onToggleSelect() }
-                )
-            } else {
-                Text(
-                    text = index.toString(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = playlistModernListTertiaryContentColor(),
-                    textAlign = TextAlign.Center
                 )
             }
         }

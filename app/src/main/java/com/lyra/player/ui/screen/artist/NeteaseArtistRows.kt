@@ -43,7 +43,6 @@ import com.lyra.player.util.media.offlineCachedImageRequest
 
 @Composable
 internal fun ArtistSongRow(
-    index: Int,
     song: SongItem,
     onClick: () -> Unit,
     offlineMode: Boolean = false
@@ -61,16 +60,6 @@ internal fun ArtistSongRow(
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.width(48.dp), contentAlignment = Alignment.Center) {
-            Text(
-                text = index.toString(),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-                overflow = TextOverflow.Clip
-            )
-        }
         AsyncImage(
             model = offlineCachedImageRequest(
                 context = context,

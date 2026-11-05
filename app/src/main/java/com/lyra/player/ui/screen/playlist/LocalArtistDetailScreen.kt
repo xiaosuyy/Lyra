@@ -549,7 +549,6 @@ fun LocalArtistDetailScreen(
                         key = { _, song -> song.stableKey() }
                     ) { index, song ->
                         LocalArtistSongRow(
-                            index = index + 1,
                             song = song,
                             selectionMode = selectionMode,
                             selected = song.stableKey() in selectedKeys,
@@ -737,7 +736,6 @@ private fun LocalArtistDetailHeader(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LocalArtistSongRow(
-    index: Int,
     song: SongItem,
     selectionMode: Boolean,
     selected: Boolean,
@@ -772,22 +770,14 @@ private fun LocalArtistSongRow(
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.width(34.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (selectionMode) {
+        if (selectionMode) {
+            Box(
+                modifier = Modifier.width(34.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Checkbox(
                     checked = selected,
                     onCheckedChange = { onToggleSelect() }
-                )
-            } else {
-                Text(
-                    text = index.toString(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Clip
                 )
             }
         }

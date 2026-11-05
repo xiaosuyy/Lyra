@@ -26,7 +26,7 @@ package com.lyra.player.data.settings
 import java.util.Locale
 
 object ThemeDefaults {
-    const val DEFAULT_SEED_COLOR_HEX = "0061A4"
+    const val DEFAULT_SEED_COLOR_HEX = "0A84FF"
     const val DEFAULT_PALETTE_STYLE = "TonalSpot"
     const val DEFAULT_COLOR_SPEC = "SPEC_2021"
     val PALETTE_STYLES = listOf(
@@ -42,6 +42,7 @@ object ThemeDefaults {
     )
     val COLOR_SPECS = listOf("SPEC_2021", "SPEC_2025")
     val PRESET_COLORS = listOf(
+        "0A84FF",
         "0061A4",
         "6750A4",
         "B3261E",

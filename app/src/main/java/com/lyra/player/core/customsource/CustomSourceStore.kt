@@ -181,8 +181,23 @@ internal object CustomSourceStore {
         val text = runCatching {
             context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
         }.getOrNull() ?: return null
+        return if (text.isBlank()) {
+            null
+        } else {
+            importScriptText(
+                context = context,
+                text = text,
+                displayName = displayName ?: uri.lastPathSegment
+            )
+        }
+    }
+
+    /**
+     * 直接导入脚本文本（用于从网络 URL 拉取脚本）。
+     */
+    fun importScriptText(context: Context, text: String, displayName: String?): String? {
         if (text.isBlank()) return null
-        val baseId = (displayName ?: uri.lastPathSegment ?: "custom_source")
+        val baseId = (displayName ?: "custom_source")
             .substringAfterLast('/')
             .removeSuffix(".js")
             .replace(Regex("[^0-9A-Za-z_\\u4e00-\\u9fff-]"), "_")

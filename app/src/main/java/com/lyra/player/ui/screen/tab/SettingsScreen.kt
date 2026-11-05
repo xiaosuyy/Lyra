@@ -50,17 +50,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.lyra.player.ui.melox.theme.MeloxShapes
+import com.lyra.player.ui.melox.theme.MeloxType
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.AltRoute
-import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.Brightness4
-import androidx.compose.material.icons.outlined.Colorize
-import androidx.compose.material.icons.outlined.DashboardCustomize
 import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Radar
@@ -130,11 +128,9 @@ import com.lyra.player.data.settings.FloatingLyricsPreferences
 import com.lyra.player.data.settings.HomeSectionId
 import com.lyra.player.data.settings.LyricFontScaleTarget
 import com.lyra.player.data.settings.LyricFontScales
-import com.lyra.player.data.settings.NowPlayingControlPlacement
 import com.lyra.player.data.settings.PlaybackControlLayoutPreferences
 import com.lyra.player.data.settings.PlaybackControlSize
 import com.lyra.player.data.settings.generated.AutoSettingInfo
-import com.lyra.player.data.settings.ThemeDefaults
 import com.lyra.player.data.settings.ThemeMode
 import com.lyra.player.data.settings.UsbExclusivePreferences
 import com.lyra.player.data.settings.MAX_LYRIC_FONT_SCALE
@@ -165,12 +161,10 @@ import com.lyra.player.ui.effect.glass.isolatedAdvancedGlassHorizontalTransition
 import com.lyra.player.ui.screen.tab.settings.about.SettingsAboutContent
 import com.lyra.player.ui.screen.tab.settings.auth.LoginSuccessDialog
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsBiliAuthDialogs
-import com.lyra.player.ui.screen.tab.settings.auth.SettingsNeteaseAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsYouTubeAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.component.LazyAnimatedVisibility
 import com.lyra.player.ui.screen.tab.settings.component.PlaybackServiceIdleShutdownSetting
 import com.lyra.player.ui.screen.tab.settings.component.NotificationPermissionSetting
-import com.lyra.player.ui.screen.tab.settings.component.SettingsAudioQualitySection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsBackupRestoreSection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsDownloadSection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsHomeLayoutSection
@@ -181,7 +175,7 @@ import com.lyra.player.ui.screen.tab.settings.component.SettingsStorageCacheSect
 import com.lyra.player.ui.screen.tab.settings.component.StorageCacheDetailsContent
 import com.lyra.player.ui.screen.tab.settings.component.SettingsTrafficManagementSection
 import com.lyra.player.ui.screen.tab.settings.component.ThemeModeActionButton
-import com.lyra.player.ui.screen.tab.settings.component.ThemeSeedListItem
+import com.lyra.player.ui.screen.tab.settings.component.AccentColorListItem
 import com.lyra.player.ui.screen.tab.settings.component.UsbExclusiveSettingsSection
 import com.lyra.player.ui.screen.tab.settings.component.YouTubePlaybackSourceSetting
 import com.lyra.player.ui.screen.tab.settings.component.SettingsCustomSourceSection
@@ -221,8 +215,6 @@ import com.lyra.player.ui.viewmodel.auth.BiliAuthEvent
 import com.lyra.player.ui.viewmodel.auth.BiliAuthViewModel
 import com.lyra.player.ui.viewmodel.auth.YouTubeAuthEvent
 import com.lyra.player.ui.viewmodel.auth.YouTubeAuthViewModel
-import com.lyra.player.ui.viewmodel.debug.NeteaseAuthEvent
-import com.lyra.player.ui.viewmodel.debug.NeteaseAuthViewModel
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
@@ -333,57 +325,49 @@ private fun SettingsSearchField(
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
-    val shape = RoundedCornerShape(16.dp)
+    val placeholderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.40f)
 
-    AdvancedGlassSurface(
-        role = AdvancedGlassRole.SettingsSection,
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(48.dp),
-        shape = shape,
-        fallbackColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.62f),
-        tintColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            .height(46.dp)
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f), MeloxShapes.capsule)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.weight(1f),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = { focusManager.clearFocus() }
-                ),
-                decorationBox = { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (query.isBlank()) {
-                            Text(
-                                text = stringResource(R.string.settings_search_hint),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        innerTextField()
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+        )
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            textStyle = MeloxType.body.copy(
+                color = MaterialTheme.colorScheme.onBackground
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(
+                onSearch = { focusManager.clearFocus() }
+            ),
+            decorationBox = { innerTextField ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (query.isBlank()) {
+                        Text(
+                            text = stringResource(R.string.settings_search_hint),
+                            style = MeloxType.body,
+                            color = placeholderColor
+                        )
                     }
+                    innerTextField()
                 }
-            )
-        }
+            }
+        )
     }
 }
 
@@ -445,8 +429,6 @@ private fun SettingsSearchResultRow(
 @Suppress("AssignedValueIsNeverRead")
 fun SettingsScreen(
     listState: LazyListState,
-    dynamicColor: Boolean,
-    onDynamicColorChange: (Boolean) -> Unit,
     isDarkTheme: Boolean,
     themeMode: ThemeMode,
     onThemeToggleRequest: (Offset, Float) -> Unit,
@@ -467,15 +449,11 @@ fun SettingsScreen(
     onMobileDataBiliAudioQualityChange: (String) -> Unit,
     devModeEnabled: Boolean,
     onDevModeChange: (Boolean) -> Unit,
-    seedColorHex: String,
-    onSeedColorChange: (String) -> Unit,
+    accentColorHex: String,
+    onAccentColorChange: (String) -> Unit,
     themeColorPalette: List<String>,
     onAddColorToPalette: (String) -> Unit,
     onRemoveColorFromPalette: (String) -> Unit,
-    themePaletteStyle: String,
-    onThemePaletteStyleChange: (String) -> Unit,
-    themeColorSpec: String,
-    onThemeColorSpecChange: (String) -> Unit,
     lyricBlurEnabled: Boolean,
     onLyricBlurEnabledChange: (Boolean) -> Unit,
     lyricBlurAmount: Float,
@@ -524,8 +502,6 @@ fun SettingsScreen(
     onBackgroundImageAlphaChangeFinished: (Float) -> Unit,
     defaultStartDestination: String,
     onDefaultStartDestinationChange: (String) -> Unit,
-    showHomeContinueCard: Boolean,
-    onShowHomeContinueCardChange: (Boolean) -> Unit,
     showHomeTrendingCard: Boolean,
     onShowHomeTrendingCardChange: (Boolean) -> Unit,
     showHomeRadarCard: Boolean,
@@ -643,15 +619,12 @@ fun SettingsScreen(
 
     // 各种对话框和弹窗的显示状态 //
     var showQualityDialog by remember { mutableStateOf(false) }
-    var showNeteaseSheet by remember { mutableStateOf(false) }
     var showYouTubeQualityDialog by remember { mutableStateOf(false) }
     var showBiliQualityDialog by remember { mutableStateOf(false) }
     var showMobileDataNeteaseQualityDialog by remember { mutableStateOf(false) }
     var showMobileDataYouTubeQualityDialog by remember { mutableStateOf(false) }
     var showMobileDataBiliQualityDialog by remember { mutableStateOf(false) }
     var showDefaultStartDestinationDialog by remember { mutableStateOf(false) }
-    var showConfirmDialog by remember { mutableStateOf(false) }
-    var showNeteaseSavedCookieDialog by remember { mutableStateOf(false) }
     var showBiliSheet by remember { mutableStateOf(false) }
     var showBiliSavedCookieDialog by remember { mutableStateOf(false) }
     var showYouTubeSheet by remember { mutableStateOf(false) }
@@ -665,7 +638,6 @@ fun SettingsScreen(
     var showClearWebDavConfigDialog by remember { mutableStateOf(false) }
     // ------------------------------------
 
-    val neteaseVm: NeteaseAuthViewModel = viewModel()
     var inlineMsg by remember { mutableStateOf<String?>(null) }
     var loginSuccessTitle by remember { mutableStateOf<String?>(null) }
     var showDownloadDirectorySwitchWarningDialog by remember { mutableStateOf(false) }
@@ -673,11 +645,9 @@ fun SettingsScreen(
     var isMigratingDownloadDirectory by remember { mutableStateOf(false) }
     val migrationProgress by ManagedDownloadStorage.migrationProgressFlow.collectAsState()
     val hasActiveDownloadOperations by GlobalDownloadManager.activeDownloadOperationsFlow.collectAsState()
-    var confirmPhoneMasked by remember { mutableStateOf<String?>(null) }
     var versionTapCount by remember { mutableIntStateOf(0) }
     val biliVm: BiliAuthViewModel = viewModel()
     var biliSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
-    var neteaseSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
     val youtubeVm: YouTubeAuthViewModel = viewModel()
     var youtubeSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
     
@@ -986,7 +956,7 @@ fun SettingsScreen(
         showHomeTrendingCard ||
             showHomeRadarCard ||
             showHomeRecommendedCard ||
-            (showHomeContinueCard && homeHasRecentUsage)
+            homeHasRecentUsage
     val homeTrendingLabelRes = if (internationalEnabled) {
         R.string.home_ytmusic_guess_you_like
     } else {
@@ -1032,29 +1002,6 @@ fun SettingsScreen(
             else -> composeResources.getString(R.string.nav_home)
         }
     }
-    LaunchedEffect(neteaseVm) {
-        neteaseVm.events.collect { e ->
-            when (e) {
-                is NeteaseAuthEvent.ShowSnack -> {
-                    inlineMsg = e.message
-                }
-                is NeteaseAuthEvent.AskConfirmSend -> {
-                    confirmPhoneMasked = e.masked
-                    showConfirmDialog = true
-                }
-                NeteaseAuthEvent.LoginSuccess -> {
-                    showNeteaseSavedCookieDialog = false
-                    inlineMsg = null
-                    showNeteaseSheet = false
-                    loginSuccessTitle = composeResources.getString(
-                        R.string.settings_netease_login_success
-                    )
-                    neteaseVm.refreshAuthHealth()
-                }
-            }
-        }
-    }
-
     LaunchedEffect(biliVm) {
         biliVm.events.collect { e ->
             when (e) {
@@ -1197,7 +1144,11 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(stringResource(R.string.settings_title))
+            Text(
+                text = stringResource(R.string.settings_title),
+                style = MeloxType.largeTitle,
+                color = MaterialTheme.colorScheme.onBackground
+            )
             ThemeModeActionButton(
                 isDarkTheme = isDarkTheme,
                 onToggleRequest = onThemeToggleRequest
@@ -1207,7 +1158,6 @@ fun SettingsScreen(
     val onSettingsSearchResultClick: (SettingsSearchEntry) -> Unit = { entry ->
         val targetId = resolveSettingsSearchHighlightTarget(
             entry = entry,
-            dynamicColor = dynamicColor,
             mobileDataFollowDefaultAudioQuality = mobileDataFollowDefaultAudioQuality,
             hasCustomBackground = backgroundImageUri != null
         )
@@ -1293,6 +1243,10 @@ fun SettingsScreen(
                             repository = autoSettingsRepository,
                             scope = scope,
                             sectionScope = AutoSettingsScopes.general,
+                            excludedKeys = setOf(
+                                "haptic_feedback_enabled",
+                                "bili_skip_segment_prompt_enabled"
+                            ),
                             highlightTargetId = settingsHighlightTargetId,
                             highlightPulse = settingsHighlightPulse,
                             onHighlightFinished = onSettingsHighlightFinished
@@ -1373,66 +1327,17 @@ fun SettingsScreen(
                             onThemeModeRequest = onThemeModeRequest
                         )
                     }
-                    miuixSettingsSectionCardItem(key = "${selectedPage.name}:dynamic_color") {
+                    miuixSettingsSectionCardItem(key = "${selectedPage.name}:accent_color") {
                         MiuixSettingsSectionIntro(
-                            title = stringResource(R.string.settings_theme_color_section),
-                            description = stringResource(R.string.settings_theme_color_section_desc)
+                            title = stringResource(R.string.settings_accent_color_section),
+                            description = stringResource(R.string.settings_accent_color_section_desc)
                         )
-                        AutoSettingsListItem(
-                            setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.DYNAMIC_COLOR),
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Colorize,
-                                    contentDescription = stringResource(R.string.settings_dynamic_color),
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            },
-                            trailingContent = {
-                                MiuixSettingsSwitch(checked = dynamicColor, onCheckedChange = onDynamicColorChange)
-                            },
+                        AccentColorListItem(
+                            accentColorHex = accentColorHex,
+                            onClick = { showColorPickerDialog = true },
                             highlightTargetId = settingsHighlightTargetId,
                             highlightPulse = settingsHighlightPulse,
-                            onHighlightFinished = onSettingsHighlightFinished,
-                            onClick = { onDynamicColorChange(!dynamicColor) }
-                        )
-                        LazyAnimatedVisibility(visible = !dynamicColor) {
-                            ThemeSeedListItem(
-                                seedColorHex = seedColorHex,
-                                onClick = { showColorPickerDialog = true },
-                                highlightTargetId = settingsHighlightTargetId,
-                                highlightPulse = settingsHighlightPulse,
-                                onHighlightFinished = onSettingsHighlightFinished
-                            )
-                        }
-                        Text(
-                            text = stringResource(R.string.settings_theme_palette_hint),
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    miuixSettingsSectionCardItem(key = "${selectedPage.name}:palette_style") {
-                        ThemePaletteStyleSelector(
-                            selectedStyle = themePaletteStyle,
-                            onStyleChange = onThemePaletteStyleChange,
-                            modifier = Modifier.settingsHighlightTarget(
-                                targetId = "manual:theme_palette_style",
-                                highlightTargetId = settingsHighlightTargetId,
-                                highlightPulse = settingsHighlightPulse,
-                                onHighlightFinished = onSettingsHighlightFinished
-                            )
-                        )
-                    }
-                    miuixSettingsSectionCardItem(key = "${selectedPage.name}:color_spec") {
-                        ThemeColorSpecSelector(
-                            selectedSpec = themeColorSpec,
-                            onSpecChange = onThemeColorSpecChange,
-                            modifier = Modifier.settingsHighlightTarget(
-                                targetId = "manual:theme_color_spec",
-                                highlightTargetId = settingsHighlightTargetId,
-                                highlightPulse = settingsHighlightPulse,
-                                onHighlightFinished = onSettingsHighlightFinished
-                            )
+                            onHighlightFinished = onSettingsHighlightFinished
                         )
                     }
                 }
@@ -1442,7 +1347,6 @@ fun SettingsScreen(
                         SettingsLoginExpandedContent(
                             biliVm = biliVm,
                             youtubeVm = youtubeVm,
-                            neteaseVm = neteaseVm,
                             onOpenBiliSheet = { tab ->
                                 inlineMsg = null
                                 biliSheetInitialTab = tab
@@ -1456,19 +1360,10 @@ fun SettingsScreen(
                                 inlineMsg = null
                                 showYouTubeSavedCookieDialog = true
                             },
-                            onOpenNeteaseSavedCookieDialog = {
-                                inlineMsg = null
-                                showNeteaseSavedCookieDialog = true
-                            },
                             onOpenYouTubeSheet = {
                                 inlineMsg = null
                                 youtubeSheetInitialTab = 0
                                 showYouTubeSheet = true
-                            },
-                            onOpenNeteaseSheet = {
-                                inlineMsg = null
-                                neteaseSheetInitialTab = 0
-                                showNeteaseSheet = true
                             }
                         )
                     }
@@ -1490,8 +1385,6 @@ fun SettingsScreen(
                                 homeRadarSupportingRes = homeRadarSupportingRes,
                                 homeRecommendedSupportingRes = homeRecommendedSupportingRes,
                                 homeStartAvailable = homeStartAvailable,
-                                showHomeContinueCard = showHomeContinueCard,
-                                onShowHomeContinueCardChange = onShowHomeContinueCardChange,
                                 showHomeTrendingCard = showHomeTrendingCard,
                                 onShowHomeTrendingCardChange = onShowHomeTrendingCardChange,
                                 showHomeRadarCard = showHomeRadarCard,
@@ -1585,7 +1478,7 @@ fun SettingsScreen(
                 }
 
                 SettingsPage.Lyrics -> {
-                    for (cardIndex in 0..3) {
+                    for (cardIndex in 0..2) {
                         item(key = "${selectedPage.name}:card:$cardIndex") {
                             SettingsLyricsSection(
                                 expanded = true,
@@ -1608,12 +1501,6 @@ fun SettingsScreen(
                                         onHighlightFinished = onSettingsHighlightFinished
                                     )
                                 },
-                                cloudMusicLyricDefaultOffsetMs = cloudMusicLyricDefaultOffsetMs,
-                                onCloudMusicLyricDefaultOffsetMsChange =
-                                    onCloudMusicLyricDefaultOffsetMsChange,
-                                qqMusicLyricDefaultOffsetMs = qqMusicLyricDefaultOffsetMs,
-                                onQqMusicLyricDefaultOffsetMsChange =
-                                    onQqMusicLyricDefaultOffsetMsChange,
                                 cardIndex = cardIndex,
                                 highlightTargetId = settingsHighlightTargetId,
                                 highlightPulse = settingsHighlightPulse,
@@ -1789,115 +1676,6 @@ fun SettingsScreen(
                 SettingsPage.PlaybackSource -> {
                     miuixSettingsSectionCardItem(key = "${selectedPage.name}:content") {
                         SettingsCustomSourceSection()
-                        AutoSettingsListItem(
-                            setting = AutoSettingsMetadata.requireSetting(
-                                AutoSettingsKeys.NETEASE_LOCAL_SOURCE_FALLBACK
-                            ),
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Outlined.LibraryMusic,
-                                    contentDescription = stringResource(
-                                        R.string.settings_netease_local_source_fallback
-                                    ),
-                                    modifier = Modifier.size(24.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            },
-                            trailingContent = {
-                                MiuixSettingsSwitch(
-                                    checked = neteaseLocalSourceFallback,
-                                    onCheckedChange = onNeteaseLocalSourceFallbackChange
-                                )
-                            },
-                            highlightTargetId = settingsHighlightTargetId,
-                            highlightPulse = settingsHighlightPulse,
-                            onHighlightFinished = onSettingsHighlightFinished,
-                            onClick = {
-                                onNeteaseLocalSourceFallbackChange(!neteaseLocalSourceFallback)
-                            }
-                        )
-                        AutoSettingsListItem(
-                            setting = AutoSettingsMetadata.requireSetting(
-                                AutoSettingsKeys.NETEASE_AUTO_SOURCE_SWITCH
-                            ),
-                            leadingContent = {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_bilibili),
-                                    contentDescription = stringResource(
-                                        R.string.settings_netease_auto_source_switch
-                                    ),
-                                    modifier = Modifier.size(24.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            },
-                            trailingContent = {
-                                MiuixSettingsSwitch(
-                                    checked = neteaseAutoSourceSwitch,
-                                    onCheckedChange = onNeteaseAutoSourceSwitchChange
-                                )
-                            },
-                            highlightTargetId = settingsHighlightTargetId,
-                            highlightPulse = settingsHighlightPulse,
-                            onHighlightFinished = onSettingsHighlightFinished,
-                            onClick = {
-                                onNeteaseAutoSourceSwitchChange(!neteaseAutoSourceSwitch)
-                            }
-                        )
-                    }
-                }
-
-                SettingsPage.AudioQuality -> {
-                    miuixSettingsSectionCardItem("${selectedPage.name}:content") {
-                        SettingsAudioQualitySection(
-                            expanded = true,
-                            arrowRotation = 0f,
-                            onExpandedChange = {},
-                            showHeader = false,
-                            qualityLabel = qualityLabel,
-                            preferredQuality = preferredQuality,
-                            onQualityChange = onQualityChange,
-                            youtubeQualityLabel = youtubeQualityLabel,
-                            youtubePreferredQuality = youtubePreferredQuality,
-                            onYouTubeQualityChange = onYouTubeQualityChange,
-                            biliQualityLabel = biliQualityLabel,
-                            biliPreferredQuality = biliPreferredQuality,
-                            onBiliQualityChange = onBiliQualityChange,
-                            mobileDataFollowDefaultAudioQuality = mobileDataFollowDefaultAudioQuality,
-                            onMobileDataFollowDefaultAudioQualityChange =
-                                onMobileDataFollowDefaultAudioQualityChange,
-                            mobileDataNeteaseQualityLabel = mobileDataNeteaseQualityLabel,
-                            mobileDataNeteaseAudioQuality = normalizedMobileDataNeteaseAudioQuality,
-                            onMobileDataNeteaseAudioQualityChange =
-                                onMobileDataNeteaseAudioQualityChange,
-                            mobileDataYouTubeQualityLabel = mobileDataYouTubeQualityLabel,
-                            mobileDataYouTubeAudioQuality = normalizedMobileDataYouTubeAudioQuality,
-                            onMobileDataYouTubeAudioQualityChange =
-                                onMobileDataYouTubeAudioQualityChange,
-                            mobileDataBiliQualityLabel = mobileDataBiliQualityLabel,
-                            mobileDataBiliAudioQuality = normalizedMobileDataBiliAudioQuality,
-                            onMobileDataBiliAudioQualityChange = onMobileDataBiliAudioQualityChange,
-                            showQualityDialog = showQualityDialog,
-                            onShowQualityDialogChange = { showQualityDialog = it },
-                            showYouTubeQualityDialog = showYouTubeQualityDialog,
-                            onShowYouTubeQualityDialogChange = { showYouTubeQualityDialog = it },
-                            showBiliQualityDialog = showBiliQualityDialog,
-                            onShowBiliQualityDialogChange = { showBiliQualityDialog = it },
-                            showMobileDataNeteaseQualityDialog = showMobileDataNeteaseQualityDialog,
-                            onShowMobileDataNeteaseQualityDialogChange = {
-                                showMobileDataNeteaseQualityDialog = it
-                            },
-                            showMobileDataYouTubeQualityDialog = showMobileDataYouTubeQualityDialog,
-                            onShowMobileDataYouTubeQualityDialogChange = {
-                                showMobileDataYouTubeQualityDialog = it
-                            },
-                            showMobileDataBiliQualityDialog = showMobileDataBiliQualityDialog,
-                            onShowMobileDataBiliQualityDialogChange = {
-                                showMobileDataBiliQualityDialog = it
-                            },
-                            highlightTargetId = settingsHighlightTargetId,
-                            highlightPulse = settingsHighlightPulse,
-                            onHighlightFinished = onSettingsHighlightFinished
-                        )
                     }
                 }
 
@@ -2094,13 +1872,6 @@ fun SettingsScreen(
                                 val copiedMessage = composeResources.getString(R.string.toast_copied)
                                 inlineMsg = copiedMessage
                                 showSettingsMessage(copiedMessage)
-                            },
-                            onOpenGitHubRepo = {
-                                val intent = Intent(
-                                    Intent.ACTION_VIEW,
-                                    "https://github.com/cwuom/Lyra".toUri()
-                                )
-                                context.startActivity(intent)
                             }
                         )
                     }
@@ -2115,30 +1886,6 @@ fun SettingsScreen(
         splitLayout = isSettingsSplitLayout,
         isolateAdvancedGlassTransitions = isolateAdvancedGlassTransitions,
         content = settingsPageContent
-    )
-
-    SettingsNeteaseAuthDialogs(
-        showSheet = showNeteaseSheet,
-        initialTab = neteaseSheetInitialTab,
-        onDismissSheet = { showNeteaseSheet = false },
-        inlineMsg = inlineMsg,
-        onInlineMsgChange = { inlineMsg = it },
-        showConfirmDialog = showConfirmDialog,
-        confirmPhoneMasked = confirmPhoneMasked,
-        onDismissConfirmDialog = { showConfirmDialog = false },
-        vm = neteaseVm,
-        showSavedCookieDialog = showNeteaseSavedCookieDialog,
-        onDismissSavedCookieDialog = { showNeteaseSavedCookieDialog = false },
-        onOpenSheetAtTab = { tab ->
-            inlineMsg = null
-            neteaseSheetInitialTab = tab
-            showNeteaseSheet = true
-        },
-        onLogout = {
-            showNeteaseSavedCookieDialog = false
-            neteaseVm.clearCookies()
-        },
-        onBrowserLogin = null
     )
 
     SettingsBiliAuthDialogs(
@@ -2195,9 +1942,9 @@ fun SettingsScreen(
         onDefaultStartDestinationChange = onDefaultStartDestinationChange,
         showColorPickerDialog = showColorPickerDialog,
         onShowColorPickerDialogChange = { showColorPickerDialog = it },
-        seedColorHex = seedColorHex,
+        accentColorHex = accentColorHex,
         themeColorPalette = themeColorPalette,
-        onSeedColorChange = onSeedColorChange,
+        onAccentColorChange = onAccentColorChange,
         onAddColorToPalette = onAddColorToPalette,
         onRemoveColorFromPalette = onRemoveColorFromPalette,
         showDpiDialog = showDpiDialog,
@@ -2455,12 +2202,6 @@ fun SettingsScreen(
 
 }
 
-private data class ThemeOption(
-    val value: String,
-    val labelRes: Int,
-    val descriptionRes: Int
-)
-
 @Composable
 private fun ThemeModeSelectorListItem(
     isDarkTheme: Boolean,
@@ -2592,75 +2333,6 @@ private fun ThemeAutoModeListItem(
 }
 
 @Composable
-private fun ThemePaletteStyleSelector(
-    selectedStyle: String,
-    onStyleChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val normalizedStyle = ThemeDefaults.normalizePaletteStyle(selectedStyle)
-    val options = listOf(
-        ThemeOption("TonalSpot", R.string.settings_theme_style_tonal_spot, R.string.settings_theme_style_tonal_spot_desc),
-        ThemeOption("Neutral", R.string.settings_theme_style_neutral, R.string.settings_theme_style_neutral_desc),
-        ThemeOption("Vibrant", R.string.settings_theme_style_vibrant, R.string.settings_theme_style_vibrant_desc),
-        ThemeOption("Expressive", R.string.settings_theme_style_expressive, R.string.settings_theme_style_expressive_desc),
-        ThemeOption("Monochrome", R.string.settings_theme_style_monochrome, R.string.settings_theme_style_monochrome_desc),
-        ThemeOption("Fidelity", R.string.settings_theme_style_fidelity, R.string.settings_theme_style_fidelity_desc)
-    )
-
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.settings_theme_palette_style),
-            modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 2.dp),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(R.string.settings_theme_palette_style_desc),
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        options.forEach { option ->
-            MiuixSettingsChoiceRow(
-                title = stringResource(option.labelRes),
-                subtitle = stringResource(option.descriptionRes),
-                selected = normalizedStyle == option.value,
-                onClick = { onStyleChange(option.value) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun ThemeColorSpecSelector(
-    selectedSpec: String,
-    onSpecChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val normalizedSpec = ThemeDefaults.normalizeColorSpec(selectedSpec)
-    val options = listOf(
-        ThemeDefaults.COLOR_SPECS[0] to stringResource(R.string.settings_theme_color_spec_2021),
-        ThemeDefaults.COLOR_SPECS[1] to stringResource(R.string.settings_theme_color_spec_2025)
-    )
-
-    ListItem(
-        modifier = modifier,
-        headlineContent = { Text(stringResource(R.string.settings_theme_color_spec)) },
-        supportingContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.settings_theme_color_spec_desc))
-                MiuixSettingsSegmentedTabs(
-                    labels = options.map { it.second },
-                    selectedIndex = options.indexOfFirst { it.first == normalizedSpec }.coerceAtLeast(0),
-                    onSelectedIndexChange = { index -> onSpecChange(options[index].first) }
-                )
-            }
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
-}
-
-@Composable
 private fun SettingsPersonalizationPageContent(
     autoSettingsRepository: AutoSettingsRepository,
     scope: kotlinx.coroutines.CoroutineScope,
@@ -2674,8 +2346,6 @@ private fun SettingsPersonalizationPageContent(
     homeRadarSupportingRes: Int?,
     homeRecommendedSupportingRes: Int?,
     homeStartAvailable: Boolean,
-    showHomeContinueCard: Boolean,
-    onShowHomeContinueCardChange: (Boolean) -> Unit,
     showHomeTrendingCard: Boolean,
     onShowHomeTrendingCardChange: (Boolean) -> Unit,
     showHomeRadarCard: Boolean,
@@ -2705,25 +2375,13 @@ private fun SettingsPersonalizationPageContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         val autoShowKeyboard by autoSettingsRepository.autoShowKeyboardFlow.collectAsState(initial = false)
-        val showCoverSourceBadge by autoSettingsRepository.showCoverSourceBadgeFlow.collectAsState(initial = true)
-        val alwaysUseNewTabStyle by autoSettingsRepository.alwaysUseNewTabStyleFlow.collectAsState(initial = true)
-        val nowPlayingShowTitle by autoSettingsRepository.nowPlayingShowTitleFlow.collectAsState(initial = true)
         val nowPlayingSongTitleMarqueeEnabled by autoSettingsRepository
             .nowPlayingSongTitleMarqueeEnabledFlow
             .collectAsState(initial = true)
         val nowPlayingKeepScreenOn by autoSettingsRepository.nowPlayingKeepScreenOnFlow.collectAsState(initial = true)
-        val nowPlayingToolbarDockEnabled by autoSettingsRepository.nowPlayingToolbarDockEnabledFlow.collectAsState(
-            initial = true
-        )
         val playbackControlLayoutPreferences by AppContainer.settingsRepo
             .playbackControlLayoutPreferencesFlow
             .collectAsState(initial = PlaybackControlLayoutPreferences())
-        val nowPlayingCoverLyricsEnabled by autoSettingsRepository.nowPlayingCoverLyricsEnabledFlow.collectAsState(
-            initial = true
-        )
-        val nowPlayingProgressShowQualitySwitch by autoSettingsRepository
-            .nowPlayingProgressShowQualitySwitchFlow
-            .collectAsState(initial = true)
         val nowPlayingProgressShowAudioCodec by autoSettingsRepository
             .nowPlayingProgressShowAudioCodecFlow
             .collectAsState(initial = true)
@@ -2777,17 +2435,6 @@ private fun SettingsPersonalizationPageContent(
                 description = stringResource(R.string.settings_personalization_home_section_desc)
             )
             SettingsHomeCardSwitch(
-                title = stringResource(R.string.player_continue),
-                icon = Icons.Outlined.History,
-                checked = showHomeContinueCard,
-                onCheckedChange = onShowHomeContinueCardChange,
-                targetId = "setting:home_card_continue",
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-
-            SettingsHomeCardSwitch(
                 title = stringResource(homeTrendingLabelRes),
                 description = homeTrendingSupportingRes?.let { stringResource(it) },
                 icon = Icons.Outlined.Bolt,
@@ -2833,7 +2480,7 @@ private fun SettingsPersonalizationPageContent(
             }
             SettingsHomeLayoutSection(
                 enabledSections = buildSet {
-                    if (showHomeContinueCard) add(HomeSectionId.CONTINUE)
+                    add(HomeSectionId.CONTINUE)
                     if (showHomeTrendingCard) add(HomeSectionId.TRENDING)
                     if (showHomeRadarCard) add(HomeSectionId.RADAR)
                     if (showHomeRecommendedCard) add(HomeSectionId.RECOMMENDED)
@@ -2847,26 +2494,6 @@ private fun SettingsPersonalizationPageContent(
                 description = stringResource(R.string.settings_personalization_playback_info_section_desc)
             )
             PersonalizationSwitchItem(
-                setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.SHOW_COVER_SOURCE_BADGE),
-                checked = showCoverSourceBadge,
-                onCheckedChange = { enabled ->
-                    scope.launch { autoSettingsRepository.setShowCoverSourceBadge(enabled) }
-                },
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-            PersonalizationSwitchItem(
-                setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.NOWPLAYING_SHOW_TITLE),
-                checked = nowPlayingShowTitle,
-                onCheckedChange = { enabled ->
-                    scope.launch { autoSettingsRepository.setNowPlayingShowTitle(enabled) }
-                },
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-            PersonalizationSwitchItem(
                 setting = AutoSettingsMetadata.requireSetting(
                     AutoSettingsKeys.NOW_PLAYING_SONG_TITLE_MARQUEE_ENABLED
                 ),
@@ -2875,28 +2502,6 @@ private fun SettingsPersonalizationPageContent(
                     scope.launch {
                         autoSettingsRepository.setNowPlayingSongTitleMarqueeEnabled(enabled)
                     }
-                },
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-            PersonalizationSwitchItem(
-                setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.NOW_PLAYING_COVER_LYRICS_ENABLED),
-                checked = nowPlayingCoverLyricsEnabled,
-                onCheckedChange = { enabled ->
-                    scope.launch { autoSettingsRepository.setNowPlayingCoverLyricsEnabled(enabled) }
-                },
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-            PersonalizationSwitchItem(
-                setting = AutoSettingsMetadata.requireSetting(
-                    AutoSettingsKeys.NOWPLAYING_PROGRESS_SHOW_QUALITY_SWITCH
-                ),
-                checked = nowPlayingProgressShowQualitySwitch,
-                onCheckedChange = { enabled ->
-                    scope.launch { autoSettingsRepository.setNowPlayingProgressShowQualitySwitch(enabled) }
                 },
                 highlightTargetId = highlightTargetId,
                 highlightPulse = highlightPulse,
@@ -2930,44 +2535,10 @@ private fun SettingsPersonalizationPageContent(
                 description = stringResource(R.string.settings_personalization_playback_controls_section_desc)
             )
             PersonalizationSwitchItem(
-                setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.ALWAYS_USE_NEW_TAB_STYLE),
-                checked = alwaysUseNewTabStyle,
-                onCheckedChange = { enabled ->
-                    scope.launch { autoSettingsRepository.setAlwaysUseNewTabStyle(enabled) }
-                },
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-            PersonalizationSwitchItem(
                 setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.NOWPLAYING_KEEP_SCREEN_ON),
                 checked = nowPlayingKeepScreenOn,
                 onCheckedChange = { enabled ->
                     scope.launch { autoSettingsRepository.setNowPlayingKeepScreenOn(enabled) }
-                },
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-            val nowPlayingControlsAtBottom =
-                playbackControlLayoutPreferences.nowPlayingPlacement.placesControlsAtBottom
-            PersonalizationSwitchItem(
-                setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.NOWPLAYING_TOOLBAR_DOCK_ENABLED),
-                checked = nowPlayingToolbarDockEnabled && !nowPlayingControlsAtBottom,
-                onCheckedChange = { enabled ->
-                    scope.launch { autoSettingsRepository.setNowPlayingToolbarDockEnabled(enabled) }
-                },
-                enabled = !nowPlayingControlsAtBottom,
-                supportingContent = if (nowPlayingControlsAtBottom) {
-                    {
-                        Text(
-                            stringResource(
-                                R.string.settings_nowplaying_toolbar_dock_disabled_by_control_position
-                            )
-                        )
-                    }
-                } else {
-                    null
                 },
                 highlightTargetId = highlightTargetId,
                 highlightPulse = highlightPulse,
@@ -3099,38 +2670,6 @@ private fun SettingsLyricsAppearanceContent(
         onHighlightFinished = onHighlightFinished
     )
     MiuixSettingsSectionIntro(
-        title = stringResource(R.string.settings_lyrics_cover_page_section),
-        description = stringResource(R.string.settings_lyrics_cover_page_section_desc)
-    )
-    LyricFontScaleSettingsItem(
-        setting = AutoSettingsMetadata.requireSetting(
-            AutoSettingsKeys.NOWPLAYING_COVER_LYRIC_FONT_SCALE
-        ),
-        currentScale = lyricFontScales.coverLyric,
-        onScaleCommit = { scale ->
-            onLyricFontScaleChange(LyricFontScaleTarget.COVER_LYRIC, scale)
-        },
-        sampleText = stringResource(R.string.settings_lyrics_sample),
-        sampleBaseSizeSp = 18f,
-        highlightTargetId = highlightTargetId,
-        highlightPulse = highlightPulse,
-        onHighlightFinished = onHighlightFinished
-    )
-    LyricFontScaleSettingsItem(
-        setting = AutoSettingsMetadata.requireSetting(
-            AutoSettingsKeys.NOWPLAYING_COVER_TRANSLATION_FONT_SCALE
-        ),
-        currentScale = lyricFontScales.coverTranslation,
-        onScaleCommit = { scale ->
-            onLyricFontScaleChange(LyricFontScaleTarget.COVER_TRANSLATION, scale)
-        },
-        sampleText = stringResource(R.string.settings_lyrics_translation_sample),
-        sampleBaseSizeSp = 14f,
-        highlightTargetId = highlightTargetId,
-        highlightPulse = highlightPulse,
-        onHighlightFinished = onHighlightFinished
-    )
-    MiuixSettingsSectionIntro(
         title = stringResource(R.string.settings_lyrics_page_section),
         description = stringResource(R.string.settings_lyrics_page_section_desc)
     )
@@ -3172,8 +2711,6 @@ private fun PersonalizationDetailCard(
 }
 
 private enum class PlaybackControlLayoutSetting {
-    NOW_PLAYING_PLACEMENT,
-    NOW_PLAYING_SIZE,
     LYRICS_SIZE
 }
 
@@ -3190,32 +2727,6 @@ private fun PlaybackControlLayoutSettings(
     }
 
     PlaybackControlLayoutListItem(
-        targetId = "setting:nowplaying_control_placement",
-        icon = Icons.Outlined.DashboardCustomize,
-        title = stringResource(R.string.settings_nowplaying_control_placement),
-        description = stringResource(R.string.settings_nowplaying_control_placement_desc),
-        value = nowPlayingControlPlacementLabel(preferences.nowPlayingPlacement),
-        onClick = {
-            selectedSetting.value = PlaybackControlLayoutSetting.NOW_PLAYING_PLACEMENT
-        },
-        highlightTargetId = highlightTargetId,
-        highlightPulse = highlightPulse,
-        onHighlightFinished = onHighlightFinished
-    )
-    PlaybackControlLayoutListItem(
-        targetId = "setting:nowplaying_control_size",
-        icon = Icons.Outlined.AspectRatio,
-        title = stringResource(R.string.settings_nowplaying_control_size),
-        description = stringResource(R.string.settings_nowplaying_control_size_desc),
-        value = playbackControlSizeLabel(preferences.nowPlayingSize),
-        onClick = {
-            selectedSetting.value = PlaybackControlLayoutSetting.NOW_PLAYING_SIZE
-        },
-        highlightTargetId = highlightTargetId,
-        highlightPulse = highlightPulse,
-        onHighlightFinished = onHighlightFinished
-    )
-    PlaybackControlLayoutListItem(
         targetId = "setting:lyrics_control_size",
         icon = Icons.Outlined.TextFields,
         title = stringResource(R.string.settings_lyrics_control_size),
@@ -3230,63 +2741,21 @@ private fun PlaybackControlLayoutSettings(
     )
 
     val setting = selectedSetting.value ?: return
-    val title = when (setting) {
-        PlaybackControlLayoutSetting.NOW_PLAYING_PLACEMENT ->
-            stringResource(R.string.settings_nowplaying_control_placement)
-        PlaybackControlLayoutSetting.NOW_PLAYING_SIZE ->
-            stringResource(R.string.settings_nowplaying_control_size)
-        PlaybackControlLayoutSetting.LYRICS_SIZE ->
-            stringResource(R.string.settings_lyrics_control_size)
-    }
+    val title = stringResource(R.string.settings_lyrics_control_size)
     MiuixSettingsDialog(
         onDismissRequest = { selectedSetting.value = null },
         title = { Text(title) },
         text = {
             Column {
                 when (setting) {
-                    PlaybackControlLayoutSetting.NOW_PLAYING_PLACEMENT -> {
-                        NowPlayingControlPlacement.entries.forEach { placement ->
-                            MiuixSettingsChoiceRow(
-                                title = nowPlayingControlPlacementLabel(placement),
-                                subtitle = if (placement.placesControlsAtBottom) {
-                                    stringResource(
-                                        R.string.settings_nowplaying_toolbar_dock_disabled_by_control_position
-                                    )
-                                } else {
-                                    null
-                                },
-                                selected = placement == preferences.nowPlayingPlacement,
-                                onClick = {
-                                    onPreferencesChange(
-                                        preferences.copy(nowPlayingPlacement = placement)
-                                    )
-                                    selectedSetting.value = null
-                                }
-                            )
-                        }
-                    }
-
-                    PlaybackControlLayoutSetting.NOW_PLAYING_SIZE,
                     PlaybackControlLayoutSetting.LYRICS_SIZE -> {
                         PlaybackControlSize.entries.forEach { size ->
-                            val selected = when (setting) {
-                                PlaybackControlLayoutSetting.NOW_PLAYING_SIZE ->
-                                    size == preferences.nowPlayingSize
-                                PlaybackControlLayoutSetting.LYRICS_SIZE ->
-                                    size == preferences.lyricsSize
-                            }
+                            val selected = size == preferences.lyricsSize
                             MiuixSettingsChoiceRow(
                                 title = playbackControlSizeLabel(size),
                                 selected = selected,
                                 onClick = {
-                                    onPreferencesChange(
-                                        when (setting) {
-                                            PlaybackControlLayoutSetting.NOW_PLAYING_SIZE ->
-                                                preferences.copy(nowPlayingSize = size)
-                                            PlaybackControlLayoutSetting.LYRICS_SIZE ->
-                                                preferences.copy(lyricsSize = size)
-                                        }
-                                    )
+                                    onPreferencesChange(preferences.copy(lyricsSize = size))
                                     selectedSetting.value = null
                                 }
                             )
@@ -3350,18 +2819,6 @@ private fun PlaybackControlLayoutListItem(
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
-}
-
-@Composable
-private fun nowPlayingControlPlacementLabel(
-    placement: NowPlayingControlPlacement
-): String = when (placement) {
-    NowPlayingControlPlacement.LOWER ->
-        stringResource(R.string.settings_nowplaying_control_placement_lower)
-    NowPlayingControlPlacement.BOTTOM ->
-        stringResource(R.string.settings_nowplaying_control_placement_bottom)
-    NowPlayingControlPlacement.BOTTOM_WITH_PROGRESS ->
-        stringResource(R.string.settings_nowplaying_control_placement_bottom_with_progress)
 }
 
 @Composable
@@ -3526,21 +2983,16 @@ private fun SettingsHomeCardSwitch(
 private fun SettingsLoginExpandedContent(
     biliVm: BiliAuthViewModel,
     youtubeVm: YouTubeAuthViewModel,
-    neteaseVm: NeteaseAuthViewModel,
     onOpenBiliSheet: (Int) -> Unit,
     onOpenBiliSavedCookieDialog: () -> Unit,
     onOpenYouTubeSavedCookieDialog: () -> Unit,
-    onOpenNeteaseSavedCookieDialog: () -> Unit,
     onOpenYouTubeSheet: () -> Unit,
-    onOpenNeteaseSheet: () -> Unit,
 ) {
     val biliAuthUiState by biliVm.uiState.collectAsStateWithLifecycleCompat()
     val youtubeAuthUiState by youtubeVm.uiState.collectAsStateWithLifecycleCompat()
-    val neteaseAuthUiState by neteaseVm.uiState.collectAsStateWithLifecycleCompat()
 
-    LaunchedEffect(biliVm, youtubeVm, neteaseVm) {
+    LaunchedEffect(biliVm, youtubeVm) {
         biliVm.refreshAuthHealth()
-        neteaseVm.refreshAuthHealth()
         youtubeVm.refreshAuthHealth()
     }
 
@@ -3564,29 +3016,6 @@ private fun SettingsLoginExpandedContent(
                 stringResource(R.string.settings_bili_status_saved_invalid)
             } else {
                 stringResource(R.string.settings_bili_status_missing)
-            }
-        }
-    }
-    val neteaseStatusText = when (neteaseAuthUiState.health.state) {
-        SavedCookieAuthState.Valid -> {
-            val relativeTime = neteaseAuthUiState.health.savedAt
-                .takeIf { it > 0L }
-                ?.let { formatSyncTime(it) }
-                ?: stringResource(R.string.time_just_now)
-            stringResource(R.string.settings_netease_status_valid, relativeTime)
-        }
-        SavedCookieAuthState.Checking -> {
-            if (neteaseAuthUiState.hasSavedCookies) {
-                stringResource(R.string.settings_netease_status_saved_invalid)
-            } else {
-                stringResource(R.string.settings_netease_status_missing)
-            }
-        }
-        SavedCookieAuthState.Missing -> {
-            if (neteaseAuthUiState.hasSavedCookies) {
-                stringResource(R.string.settings_netease_status_saved_invalid)
-            } else {
-                stringResource(R.string.settings_netease_status_missing)
             }
         }
     }
@@ -3639,20 +3068,20 @@ private fun SettingsLoginExpandedContent(
         ListItem(
             leadingContent = {
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_netease_cloud_music),
-                    contentDescription = stringResource(R.string.settings_netease),
+                    painter = painterResource(id = R.drawable.ic_youtube),
+                    contentDescription = stringResource(R.string.platform_youtube),
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onSurface
                 )
             },
-            headlineContent = { Text(stringResource(R.string.platform_netease)) },
-            supportingContent = { Text(neteaseStatusText) },
+            headlineContent = { Text(stringResource(R.string.platform_youtube)) },
+            supportingContent = { Text(youtubeStatusText) },
             modifier = Modifier.settingsItemClickable(
                 onClick = {
-                    if (neteaseAuthUiState.hasSavedCookies) {
-                        onOpenNeteaseSavedCookieDialog()
+                    if (youtubeAuthUiState.hasSavedAuth) {
+                        onOpenYouTubeSavedCookieDialog()
                     } else {
-                        onOpenNeteaseSheet()
+                        onOpenYouTubeSheet()
                     }
                 }
             ),

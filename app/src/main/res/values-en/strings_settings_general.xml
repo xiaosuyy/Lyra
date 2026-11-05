@@ -8,7 +8,7 @@
     <string name="settings_search_result_context">%1$s · %2$s</string>
     <string name="settings_general">General</string>
     <string name="settings_general_desc">Language, haptics, and global behavior</string>
-    <string name="settings_accounts_desc">Manage NetEase and Bilibili sign-in states</string>
+    <string name="settings_accounts_desc">Manage Bilibili and YouTube sign-in states</string>
     <string name="settings_personalization">Personalization</string>
     <string name="settings_network">Network</string>
     <string name="settings_bypass_proxy">Bypass Proxy</string>
@@ -97,6 +97,14 @@
     <string name="settings_custom_source_section">Custom Sources (JS plugins)</string>
     <string name="settings_custom_source_section_desc">Load lx-music style JS source scripts to resolve playable stream URLs. Bundled scripts update with the app; enable, disable, or import your own here.</string>
     <string name="settings_custom_source_import">Import source script</string>
+    <string name="settings_custom_source_import_from_local">Import from local file</string>
+    <string name="settings_custom_source_import_url_label">Script URL</string>
+    <string name="settings_custom_source_import_url_placeholder">https://example.com/source.js</string>
+    <string name="settings_custom_source_import_url_hint">Enter an online source script URL; it will be downloaded and imported automatically</string>
+    <string name="settings_custom_source_import_or">or</string>
+    <string name="settings_custom_source_import_confirm">Import</string>
+    <string name="settings_custom_source_importing">Importing…</string>
+    <string name="settings_custom_source_import_invalid_url">Enter a valid http(s) script URL</string>
     <string name="settings_custom_source_reload">Reload bundled source</string>
     <string name="settings_custom_source_empty">No source script yet</string>
     <string name="settings_custom_source_imported">Source script imported</string>

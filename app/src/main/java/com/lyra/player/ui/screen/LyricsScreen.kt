@@ -61,20 +61,24 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SpeakerGroup
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import com.lyra.player.ui.screen.nowplaying.NowPlayingAmbientBackground
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.FormatListBulleted
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,6 +90,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
@@ -118,6 +123,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -127,6 +133,7 @@ import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
+import com.lyra.player.ui.melox.theme.MeloxSystemColors
 import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
 import com.lyra.player.data.settings.LyricFontScalePage
 import com.lyra.player.data.settings.LyricFontScaleTarget
@@ -165,7 +172,6 @@ import com.lyra.player.ui.component.lyrics.rememberLyricSeekHapticFeedback
 import com.lyra.player.ui.viewmodel.tab.AlbumSummary
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.ui.haptic.HapticFeedbackEffect
-import com.lyra.player.ui.haptic.HapticFilledIconButton
 import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.util.format.formatDuration
 import com.lyra.player.util.media.offlineCachedImageRequest
@@ -187,6 +193,8 @@ fun LyricsScreen(
     onOpenCurrentArtist: () -> Unit = {},
     onOpenCurrentPlaybackSource: (() -> Unit)? = null,
     onNavigateBack: () -> Unit,
+    onOpenQueuePage: () -> Unit = {},
+    onOpenOutputPicker: () -> Unit = {},
     onSeekTo: (Long) -> Unit,
     progressSeekEnabled: Boolean = true,
     advancedLyricsEnabled: Boolean = true,
@@ -283,17 +291,15 @@ fun LyricsScreen(
     val toolbarWidthFraction = if (isTabletLandscape) 0.58f else 1f
     val lyricsControlSize = playbackControlLayoutPreferences.lyricsSize
     val baseToolbarIconSize = if (isTabletLandscape) 22.dp else 20.dp
-    val basePrimaryControlSize = if (isTabletLandscape) 50.dp else 42.dp
-    val baseSecondaryControlSize = if (isTabletLandscape) 46.dp else 42.dp
     val lyricsTopActionButtonSize = lyricsControlSize.scaleButtonSize(48.dp)
     val lyricsTopActionIconSize = lyricsControlSize.scaleIconSize(24.dp)
+    val lyricsMainButtonSize = lyricsControlSize.scaleButtonSize(64.dp)
+    val lyricsMainIconSize = lyricsControlSize.scaleIconSize(34.dp)
+    val lyricsPlayIndicatorSize = lyricsControlSize.scaleIconSize(48.dp)
+    val lyricsMainControlRowHeight = lyricsControlSize.scaleButtonSize(82.dp)
     val lyricsTopBarHeight = maxOf(56.dp, lyricsTopActionButtonSize)
     val toolbarIconSize = lyricsControlSize.scaleIconSize(baseToolbarIconSize)
     val toolbarMinimumTouchTarget = lyricsControlSize.scaleButtonSize(48.dp)
-    val primaryControlSize = lyricsControlSize.scaleButtonSize(basePrimaryControlSize)
-    val secondaryControlSize = lyricsControlSize.scaleButtonSize(baseSecondaryControlSize)
-    val secondaryControlIconSize = lyricsControlSize.scaleIconSize(32.dp)
-    val primaryControlIconSize = lyricsControlSize.scaleIconSize(24.dp)
     val snackbarHostState = remember { SnackbarHostState() }
 
     // 启动进入动画
@@ -572,11 +578,11 @@ fun LyricsScreen(
                     )
             ) {
                 Icon(
-                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
                     contentDescription = if (isFavorite) stringResource(R.string.lyrics_favorited) else stringResource(R.string.lyrics_favorite),
                     modifier = Modifier.size(lyricsTopActionIconSize),
                     tint = if (isFavorite) {
-                        Color.Red.copy(alpha = 0.6f)
+                        MeloxSystemColors.Blue
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     }
@@ -602,7 +608,7 @@ fun LyricsScreen(
                     )
             ) {
                 Icon(
-                    Icons.Filled.MoreVert,
+                    Icons.Filled.MoreHoriz,
                     contentDescription = stringResource(R.string.lyrics_more_options),
                     modifier = Modifier.size(lyricsTopActionIconSize)
                 )
@@ -706,11 +712,13 @@ fun LyricsScreen(
                     )
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(19.dp))
 
-            // 播放控制按钮
+            // 播放控制按钮（参考播放器口径：82dp 走带行、字形成在背景上）
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(lyricsMainControlRowHeight),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -728,16 +736,17 @@ fun LyricsScreen(
                             }
                         } else Modifier
                     )
-                    .size(secondaryControlSize)
+                    .size(lyricsMainButtonSize)
                 ) {
                     Icon(
                         Icons.Outlined.SkipPrevious,
                         contentDescription = stringResource(R.string.lyrics_previous),
-                        modifier = Modifier.size(secondaryControlIconSize)
+                        modifier = Modifier.size(lyricsMainIconSize),
+                        tint = Color.White
                     )
                 }
 
-                HapticFilledIconButton(
+                HapticIconButton(
                     onClick = { PlayerManager.togglePlayPause() },
                     enabled = !usbPlaybackPreparing,
                     modifier = Modifier
@@ -753,19 +762,21 @@ fun LyricsScreen(
                                 }
                             } else Modifier
                         )
-                        .size(primaryControlSize)
+                        .size(lyricsMainButtonSize)
                 ) {
-                    PlaybackControlIndicator(
-                        isPlaying = isPlaybackControlPlaying,
-                        isPlaybackWaiting = isPlaybackWaiting,
-                        isAudioRouteMuted = isAudioRouteMuted,
-                        playContentDescription = stringResource(R.string.lyrics_play),
-                        pauseContentDescription = stringResource(R.string.lyrics_pause),
-                        restoreVolumeContentDescription = stringResource(R.string.player_restore_volume),
-                        waitingContentDescription = stringResource(R.string.player_waiting),
-                        modifier = Modifier.size(primaryControlIconSize),
-                        progressIndicatorSize = primaryControlIconSize
-                    )
+                    CompositionLocalProvider(LocalContentColor provides Color.White) {
+                        PlaybackControlIndicator(
+                            isPlaying = isPlaybackControlPlaying,
+                            isPlaybackWaiting = isPlaybackWaiting,
+                            isAudioRouteMuted = isAudioRouteMuted,
+                            playContentDescription = stringResource(R.string.lyrics_play),
+                            pauseContentDescription = stringResource(R.string.lyrics_pause),
+                            restoreVolumeContentDescription = stringResource(R.string.player_restore_volume),
+                            waitingContentDescription = stringResource(R.string.player_waiting),
+                            modifier = Modifier.size(lyricsPlayIndicatorSize),
+                            progressIndicatorSize = lyricsPlayIndicatorSize
+                        )
+                    }
                 }
 
                 HapticIconButton(onClick = { PlayerManager.next() },
@@ -782,12 +793,13 @@ fun LyricsScreen(
                                 }
                             } else Modifier
                         )
-                        .size(secondaryControlSize)
+                        .size(lyricsMainButtonSize)
                 ) {
                     Icon(
                         Icons.Outlined.SkipNext,
                         contentDescription = stringResource(R.string.lyrics_next),
-                        modifier = Modifier.size(secondaryControlIconSize)
+                        modifier = Modifier.size(lyricsMainIconSize),
+                        tint = Color.White
                     )
                 }
             }
@@ -812,9 +824,17 @@ fun LyricsScreen(
                 LocalMinimumInteractiveComponentSize provides
                     toolbarLayout.minimumInteractiveComponentSize
             ) {
+                val meloxToolbarIconSize =
+                    if (isTabletLandscape) toolbarLayout.iconSize
+                    else lyricsControlSize.scaleIconSize(22.dp)
+                val meloxIdleGlyphColor = Color.White.copy(alpha = 0.72f)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(
+                            if (isTabletLandscape) Modifier
+                            else Modifier.height(72.dp)
+                        )
                         .clip(RoundedCornerShape(if (isTabletLandscape) 30.dp else 0.dp))
                         .background(
                             if (isTabletLandscape) {
@@ -824,8 +844,13 @@ fun LyricsScreen(
                             }
                         )
                         .padding(
-                            horizontal = toolbarLayout.horizontalPadding,
-                            vertical = if (isTabletLandscape) 8.dp else 4.dp
+                            horizontal = if (isTabletLandscape) {
+                                toolbarLayout.horizontalPadding
+                            } else {
+                                // 与播放页/队列页同一条基线，三键中心约在 104/212/319dp。
+                                60.dp
+                            },
+                            vertical = 8.dp
                         ),
                     horizontalArrangement = if (toolbarLayout.useEqualWidthSlots) {
                         Arrangement.Start
@@ -839,85 +864,7 @@ fun LyricsScreen(
                     } else {
                         Modifier
                     }
-            // 播放队列按钮
-            var showQueueSheet by remember { mutableStateOf(false) }
-            HapticIconButton(onClick = { showQueueSheet = true },  modifier = toolbarActionModifier.then(
-                if (sharedTransitionScope != null && animatedContentScope != null) {
-                    with(sharedTransitionScope) {
-                        Modifier.sharedBounds(
-                            rememberSharedContentState(key = "btn_queue"),
-                            animatedVisibilityScope = animatedContentScope,
-                            enter = EnterTransition.None,
-                            exit = ExitTransition.None,
-                        ).zIndex(1f)
-                    }
-                } else Modifier
-            )) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.QueueMusic,
-                    contentDescription = stringResource(R.string.lyrics_playlist),
-                    modifier = Modifier.size(toolbarLayout.iconSize)
-                )
-            }
-
-            // 定时器按钮
-            val sleepTimerState by PlayerManager.sleepTimerManager.timerState.collectAsState()
-            var showSleepTimerDialog by remember { mutableStateOf(false) }
-            HapticIconButton(onClick = { showSleepTimerDialog = true },
-                modifier = toolbarActionModifier.then(
-                    if (sharedTransitionScope != null && animatedContentScope != null) {
-                        with(sharedTransitionScope) {
-                            Modifier.sharedBounds(
-                                rememberSharedContentState(key = "btn_timer"),
-                                animatedVisibilityScope = animatedContentScope,
-                                enter = EnterTransition.None,
-                                exit = ExitTransition.None,
-                            ).zIndex(1f)
-                        }
-                    } else Modifier
-                )) {
-                Icon(
-                    Icons.Outlined.Timer,
-                    contentDescription = stringResource(R.string.lyrics_timer),
-                    tint = if (sleepTimerState.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(toolbarLayout.iconSize)
-                )
-            }
-
-            // 音量按钮 (根据设备显示不同图标, 居中)
-            val context = LocalContext.current
-            val audioManager = remember { context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
-            val devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
-            val audioDeviceIcon = remember(devices) {
-                when {
-                    devices.any { it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP } -> Icons.Default.Headset
-                    devices.any { it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET || it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES } -> Icons.Default.Headset
-                    else -> Icons.Default.SpeakerGroup
-                }
-            }
-            var showVolumeSheet by remember { mutableStateOf(false) }
-            HapticIconButton(onClick = { showVolumeSheet = true },
-                modifier = toolbarActionModifier.then(
-                    if (sharedTransitionScope != null && animatedContentScope != null) {
-                        with(sharedTransitionScope) {
-                            Modifier.sharedBounds(
-                                rememberSharedContentState(key = "btn_volume"),
-                                animatedVisibilityScope = animatedContentScope,
-                                enter = EnterTransition.None,
-                                exit = ExitTransition.None,
-                            ).zIndex(1f)
-                        }
-                    } else Modifier
-                )) {
-                Icon(
-                    audioDeviceIcon,
-                    contentDescription = stringResource(R.string.cd_audio_device),
-                    modifier = Modifier.size(toolbarLayout.iconSize)
-                )
-            }
-
-            // 歌词按钮 (返回封面页, 高亮显示)
-            @SuppressLint("UnusedContentLambdaTargetStateParameter")
+            // 歌词（最左，当前页选中：白色圆盘 + 深色歌词气泡）
             HapticIconButton(onClick = onNavigateBack,
                 modifier = toolbarActionModifier.then(
                 if (sharedTransitionScope != null && animatedContentScope != null) {
@@ -931,122 +878,69 @@ fun LyricsScreen(
                     }
                 } else Modifier
             )) {
-                AnimatedContent(
-                    targetState = true,
-                    transitionSpec = {
-                        (scaleIn() + fadeIn()) togetherWith (scaleOut() + fadeOut())
-                    },
-                    label = "lyrics_icon"
-                ) { _ ->
+                Box(
+                    modifier = Modifier.size(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.88f))
+                    )
                     Icon(
-                        imageVector = Icons.Outlined.LibraryMusic,
+                        imageVector = Icons.Outlined.ChatBubbleOutline,
                         contentDescription = stringResource(R.string.lyrics_back_to_cover),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(toolbarLayout.iconSize)
+                        tint = Color.Black.copy(alpha = 0.82f),
+                        modifier = Modifier.size(meloxToolbarIconSize)
                     )
                 }
             }
 
-            // 添加到歌单按钮
-            var showAddSheet by remember { mutableStateOf(false) }
-            val addSheetState = androidx.compose.material3.rememberModalBottomSheetState(
-                skipPartiallyExpanded = true
-            )
-            HapticIconButton(onClick = { showAddSheet = true },
+            // 投屏 / 输出设备（中间，与播放页同图标）
+            HapticIconButton(onClick = onOpenOutputPicker,
                 modifier = toolbarActionModifier.then(
-                if (sharedTransitionScope != null && animatedContentScope != null) {
-                    with(sharedTransitionScope) {
-                        Modifier.sharedBounds(
-                            rememberSharedContentState(key = "btn_add"),
-                            animatedVisibilityScope = animatedContentScope,
-                            enter = EnterTransition.None,
-                            exit = ExitTransition.None,
-                        ).zIndex(1f)
-                    }
-                } else Modifier
-            )) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.PlaylistAdd,
-                    contentDescription = stringResource(R.string.lyrics_add_to_playlist),
-                    modifier = Modifier.size(toolbarLayout.iconSize)
-                )
-            }
-
-            // 定时器对话框
-            if (showSleepTimerDialog) {
-                com.lyra.player.ui.component.playback.SleepTimerDialog(
-                    onDismiss = { showSleepTimerDialog = false }
-                )
-            }
-
-            // 音量控制弹窗
-            if (showVolumeSheet) {
-                DensityScaledModalBottomSheet(
-                    onDismissRequest = { showVolumeSheet = false },
-                    sheetGesturesEnabled = false
-                ) {
-                    VolumeControlSheetContent()
-                }
-            }
-
-            // 播放队列弹窗
-            if (showQueueSheet) {
-                NowPlayingQueueSheet(
-                    displayedQueueItems = displayedQueueItems,
-                    currentIndexInDisplay = currentIndexInDisplay,
-                    offlineMode = offlineMode,
-                    allowQueueReorder = progressSeekEnabled,
-                    onDismissRequest = { showQueueSheet = false },
-                    onOpenCurrentPlaybackSource = onOpenCurrentPlaybackSource
-                )
-            }
-
-            // 添加到歌单弹窗
-            if (showAddSheet && currentSong != null) {
-                val playlists by PlayerManager.playlistsFlow.collectAsState()
-                val selectablePlaylists = remember(playlists, context) {
-                    playlists.filterNot { LocalFilesPlaylist.isSystemPlaylist(it, context) }
-                }
-                DensityScaledModalBottomSheet(
-                    onDismissRequest = { showAddSheet = false },
-                    sheetState = addSheetState,
-                    sheetGesturesEnabled = false
-                ) {
-                    androidx.compose.foundation.lazy.LazyColumn(
-                        modifier = Modifier.bottomSheetScrollGuard()
-                    ) {
-                        itemsIndexed(selectablePlaylists) { _, pl ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        launchWithLocalSyncWarning(
-                                            song = currentSong,
-                                            actionLabel = playlistAddActionLabel
-                                        ) {
-                                            PlayerManager.addCurrentToPlaylist(pl.id)
-                                            showAddSheet = false
-                                        }
-                                    }
-                                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(pl.name, style = MaterialTheme.typography.bodyLarge)
-                                Spacer(modifier = Modifier.weight(1f))
-                            Text(
-                                pluralStringResource(
-                                    R.plurals.lyrics_song_count,
-                                    pl.songs.size,
-                                    pl.songs.size
-                                ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            }
+                    if (sharedTransitionScope != null && animatedContentScope != null) {
+                        with(sharedTransitionScope) {
+                            Modifier.sharedBounds(
+                                rememberSharedContentState(key = "btn_volume"),
+                                animatedVisibilityScope = animatedContentScope,
+                                enter = EnterTransition.None,
+                                exit = ExitTransition.None,
+                            ).zIndex(1f)
                         }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
+                    } else Modifier
+                )) {
+                Icon(
+                    MeloxCastGlyph,
+                    contentDescription = stringResource(R.string.cd_audio_device),
+                    tint = meloxIdleGlyphColor,
+                    modifier = Modifier.size(meloxToolbarIconSize)
+                )
             }
+
+            // 播放队列（最右，打开全屏队列页）
+            HapticIconButton(onClick = onOpenQueuePage,
+                modifier = toolbarActionModifier.then(
+                    if (sharedTransitionScope != null && animatedContentScope != null) {
+                        with(sharedTransitionScope) {
+                            Modifier.sharedBounds(
+                                rememberSharedContentState(key = "btn_queue"),
+                                animatedVisibilityScope = animatedContentScope,
+                                enter = EnterTransition.None,
+                                exit = ExitTransition.None,
+                            ).zIndex(1f)
+                        }
+                    } else Modifier
+                )) {
+                Icon(
+                    Icons.Outlined.FormatListBulleted,
+                    contentDescription = stringResource(R.string.lyrics_playlist),
+                    tint = meloxIdleGlyphColor,
+                    modifier = Modifier.size(meloxToolbarIconSize)
+                )
+            }
+
         }
             }
         }
@@ -1361,19 +1255,13 @@ private fun LyricsProgressSection(
         }
     }
 
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    // 与播放页同口径：52dp = 20dp 细滑条 + 26dp 时间行（左侧已播放、右侧剩余）。
+    Column(
+        modifier = modifier.height(52.dp),
+        verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = formatDuration(effectivePreviewPositionMs),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
         WaveformSlider(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             value = if (durationMs > 0) {
                 effectivePreviewPositionMs.toFloat() / durationMs
             } else {
@@ -1414,13 +1302,31 @@ private fun LyricsProgressSection(
                 pendingSeekPreviewPositionMs != null,
             durationMs = durationMs,
             playbackSpeed = playbackSpeed,
-            playbackSessionKey = songKey
+            playbackSessionKey = songKey,
+            meloxStyle = true
         )
 
-        Text(
-            text = formatDuration(durationMs),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp)
+        ) {
+            Text(
+                text = formatDuration(effectivePreviewPositionMs),
+                modifier = Modifier.align(Alignment.CenterStart),
+                color = Color.White.copy(alpha = 0.50f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "-" + formatDuration(
+                    (durationMs - effectivePreviewPositionMs).coerceAtLeast(0L)
+                ),
+                modifier = Modifier.align(Alignment.CenterEnd),
+                color = Color.White.copy(alpha = 0.50f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }

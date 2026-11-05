@@ -261,7 +261,6 @@ private fun ArtistContent(
             } else {
                 itemsIndexed(ui.songs, key = { _, item -> item.id }) { index, song ->
                     ArtistSongRow(
-                        index = index + 1,
                         song = song,
                         onClick = { onSongClick(ui.songs, index) },
                         offlineMode = offlineMode

@@ -62,4 +62,7 @@
     <string name="youtube_music_playlist_tracks_unavailable">Unable to load the playlist tracks. Please refresh and try again.</string>
     <string name="playlist_load_failed_format">Load failed: %s</string>
     <string name="local_playlist_initialization_failed">Local playlists could not be initialized. Restart the app and try again.</string>
+    <string name="nowplaying_queue_history">History</string>
+    <string name="nowplaying_queue_up_next">Up Next</string>
+    <string name="nowplaying_queue_empty">No upcoming songs</string>
 </resources>

@@ -221,7 +221,6 @@ fun RecentScreen(
 
     // 当前播放态
     val currentSong by PlayerManager.currentSongFlow.collectAsStateWithLifecycle()
-    val isPlaying by PlayerManager.isPlayingFlow.collectAsStateWithLifecycle()
     val downloadPresenceVersion by GlobalDownloadManager.downloadPresenceVersion.collectAsStateWithLifecycle()
 
     // 清空确认
@@ -426,13 +425,11 @@ fun RecentScreen(
                     ) { index, song ->
                         val isFavoriteSong = favoriteSongs.any { it.sameIdentityAs(song) }
                         RecentRowRich(
-                            index = index + 1,
                             song = song,
                             downloadPresenceVersion = downloadPresenceVersion,
                             selectionMode = selectionMode,
                             selected = song.stableKey() in selectedKeys,
                             isCurrentSong = currentSong?.sameIdentityAs(song) == true,
-                            isPlaying = currentSong?.sameIdentityAs(song) == true && isPlaying,
                             onToggleSelect = { toggleSelect(song.stableKey()) },
                             onLongPress = {
                                 if (!selectionMode) {
@@ -594,13 +591,11 @@ fun RecentScreen(
 
 @Composable
 private fun RecentRowRich(
-    index: Int,
     song: SongItem,
     downloadPresenceVersion: Int,
     selectionMode: Boolean,
     selected: Boolean,
     isCurrentSong: Boolean,
-    isPlaying: Boolean,
     onToggleSelect: () -> Unit,
     onLongPress: () -> Unit,
     onClick: () -> Unit,
@@ -658,25 +653,13 @@ private fun RecentRowRich(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 序号 / 播放指示
-        Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
-            if (selectionMode) {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { onToggleSelect() }
-                )
-            } else if (isCurrentSong) {
-                PlayingIndicator(
-                    color = MaterialTheme.colorScheme.primary,
-                    animate = isPlaying
-                )
-            } else {
-                Text(
-                    text = index.toString(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        // 多选时仅保留勾选框，正常列表不显示序号。
+        if (selectionMode) {
+            Checkbox(
+                checked = selected,
+                onCheckedChange = { onToggleSelect() }
+            )
+            Spacer(Modifier.width(8.dp))
         }
 
         // 封面
@@ -709,7 +692,12 @@ private fun RecentRowRich(
                 primaryTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
+                color = if (isCurrentSong) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
             )
             SongDownloadSubtitle(
                 text = secondaryText,
@@ -720,81 +708,5 @@ private fun RecentRowRich(
 
         // 右侧更多
         moreMenu()
-    }
-}
-
-
-/** 播放中指示 */
-@Composable
-private fun PlayingIndicator(color: Color, animate: Boolean) {
-    // 三条不同节奏/相位的无限动画
-    val t = rememberInfiniteTransition(label = "playing")
-    val flatHeight = 8f
-    val transitionSpec: FiniteAnimationSpec<Float> =
-        if (animate) snap() else tween(durationMillis = 180, easing = FastOutSlowInEasing)
-    val animatedH1 by t.animateFloat(
-        initialValue = 6f, targetValue = 18f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 520, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bar1"
-    )
-    val animatedH2 by t.animateFloat(
-        initialValue = 10f, targetValue = 22f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 680, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bar2"
-    )
-    val animatedH3 by t.animateFloat(
-        initialValue = 8f, targetValue = 16f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 600, easing = FastOutSlowInEasing, delayMillis = 90),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bar3"
-    )
-    val h1 by animateFloatAsState(
-        targetValue = if (animate) animatedH1 else flatHeight,
-        animationSpec = transitionSpec,
-        label = "bar1Hold"
-    )
-    val h2 by animateFloatAsState(
-        targetValue = if (animate) animatedH2 else flatHeight,
-        animationSpec = transitionSpec,
-        label = "bar2Hold"
-    )
-    val h3 by animateFloatAsState(
-        targetValue = if (animate) animatedH3 else flatHeight,
-        animationSpec = transitionSpec,
-        label = "bar3Hold"
-    )
-
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.width(24.dp)) {
-        Box(
-            Modifier
-                .width(3.dp)
-                .height(h1.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(color)
-        )
-        Spacer(Modifier.width(3.dp))
-        Box(
-            Modifier
-                .width(3.dp)
-                .height(h2.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(color)
-        )
-        Spacer(Modifier.width(3.dp))
-        Box(
-            Modifier
-                .width(3.dp)
-                .height(h3.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(color)
-        )
     }
 }

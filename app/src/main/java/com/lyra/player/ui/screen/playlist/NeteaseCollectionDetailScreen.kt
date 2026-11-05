@@ -866,7 +866,6 @@ fun DetailScreen(
                                                 it.sameIdentityAs(item)
                                             }
                                             SongRow(
-                                                index = index + 1,
                                                 song = item,
                                                 isFavorite = isFavoriteSong,
                                                 onFavoriteToggle = ::toggleSongFavorite,
@@ -1076,7 +1075,6 @@ private fun RetryChip(onClick: () -> Unit) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SongRow(
-    index: Int,
     song: SongItem,
     isFavorite: Boolean,
     onFavoriteToggle: (SongItem, Boolean) -> Unit,
@@ -1086,7 +1084,6 @@ private fun SongRow(
     onToggleSelect: () -> Unit,
     onLongPress: () -> Unit,
     onClick: () -> Unit,
-    indexWidth: Dp = 48.dp,
     snackbarHostState: SnackbarHostState,
     offlineMode: Boolean
 ) {
@@ -1111,24 +1108,14 @@ private fun SongRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.width(indexWidth),
-            contentAlignment = Alignment.Center
-        ) {
-            if (selectionMode) {
+        if (selectionMode) {
+            Box(
+                modifier = Modifier.width(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Checkbox(
                     checked = selected,
                     onCheckedChange = { onToggleSelect() }
-                )
-            } else {
-                Text(
-                    text = index.toString(),
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = playlistModernListTertiaryContentColor(),
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                    textAlign = TextAlign.Center
                 )
             }
         }

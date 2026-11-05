@@ -189,7 +189,6 @@ fun HotPlaylistDetailScreen(
                 } else {
                     itemsIndexed(tracks, key = { _, stat -> stat.identityKey }) { index, stat ->
                         StatTrackRow(
-                            rank = index + 1,
                             stat = stat,
                             offlineMode = offlineMode,
                             onClick = { onSongClick(songs, index) }

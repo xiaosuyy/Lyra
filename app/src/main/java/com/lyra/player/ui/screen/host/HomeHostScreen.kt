@@ -131,7 +131,6 @@ fun rememberHomeHostRuntimeState(): HomeHostRuntimeState {
 
 @Composable
 fun HomeHostScreen(
-    showContinueCard: Boolean = true,
     showTrendingCard: Boolean = true,
     showRadarCard: Boolean = true,
     showRecommendedCard: Boolean = true,
@@ -159,6 +158,8 @@ fun HomeHostScreen(
     biliPlaylistSourceRoute: (BiliPlaylist) -> String? = { null },
     localPlaylistSourceRoute: (Long) -> String? = { null },
     onOpenSettings: () -> Unit = {},
+    avatarUri: String? = null,
+    onOpenAccount: () -> Unit = {},
     coherentFeedbackEnabled: Boolean = false,
     renderScene: @Composable (
         revealTopFraction: Float,
@@ -380,7 +381,6 @@ fun HomeHostScreen(
                                 )
                         ) {
                             HomeScreen(
-                                showContinueCard = showContinueCard,
                                 showTrendingCard = showTrendingCard,
                                 showRadarCard = showRadarCard,
                                 showRecommendedCard = showRecommendedCard,
@@ -448,7 +448,9 @@ fun HomeHostScreen(
                                     openRecent(entry, ::openHomeSelectedItem)
                                 },
                                 onSongClick = onSongClick,
-                                onOpenSettings = onOpenSettings
+                                onOpenSettings = onOpenSettings,
+                                avatarUri = avatarUri,
+                                onOpenAccount = onOpenAccount
                             )
                         }
                     } else {

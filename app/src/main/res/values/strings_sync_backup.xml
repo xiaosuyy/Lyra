@@ -145,4 +145,23 @@
     <string name="settings_github_token_label">GitHub Token</string>
     <string name="settings_github_token_placeholder">ghp_xxxxxxxxxxxx</string>
     <string name="settings_sync_repo_placeholder">username/repo-name</string>
+    <string name="account_title">账号</string>
+    <string name="account_login_title">登录 WebDAV</string>
+    <string name="account_login_desc">登录后自动同步播放历史与歌单，头像与昵称跟随账号保存。</string>
+    <string name="account_name_label">昵称</string>
+    <string name="account_history">听歌历史</string>
+    <string name="account_cloud_playlists">云端歌单</string>
+    <string name="account_logout">退出登录</string>
+    <string name="account_logout_confirm_title">退出 WebDAV？</string>
+    <string name="account_logout_confirm_message">退出后需要重新输入 WebDAV 地址与账号密码才能继续同步。</string>
+    <string name="account_sync_now">立即同步</string>
+    <string name="account_last_sync">上次同步</string>
+    <string name="account_never_synced">尚未同步</string>
+    <string name="account_edit_name">修改昵称</string>
+    <string name="account_avatar_hint">点击更换头像</string>
+    <string name="account_not_logged_in">未登录</string>
+    <string name="account_syncing">同步中…</string>
+    <string name="account_cloud_empty">还没有云端歌单</string>
+    <string name="account_default_avatar_desc">默认头像</string>
+    <string name="account_title_sub">WebDAV 同步</string>
 </resources>

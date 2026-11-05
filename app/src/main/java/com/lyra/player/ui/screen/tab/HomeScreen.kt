@@ -113,6 +113,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.lyra.player.ui.screen.account.AccountAvatar
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -121,6 +125,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.lyra.player.R
@@ -139,6 +144,7 @@ import com.lyra.player.data.playlist.usage.UsageEntry
 import com.lyra.player.data.playlist.usage.buildLocalPlaylistUsageLookup
 import com.lyra.player.data.platform.youtube.buildYouTubeMusicMediaUri
 import com.lyra.player.data.local.media.displayAlbum
+import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.ui.util.shouldAllowCollapsingTopAppBar
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
@@ -199,10 +205,9 @@ private const val HomeScrollKeyYtEmptyFeedError = "home:ytmusic:empty-feed:error
 private const val HomeScrollKeyNeteaseRadarPlaylists = "home:netease:radar-playlists"
 
 internal fun shouldShowHomeContinueSection(
-    showContinueCard: Boolean,
     usageLoaded: Boolean,
     hasUsage: Boolean
-): Boolean = showContinueCard && (!usageLoaded || hasUsage)
+): Boolean = !usageLoaded || hasUsage
 
 internal fun homeNeteaseRadarPlaylistScrollKey(id: Long): String {
     return "$HomeScrollKeyNeteaseRadarPlaylists:playlist:$id"
@@ -228,7 +233,6 @@ private fun homeYtMusicHomeItemScrollKey(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
-    showContinueCard: Boolean = true,
     showTrendingCard: Boolean = true,
     showRadarCard: Boolean = true,
     showRecommendedCard: Boolean = true,
@@ -243,7 +247,9 @@ fun HomeScreen(
     onScrollAnchorIndexesChanged: (Map<String, Int>) -> Unit = {},
     onOpenRecent: (UsageEntry) -> Unit = {},
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    avatarUri: String? = null,
+    onOpenAccount: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -312,14 +318,7 @@ fun HomeScreen(
         }
     }
 
-    val titleOptions = listOf(
-        stringResource(R.string.app_name),
-        stringResource(R.string.home_title_brand_loud),
-        stringResource(R.string.home_title_brand_wave),
-        stringResource(R.string.home_title_brand_call)
-    ).distinct()
-    val titleSeed = rememberSaveable { (0..Int.MAX_VALUE).random() }
-    val appBarTitle = titleOptions[titleSeed % titleOptions.size]
+    val appBarTitle = stringResource(R.string.nav_home)
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         state = topAppBarState,
         canScroll = {
@@ -349,7 +348,6 @@ fun HomeScreen(
     }
     val scope = rememberCoroutineScope()
     val showContinue = shouldShowHomeContinueSection(
-        showContinueCard = showContinueCard,
         usageLoaded = usageLoaded,
         hasUsage = usageEntries.isNotEmpty()
     )
@@ -389,6 +387,18 @@ fun HomeScreen(
     val currentSong by PlayerManager.currentSongFlow.collectAsStateWithLifecycle()
     val homeSourceOptions by vm.homeSourceOptions.collectAsStateWithLifecycle()
     var homeRefreshGeneration by remember { mutableStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    fun triggerHomeRefresh() {
+        if (offlineMode) return
+        if (isInternational) {
+            vm.refreshYtMusicHome()
+        } else {
+            vm.refreshNeteaseHome()
+        }
+        // 刷新即换批：新的 Home generation + seed（force 绕过初始化守卫）
+        vm.beginHomeGeneration(force = true)
+        homeRefreshGeneration += 1
+    }
     // Fix-01B：是否换批由 ViewModel 跨 Tab 存活的状态决定（首次进入换批；普通返回不换批）。
     LaunchedEffect(Unit) {
         vm.beginHomeGeneration()
@@ -437,32 +447,23 @@ fun HomeScreen(
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
         ) {
             LargeTopAppBar(
-                title = { Text(appBarTitle) },
+                title = {
+                    Text(
+                        appBarTitle,
+                        style = MeloxType.largeTitle,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
                 actions = {
-                    HapticIconButton(
-                        enabled = !offlineMode,
-                        onClick = {
-                            if (isInternational) {
-                                vm.refreshYtMusicHome()
-                            } else {
-                                vm.refreshNeteaseHome()
-                            }
-                            // 刷新即换批：新的 Home generation + seed（force 绕过初始化守卫）
-                            vm.beginHomeGeneration(force = true)
-                            homeRefreshGeneration += 1
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = stringResource(R.string.recommend_refresh)
-                        )
-                    }
-                    HapticIconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = stringResource(R.string.nav_settings)
-                        )
-                    }
+                    AccountAvatar(
+                        avatarUri = avatarUri,
+                        size = 36.dp,
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .clickable(onClick = onOpenAccount),
+                    )
                 },
                 scrollBehavior = scrollBehavior,
                 windowInsets = WindowInsets(0),
@@ -660,6 +661,25 @@ fun HomeScreen(
                     }
                 }
 
+                val pullToRefreshState = rememberPullToRefreshState()
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = {
+                        isRefreshing = true
+                        triggerHomeRefresh()
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    state = pullToRefreshState,
+                    indicator = {
+                        PullToRefreshDefaults.Indicator(
+                            state = pullToRefreshState,
+                            isRefreshing = isRefreshing,
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                ) {
                 LazyVerticalGrid(
                     state = gridState,
                     columns = GridCells.Adaptive(gridMinCellSize),
@@ -719,6 +739,13 @@ fun HomeScreen(
                         }
                     }
                 }
+                }
+                LaunchedEffect(homeRefreshGeneration) {
+                    if (isRefreshing) {
+                        delay(700)
+                        isRefreshing = false
+                    }
+                }
                 SideEffect {
                     onScrollAnchorIndexesChanged(scrollAnchorIndexes.toMap())
                 }
@@ -752,13 +779,13 @@ private fun SectionHeader(icon: ImageVector, title: String) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
+            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.60f),
+            modifier = Modifier.size(20.dp)
         )
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
-            color = MaterialTheme.colorScheme.primary,
+            style = MeloxType.title2,
+            color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(start = 8.dp)
         )
     }
