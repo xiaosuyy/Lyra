@@ -46,4 +46,17 @@
     <string name="home_offline_no_continue">Offline mode only shows Continue Playing. Nothing is available yet.</string>
     <string name="offline_mode_title">Offline Mode</string>
     <string name="offline_mode_bottom_hint">Currently in offline mode</string>
+    <string name="home_greeting_morning">Good morning</string>
+    <string name="home_greeting_afternoon">Good afternoon</string>
+    <string name="home_greeting_evening">Good evening</string>
+    <string name="home_eyebrow_daily">Daily</string>
+    <string name="home_subtitle_daily">Made for you</string>
+    <string name="home_eyebrow_hot">Trending</string>
+    <string name="home_subtitle_hot">Everyone is listening</string>
+    <string name="home_eyebrow_radar">Personal radar</string>
+    <string name="home_subtitle_radar">Updated for your taste</string>
+    <string name="home_eyebrow_roam">Personal roam</string>
+    <string name="home_subtitle_roam">Discover more good music</string>
+    <string name="home_pull_to_refresh">Pull to refresh</string>
+    <string name="home_no_recommendations">No recommendations yet</string>
 </resources>

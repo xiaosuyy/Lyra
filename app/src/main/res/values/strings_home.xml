@@ -46,4 +46,17 @@
     <string name="home_offline_no_continue">脱机模式下仅显示继续播放，暂无可显示内容。</string>
     <string name="offline_mode_title">脱机模式</string>
     <string name="offline_mode_bottom_hint">当前处于脱机模式</string>
+    <string name="home_greeting_morning">早上好</string>
+    <string name="home_greeting_afternoon">下午好</string>
+    <string name="home_greeting_evening">晚上好</string>
+    <string name="home_eyebrow_daily">每日更新</string>
+    <string name="home_subtitle_daily">为你定制的歌曲</string>
+    <string name="home_eyebrow_hot">全站热门</string>
+    <string name="home_subtitle_hot">大家都在听</string>
+    <string name="home_eyebrow_radar">私人雷达</string>
+    <string name="home_subtitle_radar">根据口味持续更新</string>
+    <string name="home_eyebrow_roam">私人漫游</string>
+    <string name="home_subtitle_roam">发现更多好歌</string>
+    <string name="home_pull_to_refresh">下拉刷新</string>
+    <string name="home_no_recommendations">暂无推荐歌曲</string>
 </resources>

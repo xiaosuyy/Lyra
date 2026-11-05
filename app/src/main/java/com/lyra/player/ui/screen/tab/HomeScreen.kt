@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,9 +50,11 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,10 +65,12 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Radar
 import androidx.compose.material.icons.outlined.Settings
@@ -79,10 +84,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -100,6 +107,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
@@ -112,7 +120,9 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -158,6 +168,7 @@ import com.lyra.player.ui.viewmodel.tab.HomeNeteasePlaylistSectionState
 import com.lyra.player.ui.viewmodel.tab.HomeNeteaseSongSectionState
 import com.lyra.player.ui.viewmodel.tab.HomeSectionState
 import com.lyra.player.ui.viewmodel.tab.HomeViewModel
+import com.lyra.player.ui.viewmodel.tab.NeteaseHomeSongSource
 import com.lyra.player.ui.viewmodel.tab.PlaylistSummary
 import com.lyra.player.ui.viewmodel.tab.YouTubeMusicPlaylist
 import com.lyra.player.ui.viewmodel.tab.favoriteId
@@ -180,6 +191,7 @@ import com.lyra.player.util.media.fastScrollableImageRequest
 import com.lyra.player.util.format.formatPlayCount
 import kotlin.math.ceil
 import kotlin.math.min
+import java.time.LocalTime
 import java.util.Locale
 
 private const val HomeContinueHorizontalPaddingDp = 8f
@@ -203,6 +215,17 @@ private const val HomeScrollKeyYtShelvesError = "home:ytmusic:shelves:error"
 private const val HomeScrollKeyYtEmptyFeedLoading = "home:ytmusic:empty-feed:loading"
 private const val HomeScrollKeyYtEmptyFeedError = "home:ytmusic:empty-feed:error"
 private const val HomeScrollKeyNeteaseRadarPlaylists = "home:netease:radar-playlists"
+
+private data class MeloxHomeQuickAction(
+    val key: String,
+    val title: String,
+    val eyebrow: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val colors: List<Color>,
+    val songs: List<SongItem>,
+    val requiresLogin: Boolean = false
+)
 
 internal fun shouldShowHomeContinueSection(
     usageLoaded: Boolean,
@@ -388,6 +411,72 @@ fun HomeScreen(
     val homeSourceOptions by vm.homeSourceOptions.collectAsStateWithLifecycle()
     var homeRefreshGeneration by remember { mutableStateOf(0) }
     var isRefreshing by remember { mutableStateOf(false) }
+    val isMeloxNeteaseHome = !isInternational && !offlineMode
+    var quickActionSheet by remember { mutableStateOf<Pair<String, List<SongItem>>?>(null) }
+    val dailyRecommendSongs = ui.radarSongSections
+        .firstOrNull { it.source == NeteaseHomeSongSource.DAILY_RECOMMEND }
+        ?.section?.items.orEmpty()
+    val hotSongs = ui.trendingSongSections
+        .firstOrNull { it.source == NeteaseHomeSongSource.TOP_HOT }
+        ?.section?.items.orEmpty()
+        .ifEmpty {
+            ui.trendingSongSections
+                .firstOrNull { it.source == NeteaseHomeSongSource.TOP_SOARING }
+                ?.section?.items.orEmpty()
+        }
+    val radarSongs = ui.radarSongSections
+        .firstOrNull { it.source == NeteaseHomeSongSource.PERSONAL_RADAR }
+        ?.section?.items.orEmpty()
+    val roamSongs = ui.radarSongSections
+        .firstOrNull { it.source == NeteaseHomeSongSource.PRIVATE_FM }
+        ?.section?.items.orEmpty()
+    val meloxQuickActions = listOf(
+        MeloxHomeQuickAction(
+            key = "daily",
+            title = stringResource(R.string.home_netease_daily_songs),
+            eyebrow = stringResource(R.string.home_eyebrow_daily),
+            subtitle = stringResource(R.string.home_subtitle_daily),
+            icon = Icons.Outlined.CalendarMonth,
+            colors = listOf(Color(0xFFFF5B8A), Color(0xFFFF3147)),
+            songs = dailyRecommendSongs,
+            requiresLogin = true
+        ),
+        MeloxHomeQuickAction(
+            key = "hot",
+            title = stringResource(R.string.home_netease_hot_rank),
+            eyebrow = stringResource(R.string.home_eyebrow_hot),
+            subtitle = stringResource(R.string.home_subtitle_hot),
+            icon = Icons.Outlined.LocalFireDepartment,
+            colors = listOf(Color(0xFFFFA14A), Color(0xFFFF5A36)),
+            songs = hotSongs
+        ),
+        MeloxHomeQuickAction(
+            key = "radar",
+            title = stringResource(R.string.recommend_radar),
+            eyebrow = stringResource(R.string.home_eyebrow_radar),
+            subtitle = stringResource(R.string.home_subtitle_radar),
+            icon = Icons.Outlined.Radar,
+            colors = listOf(Color(0xFF6B7BFF), Color(0xFF8C52FF)),
+            songs = radarSongs
+        ),
+        MeloxHomeQuickAction(
+            key = "roam",
+            title = stringResource(R.string.home_netease_private_fm),
+            eyebrow = stringResource(R.string.home_eyebrow_roam),
+            subtitle = stringResource(R.string.home_subtitle_roam),
+            icon = Icons.Outlined.Explore,
+            colors = listOf(Color(0xFF26C6DA), Color(0xFF4285F4)),
+            songs = roamSongs,
+            requiresLogin = true
+        )
+    )
+    val meloxGreeting = remember {
+        when (LocalTime.now().hour) {
+            in 5..11 -> R.string.home_greeting_morning
+            in 12..17 -> R.string.home_greeting_afternoon
+            else -> R.string.home_greeting_evening
+        }
+    }
     fun triggerHomeRefresh() {
         if (offlineMode) return
         if (isInternational) {
@@ -661,6 +750,185 @@ fun HomeScreen(
                     }
                 }
 
+                fun LazyGridScope.addMeloxPlaylistSection(
+                    group: HomeFeedGroup,
+                    titleRes: Int = group.titleResId
+                ) {
+                    val sectionKey = "home:melox:${group.key}"
+                    val items = group.playlists.items
+                    if (items.isEmpty() && !group.playlists.loading && group.playlists.error.isNullOrBlank()) {
+                        return
+                    }
+                    item(
+                        key = registerGridItemKey("$sectionKey:header"),
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
+                        MeloxSectionTitle(
+                            title = stringResource(titleRes),
+                            trailing = stringResource(R.string.home_pull_to_refresh),
+                            modifier = Modifier
+                                .padding(horizontal = gridContentPadding)
+                                .animateItem()
+                        )
+                    }
+                    item(
+                        key = registerGridItemKey("$sectionKey:content"),
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
+                        when {
+                            items.isNotEmpty() -> LazyRow(
+                                contentPadding = PaddingValues(horizontal = gridContentPadding),
+                                horizontalArrangement = Arrangement.spacedBy(gridSpacing),
+                                modifier = Modifier
+                                    .animateItem()
+                                    .fillMaxWidth()
+                            ) {
+                                items(
+                                    items = items.take(10),
+                                    key = { it.id }
+                                ) { playlist ->
+                                    Box(
+                                        Modifier.width(if (isTabletLayout) 248.dp else 214.dp)
+                                    ) {
+                                        PlaylistCard(
+                                            playlist = playlist,
+                                            isFavorite = favoriteKeys.contains("netease:${playlist.id}"),
+                                            onClick = { onItemClick(playlist) },
+                                            onShowSnackbar = showHomeSnackbar,
+                                            offlineMode = offlineMode,
+                                            large = true
+                                        )
+                                    }
+                                }
+                            }
+
+                            group.playlists.loading -> SectionLoadingState(homeLoadingText)
+
+                            else -> SectionErrorState(
+                                detail = group.playlists.error.orEmpty()
+                            )
+                        }
+                    }
+                }
+
+                fun LazyGridScope.addMeloxSongSection(group: HomeFeedGroup) {
+                    val sectionKey = "home:melox:${group.key}"
+                    val songs = group.songs.items
+                    if (songs.isEmpty() && !group.songs.loading && group.songs.error.isNullOrBlank()) {
+                        return
+                    }
+                    item(
+                        key = registerGridItemKey("$sectionKey:header"),
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
+                        MeloxSectionTitle(
+                            title = stringResource(group.titleResId),
+                            trailing = null,
+                            modifier = Modifier
+                                .padding(horizontal = gridContentPadding)
+                                .animateItem()
+                        )
+                    }
+                    item(
+                        key = registerGridItemKey("$sectionKey:content"),
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
+                        when {
+                            songs.isNotEmpty() -> MeloxSongCarousel(
+                                songs = songs.take(12),
+                                isTabletLayout = isTabletLayout,
+                                offlineMode = offlineMode,
+                                onSongClick = onSongClick,
+                                modifier = Modifier.animateItem()
+                            )
+
+                            group.songs.loading -> SectionLoadingState(homeLoadingText)
+
+                            else -> SectionErrorState(
+                                detail = group.songs.error.orEmpty()
+                            )
+                        }
+                    }
+                }
+
+                fun LazyGridScope.addMeloxHomeContent() {
+                    item(
+                        key = registerGridItemKey("home:melox:greeting"),
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
+                        Text(
+                            text = stringResource(meloxGreeting),
+                            style = MeloxType.title2,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f),
+                            modifier = Modifier
+                                .padding(
+                                    horizontal = gridContentPadding + 4.dp,
+                                    vertical = gridContentPadding
+                                )
+                                .animateItem()
+                        )
+                    }
+                    item(
+                        key = registerGridItemKey("home:melox:quick_actions"),
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
+                        MeloxQuickActionRow(
+                            actions = meloxQuickActions,
+                            contentPadding = gridContentPadding,
+                            onAction = { action ->
+                                if (action.songs.isNotEmpty()) {
+                                    quickActionSheet = action.title to action.songs
+                                } else {
+                                    showHomeSnackbar(
+                                        if (action.requiresLogin && !ui.hasLogin) {
+                                            context.getString(R.string.home_login_required)
+                                        } else {
+                                            context.getString(R.string.home_no_recommendations)
+                                        }
+                                    )
+                                }
+                            }
+                        )
+                    }
+
+                    val recommendedGroups = homeFeedGroups[HomeSectionId.RECOMMENDED].orEmpty()
+                    val featuredRecommended = recommendedGroups.firstOrNull {
+                        it.presentation == HomeFeedPresentation.PLAYLIST_GRID &&
+                            it.playlists.items.isNotEmpty()
+                    } ?: recommendedGroups.firstOrNull()
+                    if (showOnlineFeeds && showRecommendedCard) {
+                        if (featuredRecommended != null) {
+                            addMeloxPlaylistSection(
+                                group = featuredRecommended,
+                                titleRes = R.string.home_netease_daily_songs
+                            )
+                        }
+                        recommendedGroups
+                            .filter { it.key != featuredRecommended?.key }
+                            .forEach { addMeloxPlaylistSection(it) }
+                    }
+
+                    if (showOnlineFeeds && showNeteaseTrending) {
+                        homeFeedGroups[HomeSectionId.TRENDING].orEmpty().forEach { group ->
+                            if (group.presentation == HomeFeedPresentation.SONG_LIST) {
+                                addMeloxSongSection(group)
+                            } else {
+                                addMeloxPlaylistSection(group)
+                            }
+                        }
+                    }
+
+                    if (showOnlineFeeds && showNeteaseRadar) {
+                        homeFeedGroups[HomeSectionId.RADAR].orEmpty().forEach { group ->
+                            if (group.presentation == HomeFeedPresentation.SONG_LIST) {
+                                addMeloxSongSection(group)
+                            } else {
+                                addMeloxPlaylistSection(group)
+                            }
+                        }
+                    }
+                }
+
                 val pullToRefreshState = rememberPullToRefreshState()
                 PullToRefreshBox(
                     isRefreshing = isRefreshing,
@@ -693,6 +961,9 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(gridSpacing),
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    if (isMeloxNeteaseHome) {
+                        addMeloxHomeContent()
+                    } else {
                     // Hero：使用当前推荐歌单作为视觉重点（大封面 + 克制 Dynamic Color 氛围）
                     val heroPlaylist = homeFeedGroups[HomeSectionId.RECOMMENDED].orEmpty()
                         .firstOrNull {
@@ -738,6 +1009,7 @@ fun HomeScreen(
                             }
                         }
                     }
+                    }
                 }
                 }
                 LaunchedEffect(homeRefreshGeneration) {
@@ -752,10 +1024,220 @@ fun HomeScreen(
             }
         }
 
+        quickActionSheet?.let { (title, songs) ->
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { quickActionSheet = null },
+                sheetState = sheetState
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = LocalMiniPlayerHeight.current)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 520.dp),
+                        contentPadding = PaddingValues(bottom = 12.dp)
+                    ) {
+                        itemsIndexed(
+                            items = songs,
+                            key = { _, song -> song.stableKey() }
+                        ) { index, song ->
+                            LyraSongRow(
+                                song = song,
+                                isCurrent = currentSong?.sameIdentityAs(song) == true,
+                                onClick = {
+                                    onSongClick(songs, index)
+                                    quickActionSheet = null
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         LyraOverlaySnackbarHost(
             hostState = snackbarHostState,
             bottomPadding = LocalMiniPlayerHeight.current
         )
+    }
+}
+
+@Composable
+private fun MeloxSectionTitle(
+    title: String,
+    trailing: String?,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = title,
+            style = MeloxType.title2,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        if (!trailing.isNullOrBlank()) {
+            Text(
+                text = trailing,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f),
+                modifier = Modifier.padding(start = 12.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MeloxQuickActionRow(
+    actions: List<MeloxHomeQuickAction>,
+    contentPadding: Dp,
+    onAction: (MeloxHomeQuickAction) -> Unit
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = contentPadding),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(actions, key = { it.key }) { action ->
+            Column(
+                modifier = Modifier
+                    .width(300.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onAction(action) }
+            ) {
+                Text(
+                    text = action.eyebrow.uppercase(),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = action.title,
+                    modifier = Modifier.padding(top = 3.dp),
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = action.subtitle,
+                    modifier = Modifier.padding(top = 2.dp),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f),
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .aspectRatio(1.48f)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Brush.linearGradient(action.colors)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = action.icon,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.24f),
+                        modifier = Modifier.size(72.dp)
+                    )
+                    Text(
+                        text = action.title,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(18.dp),
+                        color = Color.White,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MeloxSongCarousel(
+    songs: List<SongItem>,
+    isTabletLayout: Boolean,
+    offlineMode: Boolean,
+    onSongClick: (List<SongItem>, Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val cardWidth = if (isTabletLayout) 176.dp else 152.dp
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        itemsIndexed(songs, key = { _, song -> song.stableKey() }) { index, song ->
+            Column(
+                modifier = Modifier
+                    .width(cardWidth)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { onSongClick(songs, index) }
+                    .padding(bottom = 2.dp)
+            ) {
+                AsyncImage(
+                    model = fastScrollableImageRequest(
+                        context = context,
+                        data = song.coverUrl,
+                        sizePx = 384,
+                        offlineMode = offlineMode
+                    ),
+                    contentDescription = song.displayName(),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                )
+                Text(
+                    text = song.displayName(),
+                    modifier = Modifier.padding(top = 7.dp, start = 2.dp, end = 2.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = song.displayArtist(),
+                    modifier = Modifier.padding(top = 2.dp, start = 2.dp, end = 2.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (song.album.isNotBlank()) {
+                    Text(
+                        text = song.album,
+                        modifier = Modifier.padding(top = 1.dp, start = 2.dp, end = 2.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1170,19 +1652,21 @@ fun PlaylistCard(
     isFavorite: Boolean,
     onClick: () -> Unit,
     onShowSnackbar: (String) -> Unit = {},
-    offlineMode: Boolean = false
+    offlineMode: Boolean = false,
+    large: Boolean = false
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
     var showMenu by remember { mutableStateOf(false) }
+    val cardShape = RoundedCornerShape(if (large) 16.dp else 8.dp)
 
     val unfavoritedText = stringResource(R.string.home_unfavorited)
     val favoriteSuccessText = stringResource(R.string.favorite_success)
 
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(cardShape)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { showMenu = true }
@@ -1200,14 +1684,26 @@ fun PlaylistCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(cardShape)
         )
-        Column(modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp, bottom = 4.dp)) {
+        Column(
+            modifier = Modifier.padding(
+                top = if (large) 8.dp else 6.dp,
+                start = if (large) 6.dp else 4.dp,
+                end = if (large) 6.dp else 4.dp,
+                bottom = 4.dp
+            )
+        ) {
             Text(
                 text = playlist.name,
-                maxLines = 1,
+                maxLines = if (large) 2 else 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleSmall
+                style = if (large) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.titleSmall
+                },
+                fontWeight = if (large) FontWeight.SemiBold else null
             )
             Text(
                 text = stringResource(
