@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -121,6 +122,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -790,7 +792,7 @@ fun HomeScreen(
                             title = stringResource(titleRes),
                             trailing = null,
                             modifier = Modifier
-                                .padding(horizontal = gridContentPadding)
+                                .padding(horizontal = 20.dp)
                                 .animateItem()
                         )
                     }
@@ -800,18 +802,21 @@ fun HomeScreen(
                     ) {
                         when {
                             items.isNotEmpty() -> LazyRow(
-                                contentPadding = PaddingValues(horizontal = gridContentPadding),
-                                horizontalArrangement = Arrangement.spacedBy(gridSpacing),
+                                contentPadding = PaddingValues(horizontal = 20.dp),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
                                 modifier = Modifier
                                     .animateItem()
                                     .fillMaxWidth()
                             ) {
-                                items(
+                                itemsIndexed(
                                     items = items.take(10),
-                                    key = { it.id }
-                                ) { playlist ->
+                                    key = { _, playlist -> playlist.id }
+                                ) { index, playlist ->
                                     Box(
-                                        Modifier.width(if (isTabletLayout) 248.dp else 214.dp)
+                                        Modifier.size(
+                                            width = if (index == 0) 246.dp else 174.dp,
+                                            height = 254.dp
+                                        )
                                     ) {
                                         PlaylistCard(
                                             playlist = playlist,
@@ -851,7 +856,7 @@ fun HomeScreen(
                             title = stringResource(titleRes),
                             trailing = null,
                             modifier = Modifier
-                                .padding(horizontal = gridContentPadding)
+                                .padding(horizontal = 20.dp)
                                 .animateItem()
                         )
                     }
@@ -888,7 +893,7 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f),
                             modifier = Modifier
                                 .padding(
-                                    horizontal = gridContentPadding,
+                                    horizontal = 20.dp,
                                     vertical = gridContentPadding
                                 )
                                 .animateItem()
@@ -900,7 +905,7 @@ fun HomeScreen(
                     ) {
                         MeloxQuickActionRow(
                             actions = meloxQuickActions,
-                            contentPadding = gridContentPadding,
+                            contentPadding = 20.dp,
                             onAction = { action ->
                                 when {
                                     action.playlist != null -> onItemClick(action.playlist)
@@ -951,7 +956,7 @@ fun HomeScreen(
                                     title = stringResource(R.string.home_all_recent_trending),
                                     trailing = null,
                                     modifier = Modifier
-                                        .padding(horizontal = gridContentPadding)
+                                        .padding(horizontal = 20.dp)
                                         .animateItem()
                                 )
                             }
@@ -1010,8 +1015,8 @@ fun HomeScreen(
                     state = gridState,
                     columns = GridCells.Adaptive(gridMinCellSize),
                     contentPadding = PaddingValues(
-                        start = gridContentPadding,
-                        end = gridContentPadding,
+                        start = if (isMeloxNeteaseHome) 0.dp else gridContentPadding,
+                        end = if (isMeloxNeteaseHome) 0.dp else gridContentPadding,
                         top = gridContentPadding,
                         bottom = gridContentPadding + miniPlayerHeight
                     ),
@@ -1238,60 +1243,66 @@ private fun MeloxSongCarousel(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val cardWidth = if (isTabletLayout) 176.dp else 152.dp
+    val columnWidth = if (isTabletLayout) 390.dp else 320.dp
+    val columns = songs.chunked(3)
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
         modifier = modifier.fillMaxWidth()
     ) {
-        itemsIndexed(songs, key = { _, song -> song.stableKey() }) { index, song ->
+        itemsIndexed(
+            items = columns,
+            key = { _, column -> column.joinToString("-") { it.stableKey() } }
+        ) { columnIndex, column ->
             Column(
-                modifier = Modifier
-                    .width(cardWidth)
-                    .clip(RoundedCornerShape(14.dp))
-                    .clickable { onSongClick(songs, index) }
-                    .padding(bottom = 2.dp)
+                modifier = Modifier.width(columnWidth),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                AsyncImage(
-                    model = fastScrollableImageRequest(
-                        context = context,
-                        data = song.coverUrl,
-                        sizePx = 384,
-                        offlineMode = offlineMode
-                    ),
-                    contentDescription = song.displayName(),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                )
-                Text(
-                    text = song.displayName(),
-                    modifier = Modifier.padding(top = 7.dp, start = 2.dp, end = 2.dp),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = song.displayArtist(),
-                    modifier = Modifier.padding(top = 2.dp, start = 2.dp, end = 2.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (song.album.isNotBlank()) {
-                    Text(
-                        text = song.album,
-                        modifier = Modifier.padding(top = 1.dp, start = 2.dp, end = 2.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                column.forEachIndexed { rowIndex, song ->
+                    val songIndex = columnIndex * 3 + rowIndex
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(66.dp)
+                            .clickable { onSongClick(songs, songIndex) }
+                            .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                        ) {
+                            AsyncImage(
+                                model = fastScrollableImageRequest(
+                                    context = context,
+                                    data = song.coverUrl,
+                                    sizePx = 192,
+                                    offlineMode = offlineMode
+                                ),
+                                contentDescription = song.displayName(),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = song.displayName(),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = song.displayArtist(),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f),
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1723,11 +1734,12 @@ fun PlaylistCard(
 
     Column(
         modifier = Modifier
-            .clip(cardShape)
+            .then(if (large) Modifier.fillMaxHeight() else Modifier)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { showMenu = true }
             )
+            .padding(if (large) 8.dp else 0.dp)
     ) {
         AsyncImage(
             model = fastScrollableImageRequest(
@@ -1740,38 +1752,61 @@ fun PlaylistCard(
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
+                .then(
+                    if (large) Modifier.height(174.dp)
+                    else Modifier.aspectRatio(1f)
+                )
                 .clip(cardShape)
         )
         Column(
-            modifier = Modifier.padding(
-                top = if (large) 8.dp else 6.dp,
-                start = if (large) 6.dp else 4.dp,
-                end = if (large) 6.dp else 4.dp,
-                bottom = 4.dp
-            )
+            modifier = if (large) {
+                Modifier.weight(1f)
+            } else {
+                Modifier.padding(
+                    top = 6.dp,
+                    start = 4.dp,
+                    end = 4.dp,
+                    bottom = 4.dp
+                )
+            }
         ) {
             Text(
                 text = playlist.name,
                 maxLines = if (large) 2 else 1,
                 overflow = TextOverflow.Ellipsis,
+                fontSize = if (large) 15.sp else TextUnit.Unspecified,
+                lineHeight = if (large) 19.sp else TextUnit.Unspecified,
                 style = if (large) {
-                    MaterialTheme.typography.titleMedium
+                    MaterialTheme.typography.titleSmall
                 } else {
                     MaterialTheme.typography.titleSmall
                 },
-                fontWeight = if (large) FontWeight.SemiBold else null
+                fontWeight = if (large) FontWeight.SemiBold else null,
+                modifier = if (large) Modifier.padding(top = 7.dp) else Modifier
             )
+            if (large) {
+                Spacer(Modifier.weight(1f))
+            }
             Text(
-                text = stringResource(
-                    R.string.home_play_count_format,
-                    formatPlayCount(context, playlist.playCount),
-                    playlist.trackCount
-                ),
+                text = if (large) {
+                    stringResource(
+                        R.string.home_play_count_only_format,
+                        formatPlayCount(context, playlist.playCount)
+                    )
+                } else {
+                    stringResource(
+                        R.string.home_play_count_format,
+                        formatPlayCount(context, playlist.playCount),
+                        playlist.trackCount
+                    )
+                },
                 style = MaterialTheme.typography.bodySmall,
+                fontSize = if (large) 11.sp else TextUnit.Unspecified,
+                lineHeight = if (large) 14.sp else TextUnit.Unspecified,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Clip
+                overflow = TextOverflow.Clip,
+                modifier = if (large) Modifier.padding(top = 3.dp) else Modifier
             )
         }
 

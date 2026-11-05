@@ -35,6 +35,7 @@
     <string name="home_login_required_hint">Will auto-enable after sign-in</string>
     <string name="home_retry_hint">Tap refresh in the upper right to retry~</string>
     <string name="home_play_count_format" formatted="false">%s · %d songs</string>
+    <string name="home_play_count_only_format" formatted="false">%s plays</string>
     <string name="home_unfavorite_playlist">Unfavorite</string>
     <string name="home_favorite_playlist">Favorite Playlist</string>
     <string name="home_unfavorited">Unfavorited</string>
