@@ -697,6 +697,33 @@ class NeteaseClient {
 
     @Throws(IOException::class)
     fun loginByCaptcha(phone: String, captcha: String, ctcode: Int = 86, remember: Boolean = true): String {
+        val now = System.currentTimeMillis()
+        val loginHeader = mapOf(
+            "os" to "ios",
+            "appver" to "9.0.90",
+            "osver" to "18.0",
+            "buildver" to (now / 1000L).toString(),
+            "channel" to "distribution",
+            "requestId" to "${now}_0000",
+            "__csrf" to ""
+        )
+        val params = mutableMapOf<String, Any>(
+            "phone" to phone,
+            "countrycode" to ctcode.toString(),
+            "remember" to true,
+            "type" to 1,
+            "captcha" to captcha,
+            "header" to loginHeader,
+            "e_r" to false
+        )
+        return callEApi("/w/login/cellphone", params, usePersistedCookies = false)
+    }
+
+    /**
+     * EAPI 登录在部分账号/设备上会返回空 msg 的失败码，回退到 WEAPI 再试一次。
+     */
+    @Throws(IOException::class)
+    fun loginByCaptchaWeapi(phone: String, captcha: String, ctcode: Int = 86, remember: Boolean = true): String {
         val params = mutableMapOf<String, Any>(
             "phone" to phone,
             "countrycode" to ctcode.toString(),
@@ -704,7 +731,7 @@ class NeteaseClient {
             "type" to "1",
             "captcha" to captcha
         )
-        return callEApi("/w/login/cellphone", params, usePersistedCookies = false)
+        return callWeApi("/w/login/cellphone", params, usePersistedCookies = false)
     }
 
     // 业务接口

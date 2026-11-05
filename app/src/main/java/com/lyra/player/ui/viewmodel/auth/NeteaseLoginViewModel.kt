@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lyra.player.R
 import com.lyra.player.core.di.AppContainer
+import com.lyra.player.core.logging.LyraLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -146,39 +147,64 @@ class NeteaseLoginViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(loggingIn = true, error = null) }
             try {
-                val verifyResponse = client.verifyCaptcha(phone, captcha)
-                val verifyJson = JSONObject(verifyResponse)
-                if (verifyJson.optInt("code", -1) != 200) {
-                    _uiState.update {
-                        it.copy(
-                            loggingIn = false,
-                            error = verifyJson.optString("msg").ifBlank {
-                                getApplication<Application>().getString(R.string.login_code_error)
-                            }
-                        )
-                    }
-                    return@launch
-                }
-
-                val loginResponse = client.loginByCaptcha(phone = phone, captcha = captcha)
-                val loginJson = JSONObject(loginResponse)
+                var loginResponse = client.loginByCaptcha(phone = phone, captcha = captcha)
+                var loginJson = JSONObject(loginResponse)
+                LyraLogger.d(
+                    "LYRA-NeteaseLogin",
+                    "eapi login response code=${loginJson.optInt("code", -1)} " +
+                        "msg=${loginJson.optString("msg")}"
+                )
                 if (loginJson.optInt("code", -1) != 200) {
+                    loginResponse = client.loginByCaptchaWeapi(phone = phone, captcha = captcha)
+                    loginJson = JSONObject(loginResponse)
+                    LyraLogger.d(
+                        "LYRA-NeteaseLogin",
+                        "weapi login response code=${loginJson.optInt("code", -1)} " +
+                            "msg=${loginJson.optString("msg")}"
+                    )
+                }
+                if (loginJson.optInt("code", -1) != 200) {
+                    val code = loginJson.optInt("code", -1)
+                    val message = loginJson.optString("msg").ifBlank { "code=$code" }
                     _uiState.update {
                         it.copy(
                             loggingIn = false,
-                            error = loginJson.optString("msg").ifBlank {
-                                getApplication<Application>().getString(
-                                    R.string.netease_login_failed,
-                                    "error"
-                                )
-                            }
+                            error = getApplication<Application>().getString(
+                                R.string.netease_login_failed,
+                                message
+                            )
                         )
                     }
                     return@launch
                 }
 
                 runCatching { client.ensureWeapiSession() }
-                val cookies = client.getCookies()
+                val cookies = client.getCookies().toMutableMap()
+                loginJson.optString("cookie")
+                    .takeIf { it.isNotBlank() }
+                    ?.split(';')
+                    ?.map(String::trim)
+                    ?.filter { it.contains('=') }
+                    ?.forEach { pair ->
+                        val index = pair.indexOf('=')
+                        if (index > 0) {
+                            val key = pair.substring(0, index).trim()
+                            val value = pair.substring(index + 1).trim()
+                            if (key.isNotBlank() && value.isNotBlank()) {
+                                cookies[key] = value
+                            }
+                        }
+                    }
+                if (cookies["MUSIC_U"].orEmpty().isBlank()) {
+                    _uiState.update {
+                        it.copy(
+                            loggingIn = false,
+                            error = getApplication<Application>().getString(R.string.auth_cookie_invalid)
+                        )
+                    }
+                    return@launch
+                }
+                client.setPersistedCookies(cookies)
                 if (!cookieRepo.saveCookies(cookies)) {
                     _uiState.update {
                         it.copy(
