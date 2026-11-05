@@ -168,6 +168,8 @@ import com.lyra.player.ui.viewmodel.tab.HomeNeteasePlaylistSectionState
 import com.lyra.player.ui.viewmodel.tab.HomeNeteaseSongSectionState
 import com.lyra.player.ui.viewmodel.tab.HomeSectionState
 import com.lyra.player.ui.viewmodel.tab.HomeViewModel
+import com.lyra.player.ui.viewmodel.tab.NETEASE_PRIVATE_RADAR_PLAYLIST_ID
+import com.lyra.player.ui.viewmodel.tab.NETEASE_TOPLIST_HOT_ID
 import com.lyra.player.ui.viewmodel.tab.NeteaseHomeSongSource
 import com.lyra.player.ui.viewmodel.tab.PlaylistSummary
 import com.lyra.player.ui.viewmodel.tab.YouTubeMusicPlaylist
@@ -224,7 +226,8 @@ private data class MeloxHomeQuickAction(
     val icon: ImageVector,
     val colors: List<Color>,
     val songs: List<SongItem>,
-    val requiresLogin: Boolean = false
+    val requiresLogin: Boolean = false,
+    val playlist: PlaylistSummary? = null
 )
 
 internal fun shouldShowHomeContinueSection(
@@ -448,7 +451,14 @@ fun HomeScreen(
             subtitle = stringResource(R.string.home_subtitle_hot),
             icon = Icons.Outlined.LocalFireDepartment,
             colors = listOf(Color(0xFFFFA14A), Color(0xFFFF5A36)),
-            songs = hotSongs
+            songs = hotSongs,
+            playlist = PlaylistSummary(
+                id = NETEASE_TOPLIST_HOT_ID,
+                name = stringResource(R.string.home_netease_hot_rank),
+                picUrl = hotSongs.firstOrNull()?.coverUrl.orEmpty(),
+                playCount = 0L,
+                trackCount = hotSongs.size
+            )
         ),
         MeloxHomeQuickAction(
             key = "radar",
@@ -457,7 +467,14 @@ fun HomeScreen(
             subtitle = stringResource(R.string.home_subtitle_radar),
             icon = Icons.Outlined.Radar,
             colors = listOf(Color(0xFF6B7BFF), Color(0xFF8C52FF)),
-            songs = radarSongs
+            songs = radarSongs,
+            playlist = PlaylistSummary(
+                id = NETEASE_PRIVATE_RADAR_PLAYLIST_ID,
+                name = stringResource(R.string.recommend_radar),
+                picUrl = radarSongs.firstOrNull()?.coverUrl.orEmpty(),
+                playCount = 0L,
+                trackCount = radarSongs.size
+            )
         ),
         MeloxHomeQuickAction(
             key = "roam",
@@ -885,16 +902,20 @@ fun HomeScreen(
                             actions = meloxQuickActions,
                             contentPadding = gridContentPadding,
                             onAction = { action ->
-                                if (action.songs.isNotEmpty()) {
-                                    quickActionSheet = action.title to action.songs
-                                } else {
-                                    showHomeSnackbar(
-                                        if (action.requiresLogin && !ui.hasLogin) {
-                                            context.getString(R.string.home_login_required)
-                                        } else {
-                                            context.getString(R.string.home_no_recommendations)
-                                        }
-                                    )
+                                when {
+                                    action.playlist != null -> onItemClick(action.playlist)
+                                    action.songs.isNotEmpty() -> {
+                                        quickActionSheet = action.title to action.songs
+                                    }
+                                    else -> {
+                                        showHomeSnackbar(
+                                            if (action.requiresLogin && !ui.hasLogin) {
+                                                context.getString(R.string.home_login_required)
+                                            } else {
+                                                context.getString(R.string.home_no_recommendations)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         )
