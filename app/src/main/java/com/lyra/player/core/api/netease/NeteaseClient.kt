@@ -683,6 +683,17 @@ class NeteaseClient {
 
     @Throws(IOException::class)
     fun sendCaptcha(phone: String, ctcode: Int = 86): String {
+        val params = mutableMapOf<String, Any>(
+            "cellphone" to phone,
+            "ctcode" to ctcode.toString(),
+            "header" to neteaseAnonymousLoginHeader(),
+            "e_r" to false
+        )
+        return callEApi("/sms/captcha/sent", params, usePersistedCookies = false)
+    }
+
+    @Throws(IOException::class)
+    fun sendCaptchaWeapi(phone: String, ctcode: Int = 86): String {
         val url = "https://interface.music.163.com/weapi/sms/captcha/sent"
         val params = mapOf("cellphone" to phone, "ctcode" to ctcode.toString())
         return request(url, params, CryptoMode.WEAPI, "POST", usePersistedCookies = false)
@@ -697,8 +708,21 @@ class NeteaseClient {
 
     @Throws(IOException::class)
     fun loginByCaptcha(phone: String, captcha: String, ctcode: Int = 86, remember: Boolean = true): String {
+        val params = mutableMapOf<String, Any>(
+            "phone" to phone,
+            "countrycode" to ctcode.toString(),
+            "remember" to true,
+            "type" to 1,
+            "captcha" to captcha,
+            "header" to neteaseAnonymousLoginHeader(),
+            "e_r" to false
+        )
+        return callEApi("/w/login/cellphone", params, usePersistedCookies = false)
+    }
+
+    private fun neteaseAnonymousLoginHeader(): Map<String, Any> {
         val now = System.currentTimeMillis()
-        val loginHeader = mapOf(
+        return mapOf(
             "os" to "ios",
             "appver" to "9.0.90",
             "osver" to "18.0",
@@ -707,16 +731,6 @@ class NeteaseClient {
             "requestId" to "${now}_0000",
             "__csrf" to ""
         )
-        val params = mutableMapOf<String, Any>(
-            "phone" to phone,
-            "countrycode" to ctcode.toString(),
-            "remember" to true,
-            "type" to 1,
-            "captcha" to captcha,
-            "header" to loginHeader,
-            "e_r" to false
-        )
-        return callEApi("/w/login/cellphone", params, usePersistedCookies = false)
     }
 
     /**

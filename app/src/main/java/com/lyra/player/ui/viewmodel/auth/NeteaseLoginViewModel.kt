@@ -99,20 +99,33 @@ class NeteaseLoginViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(sending = true, error = null) }
             try {
-                val response = client.sendCaptcha(phone)
-                val json = JSONObject(response)
+                var response = client.sendCaptcha(phone)
+                var json = JSONObject(response)
+                LyraLogger.d(
+                    "LYRA-NeteaseLogin",
+                    "eapi send code response code=${json.optInt("code", -1)} msg=${json.optString("msg")}"
+                )
+                if (json.optInt("code", -1) != 200) {
+                    response = client.sendCaptchaWeapi(phone)
+                    json = JSONObject(response)
+                    LyraLogger.d(
+                        "LYRA-NeteaseLogin",
+                        "weapi send code response code=${json.optInt("code", -1)} msg=${json.optString("msg")}"
+                    )
+                }
                 if (json.optInt("code", -1) == 200) {
                     _uiState.update {
                         it.copy(codeSent = true, sending = false)
                     }
                     startCountdown()
                 } else {
+                    val code = json.optInt("code", -1)
                     _uiState.update {
                         it.copy(
                             sending = false,
                             error = getApplication<Application>().getString(
                                 R.string.netease_login_code_send_failed,
-                                json.optString("msg").ifBlank { "error" }
+                                json.optString("msg").ifBlank { "code=$code" }
                             )
                         )
                     }
