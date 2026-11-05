@@ -477,6 +477,12 @@ fun HomeScreen(
             else -> R.string.home_greeting_evening
         }
     }
+    val allRecentTrendingSongs = remember(ui.trendingSongSections) {
+        ui.trendingSongSections
+            .flatMap { it.section.items }
+            .distinctBy { it.stableKey() }
+            .take(12)
+    }
     fun triggerHomeRefresh() {
         if (offlineMode) return
         if (isInternational) {
@@ -765,7 +771,7 @@ fun HomeScreen(
                     ) {
                         MeloxSectionTitle(
                             title = stringResource(titleRes),
-                            trailing = stringResource(R.string.home_pull_to_refresh),
+                            trailing = null,
                             modifier = Modifier
                                 .padding(horizontal = gridContentPadding)
                                 .animateItem()
@@ -811,7 +817,10 @@ fun HomeScreen(
                     }
                 }
 
-                fun LazyGridScope.addMeloxSongSection(group: HomeFeedGroup) {
+                fun LazyGridScope.addMeloxSongSection(
+                    group: HomeFeedGroup,
+                    titleRes: Int = group.titleResId
+                ) {
                     val sectionKey = "home:melox:${group.key}"
                     val songs = group.songs.items
                     if (songs.isEmpty() && !group.songs.loading && group.songs.error.isNullOrBlank()) {
@@ -822,7 +831,7 @@ fun HomeScreen(
                         span = { GridItemSpan(maxLineSpan) }
                     ) {
                         MeloxSectionTitle(
-                            title = stringResource(group.titleResId),
+                            title = stringResource(titleRes),
                             trailing = null,
                             modifier = Modifier
                                 .padding(horizontal = gridContentPadding)
@@ -903,19 +912,47 @@ fun HomeScreen(
                                 titleRes = R.string.home_netease_daily_songs
                             )
                         }
-                        recommendedGroups
-                            .filter { it.key != featuredRecommended?.key }
-                            .forEach { addMeloxPlaylistSection(it) }
                     }
 
                     if (showOnlineFeeds && showNeteaseTrending) {
-                        homeFeedGroups[HomeSectionId.TRENDING].orEmpty().forEach { group ->
-                            if (group.presentation == HomeFeedPresentation.SONG_LIST) {
-                                addMeloxSongSection(group)
-                            } else {
-                                addMeloxPlaylistSection(group)
+                        val trendingGroups = homeFeedGroups[HomeSectionId.TRENDING].orEmpty()
+                        trendingGroups
+                            .firstOrNull { it.key.contains("PERSONALIZED_NEW_SONGS") }
+                            ?.let { group ->
+                                addMeloxSongSection(group, titleRes = R.string.recommend_for_you)
+                            }
+                        if (allRecentTrendingSongs.isNotEmpty()) {
+                            item(
+                                key = registerGridItemKey("home:melox:all_recent_trending:header"),
+                                span = { GridItemSpan(maxLineSpan) }
+                            ) {
+                                MeloxSectionTitle(
+                                    title = stringResource(R.string.home_all_recent_trending),
+                                    trailing = null,
+                                    modifier = Modifier
+                                        .padding(horizontal = gridContentPadding)
+                                        .animateItem()
+                                )
+                            }
+                            item(
+                                key = registerGridItemKey("home:melox:all_recent_trending:content"),
+                                span = { GridItemSpan(maxLineSpan) }
+                            ) {
+                                MeloxSongCarousel(
+                                    songs = allRecentTrendingSongs,
+                                    isTabletLayout = isTabletLayout,
+                                    offlineMode = offlineMode,
+                                    onSongClick = onSongClick,
+                                    modifier = Modifier.animateItem()
+                                )
                             }
                         }
+                    }
+
+                    if (showOnlineFeeds && showRecommendedCard) {
+                        recommendedGroups
+                            .filter { it.key != featuredRecommended?.key }
+                            .forEach { addMeloxPlaylistSection(it) }
                     }
 
                     if (showOnlineFeeds && showNeteaseRadar) {

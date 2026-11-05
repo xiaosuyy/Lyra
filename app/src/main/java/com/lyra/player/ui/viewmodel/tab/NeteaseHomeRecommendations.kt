@@ -36,6 +36,7 @@ enum class NeteaseHomePlaylistSource(
 ) {
     PERSONALIZED(R.string.recommend_for_you, requiresLogin = false),
     DAILY_RESOURCE(R.string.home_netease_daily_playlists, requiresLogin = true),
+    CHARTS(R.string.home_charts, requiresLogin = false),
     HIGH_QUALITY(R.string.home_netease_high_quality_playlists, requiresLogin = false),
     HOT_PLAYLISTS(R.string.home_netease_hot_playlists, requiresLogin = false),
     ACG_PLAYLISTS(R.string.home_netease_acg_playlists, requiresLogin = false)
@@ -76,6 +77,7 @@ internal val NeteaseHomeRadarSongSources = listOf(
 internal val NeteaseHomePlaylistSources = listOf(
     NeteaseHomePlaylistSource.PERSONALIZED,
     NeteaseHomePlaylistSource.DAILY_RESOURCE,
+    NeteaseHomePlaylistSource.CHARTS,
     NeteaseHomePlaylistSource.HIGH_QUALITY,
     NeteaseHomePlaylistSource.HOT_PLAYLISTS,
     NeteaseHomePlaylistSource.ACG_PLAYLISTS
@@ -221,6 +223,7 @@ private fun firstPlaylistArray(root: JSONObject): JSONArray? {
     return root.optJSONArray("result")
         ?: root.optJSONArray("recommend")
         ?: root.optJSONArray("playlists")
+        ?: root.optJSONArray("list")
         ?: root.optJSONObject("data")?.optJSONArray("playlists")
         ?: root.optJSONObject("data")?.optJSONArray("list")
 }

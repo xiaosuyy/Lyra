@@ -769,6 +769,11 @@ class NeteaseClient {
     }
 
     @Throws(IOException::class)
+    fun getToplists(usePersistedCookies: Boolean = true): String {
+        return callWeApi("/toplist", emptyMap(), usePersistedCookies = usePersistedCookies)
+    }
+
+    @Throws(IOException::class)
     fun searchSongs(
         keyword: String,
         limit: Int = 30,

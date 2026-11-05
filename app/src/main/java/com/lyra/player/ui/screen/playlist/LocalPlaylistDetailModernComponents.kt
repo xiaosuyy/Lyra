@@ -7,16 +7,20 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +29,7 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.Icon
@@ -47,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -67,10 +73,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
@@ -96,8 +105,8 @@ internal const val PLAYLIST_ACTIONS_KEY = "playlist_actions"
 internal const val LOCAL_PLAYLIST_HEADER_KEY = PLAYLIST_HEADER_KEY
 internal const val LOCAL_PLAYLIST_ACTIONS_KEY = PLAYLIST_ACTIONS_KEY
 internal const val LOCAL_PLAYLIST_METADATA_PROCESSING_KEY = "metadata_processing_card"
-internal val PlaylistModernHeroHeight = 122.dp
-internal val PlaylistModernHeroSearchHeight = 190.dp
+internal val PlaylistModernHeroHeight = 430.dp
+internal val PlaylistModernHeroSearchHeight = 490.dp
 internal val PlaylistModernHeroSearchFieldOffset = 106.dp
 private const val PlaylistHeroLightFallbackSeedArgb = 0xFF5F6875.toInt()
 private const val PlaylistHeroDarkFallbackSeedArgb = 0xFF303846.toInt()
@@ -981,6 +990,7 @@ internal fun PlaylistModernHeroHeader(
     offlineMode: Boolean,
     height: Dp,
     coverContentDescription: String = displayName,
+    metadata: String? = null,
     actions: (@Composable () -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -990,29 +1000,47 @@ internal fun PlaylistModernHeroHeader(
         offlineMode = offlineMode
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(height)
             .background(visualColors.background)
     ) {
+        val artworkSize = minOf(maxWidth * 0.64f, 280.dp)
         Column(
             modifier = Modifier
-                .align(Alignment.TopStart)
                 .fillMaxWidth()
-                .padding(start = 20.dp, top = 6.dp, end = 20.dp, bottom = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(top = 6.dp, bottom = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            CompositionLocalProvider(LocalPlaylistHeroVisualColors provides visualColors) {
+                if (actions != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 4.dp)
+                    ) {
+                        actions()
+                    }
+                }
+            }
+            Spacer(Modifier.height(if (actions == null) 24.dp else 16.dp))
+            Box(
+                modifier = Modifier
+                    .size(artworkSize)
+                    .shadow(
+                        elevation = 18.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        clip = false,
+                        ambientColor = Color.Black.copy(alpha = 0.18f),
+                        spotColor = Color.Black.copy(alpha = 0.18f)
+                    )
             ) {
                 AsyncImage(
                     model = offlineCachedImageRequest(
                         context = context,
                         data = normalizedCoverModel,
-                        sizePx = 320,
+                        sizePx = 640,
                         allowHardware = false,
                         crossfade = true,
                         offlineMode = offlineMode
@@ -1020,41 +1048,42 @@ internal fun PlaylistModernHeroHeader(
                     contentDescription = coverContentDescription,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(PlaylistHeroCoverSize)
-                        .clip(RoundedCornerShape(PlaylistHeroCoverCornerRadius))
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(16.dp))
                 )
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = displayName,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            shadow = Shadow(
-                                color = Color.Black.copy(alpha = 0.22f),
-                                offset = Offset(1f, 1f),
-                                blurRadius = 3f
-                            )
-                        ),
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.76f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
-            CompositionLocalProvider(LocalPlaylistHeroVisualColors provides visualColors) {
-                if (actions != null) {
-                    Box(modifier = Modifier.padding(top = PlaylistHeroSearchTopPadding)) {
-                        actions()
-                    }
-                }
+            Text(
+                text = displayName,
+                modifier = Modifier.padding(top = 24.dp, start = 24.dp, end = 24.dp),
+                color = Color.White,
+                fontSize = 22.sp,
+                lineHeight = 27.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp),
+                color = Color.White.copy(alpha = 0.86f),
+                fontSize = 16.sp,
+                lineHeight = 21.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            metadata?.takeUnless { it.isBlank() }?.let { value ->
+                Text(
+                    text = value,
+                    modifier = Modifier.padding(top = 6.dp),
+                    color = Color.White.copy(alpha = 0.58f),
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
             }
         }
     }
@@ -1320,31 +1349,14 @@ internal fun PlaylistModernActionSheet(
         coverUrl = coverUrl,
         offlineMode = offlineMode
     )
-    val fallbackColor = playlistModernSheetFallbackColor(hasCustomBackground)
-    val tintColor = playlistModernSheetTintColor(hasCustomBackground)
-    val glassEnabled = hasCustomBackground || !playlistModernUsesDarkSurface()
     CompositionLocalProvider(LocalPlaylistHeroVisualColors provides visualColors) {
         Box(
             modifier = modifier
                 .fillMaxWidth()
+                .background(visualColors.background),
+            contentAlignment = Alignment.Center
         ) {
-            PlaylistActionSheetCornerGapLayer(
-                shape = shape,
-                color = visualColors.background,
-                gapHeight = cornerGapHeight
-            )
-            AdvancedGlassSurface(
-                role = AdvancedGlassRole.PlaylistSheet,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
-                shape = shape,
-                fallbackColor = fallbackColor,
-                tintColor = tintColor,
-                enabled = glassEnabled
-            ) {
-                content()
-            }
+            content()
         }
     }
 }
@@ -1412,85 +1424,85 @@ internal fun PlaylistModernPlaybackActions(
 ) {
     val canUseSongs = songCount > 0
     val visualColors = LocalPlaylistHeroVisualColors.current
-    val accentColor = visualColors?.readableAccent ?: MaterialTheme.colorScheme.primary
-    val onAccentColor = resolvePlaylistContentColor(accentColor)
     val controlContentColor = visualColors?.controlContent
         ?: MaterialTheme.colorScheme.onSurface
-    val playLabel = if (shuffleEnabled) {
-        stringResource(R.string.player_shuffle_play)
+    val lightControls = controlContentColor.luminance() > 0.5f
+    val circleColor = if (lightControls) {
+        Color.Black.copy(alpha = 0.26f)
     } else {
-        stringResource(R.string.player_play_all)
+        Color.White.copy(alpha = 0.42f)
     }
+    val playBackground = if (lightControls) Color.White else Color.Black
+    val playForeground = if (lightControls) Color.Black else Color.White
+    val playLabel = stringResource(R.string.player_play)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 18.dp, top = 8.dp, end = 22.dp, bottom = 8.dp),
+            .padding(start = 18.dp, top = 12.dp, end = 18.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.Center
     ) {
         HapticFilledIconButton(
-            onClick = {
-                if (shuffleEnabled) {
-                    onShufflePlay()
-                } else {
-                    onPlayInOrder()
-                }
-            },
+            onClick = onShufflePlay,
             enabled = canUseSongs,
-            modifier = Modifier.size(PlaylistActionBarHeight),
+            modifier = Modifier.size(54.dp),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = accentColor,
-                contentColor = onAccentColor
+                containerColor = circleColor,
+                contentColor = controlContentColor
             )
+        ) {
+            Icon(
+                Icons.Outlined.Shuffle,
+                contentDescription = stringResource(R.string.playlist_mode_shuffle),
+                modifier = Modifier.size(25.dp)
+            )
+        }
+
+        Spacer(Modifier.width(18.dp))
+
+        Row(
+            modifier = Modifier
+                .width(148.dp)
+                .height(52.dp)
+                .clip(CircleShape)
+                .background(playBackground)
+                .clickable(enabled = canUseSongs, onClick = onPlayInOrder),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 Icons.Filled.PlayArrow,
                 contentDescription = playLabel,
-                modifier = Modifier.size(26.dp)
+                tint = playForeground,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(Modifier.width(7.dp))
+            Text(
+                text = playLabel,
+                color = playForeground,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold
             )
         }
 
-        Text(
-            text = playLabel,
-            style = MaterialTheme.typography.titleMedium,
-            color = controlContentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
+        Spacer(Modifier.width(18.dp))
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        HapticFilledIconButton(
+            onClick = onExportToLocalPlaylist,
+            enabled = canUseSongs && exportEnabled,
+            modifier = Modifier.size(54.dp),
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = circleColor,
+                contentColor = controlContentColor
+            )
         ) {
-            PlaylistCompactIconButton(
-                imageVector = Icons.Outlined.Shuffle,
-                contentDescription = if (shuffleEnabled) {
-                    stringResource(R.string.playlist_mode_shuffle)
-                } else {
-                    stringResource(R.string.playlist_mode_order)
-                },
-                enabled = canUseSongs,
-                active = shuffleEnabled,
-                onClick = onToggleShuffle
-            )
-            PlaylistCompactIconButton(
-                imageVector = if (repeatMode == Player.REPEAT_MODE_ONE) {
-                    Icons.Filled.RepeatOne
-                } else {
-                    Icons.Outlined.Repeat
-                },
-                contentDescription = stringResource(playlistRepeatModeLabelRes(repeatMode)),
-                active = repeatMode != Player.REPEAT_MODE_OFF,
-                onClick = onCycleRepeatMode
-            )
-            PlaylistCompactIconButton(
-                imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
+            Icon(
+                Icons.Outlined.Add,
                 contentDescription = stringResource(R.string.playlist_export_to_local),
-                enabled = canUseSongs && exportEnabled,
-                onClick = onExportToLocalPlaylist,
+                modifier = Modifier.size(26.dp)
             )
         }
     }

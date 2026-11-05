@@ -1222,6 +1222,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     usePersistedCookies = hasRecommendLogin
                 )
                 NeteaseHomePlaylistSource.DAILY_RESOURCE -> client.getDailyRecommendedPlaylists()
+                NeteaseHomePlaylistSource.CHARTS -> client.getToplists()
                 NeteaseHomePlaylistSource.HIGH_QUALITY -> client.getHighQualityPlaylists(
                     cat = "全部",
                     limit = HOME_NETEASE_PLAYLIST_LIMIT,

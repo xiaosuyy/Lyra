@@ -62,6 +62,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -123,6 +124,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -540,18 +542,19 @@ fun DetailScreen(
                     // 顶部栏: 普通模式 / 多选模式
                     if (!selectionMode) {
                         TopAppBar(
-                            title = {
-                                Text(
-                                    text = ui.header?.name ?: "Playlist Shuffling",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
+                            title = {},
                             navigationIcon = {
-                                HapticIconButton(onClick = onBack) {
+                                HapticIconButton(
+                                    onClick = onBack,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.22f))
+                                ) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = stringResource(R.string.cd_back)
+                                        contentDescription = stringResource(R.string.cd_back),
+                                        modifier = Modifier.size(21.dp)
                                     )
                                 }
                             },
@@ -563,7 +566,12 @@ fun DetailScreen(
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
                                     }
-                                }) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search_songs)) }
+                                },
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.22f))
+                                ) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search_songs), modifier = Modifier.size(21.dp)) }
 
                                 // 收藏按钮
                                 HapticIconButton(onClick = {
@@ -583,20 +591,32 @@ fun DetailScreen(
                                             }
                                         }
                                     }
-                                }) {
+                                },
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.22f))
+                                ) {
                                     Icon(
                                         imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                                         contentDescription = if (isFavorite) stringResource(R.string.action_unfavorite) else stringResource(R.string.action_favorite_playlist),
-                                        tint = playlistTopBarContentColor
+                                        tint = playlistTopBarContentColor,
+                                        modifier = Modifier.size(21.dp)
                                     )
                                 }
 
                                 if (hasDownloadManagerEntry) {
-                                    HapticIconButton(onClick = { showDownloadManager = true }) {
+                                    HapticIconButton(onClick = { showDownloadManager = true },
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.Black.copy(alpha = 0.22f))
+                                    ) {
                                         Icon(
                                             Icons.Outlined.Download,
                                             contentDescription = stringResource(R.string.cd_download_manager),
-                                            tint = playlistTopBarContentColor
+                                            tint = playlistTopBarContentColor,
+                                            modifier = Modifier.size(21.dp)
                                         )
                                     }
                                 }
@@ -705,11 +725,14 @@ fun DetailScreen(
                     )
                     val trackCount = ui.header?.trackCount ?: ui.tracks.size
                     val heroTitle = ui.header?.name ?: stringResource(R.string.playlist_title)
-                    val heroSubtitle = if (ui.header?.isAlbum == true) {
-                        stringResource(
-                            R.string.collection_track_count_format,
-                            trackCount
-                        )
+                    val creatorLabel = stringResource(R.string.platform_netease)
+                    val heroSubtitle = stringResource(
+                        R.string.playlist_creator_track_format,
+                        creatorLabel,
+                        trackCount
+                    )
+                    val heroMetadata = if (ui.header?.isAlbum == true) {
+                        null
                     } else {
                         stringResource(
                             R.string.playlist_play_count_format,
@@ -750,6 +773,7 @@ fun DetailScreen(
                                         displayName = heroTitle,
                                         coverUrl = displayCoverUrl,
                                         subtitle = heroSubtitle,
+                                        metadata = heroMetadata,
                                         offlineMode = offlineMode,
                                         height = playlistHeroHeight,
                                         coverContentDescription = heroTitle,
@@ -869,7 +893,8 @@ fun DetailScreen(
                                                 song = item,
                                                 isFavorite = isFavoriteSong,
                                                 onFavoriteToggle = ::toggleSongFavorite,
-                                                showCover = ui.header?.isAlbum == false,
+                                                showCover = false,
+                                                trackNumber = index + 1,
                                                 selectionMode = selectionMode,
                                                 selected = selectedIds.contains(item.id),
                                                 onToggleSelect = { toggleSelect(item.id) },
@@ -1079,6 +1104,7 @@ private fun SongRow(
     isFavorite: Boolean,
     onFavoriteToggle: (SongItem, Boolean) -> Unit,
     showCover: Boolean,
+    trackNumber: Int = 0,
     selectionMode: Boolean,
     selected: Boolean,
     onToggleSelect: () -> Unit,
@@ -1122,6 +1148,18 @@ private fun SongRow(
 
         val itemContext = LocalContext.current
         val displayCoverUrl = rememberSongDisplayCoverUrl(song)
+        if (!showCover && trackNumber > 0) {
+            Text(
+                text = trackNumber.toString(),
+                modifier = Modifier
+                    .width(40.dp)
+                    .padding(start = 8.dp, end = 8.dp),
+                color = playlistModernListSecondaryContentColor(),
+                fontSize = 20.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+        }
         if (showCover && !displayCoverUrl.isNullOrBlank()) {
             Box(
                 modifier = Modifier

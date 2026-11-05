@@ -59,4 +59,6 @@
     <string name="home_subtitle_roam">Discover more good music</string>
     <string name="home_pull_to_refresh">Pull to refresh</string>
     <string name="home_no_recommendations">No recommendations yet</string>
+    <string name="home_all_recent_trending">All recent trending</string>
+    <string name="home_charts">Charts</string>
 </resources>

@@ -59,4 +59,6 @@
     <string name="home_subtitle_roam">发现更多好歌</string>
     <string name="home_pull_to_refresh">下拉刷新</string>
     <string name="home_no_recommendations">暂无推荐歌曲</string>
+    <string name="home_all_recent_trending">全部近期热门</string>
+    <string name="home_charts">排行榜</string>
 </resources>
