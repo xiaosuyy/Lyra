@@ -144,6 +144,57 @@ class NeteaseLoginViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    /**
+     * 使用网页登录返回的 Cookie 完成登录。
+     * 手机号验证码接口可能被网易云风控拦截（-462），网页登录是兜底路径。
+     */
+    fun loginWithCookies(cookieJson: String) {
+        val cookies = runCatching {
+            val json = JSONObject(cookieJson)
+            buildMap {
+                json.keys().forEach { key ->
+                    val value = json.optString(key)
+                    if (key.isNotBlank() && value.isNotBlank()) put(key, value)
+                }
+            }
+        }.getOrElse {
+            _uiState.update {
+                it.copy(error = getApplication<Application>().getString(R.string.auth_cookie_invalid))
+            }
+            return
+        }
+        if (cookies["MUSIC_U"].isNullOrBlank()) {
+            _uiState.update {
+                it.copy(error = getApplication<Application>().getString(R.string.auth_cookie_invalid))
+            }
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(loggingIn = true, error = null) }
+            client.setPersistedCookies(cookies)
+            if (!cookieRepo.saveCookies(cookies)) {
+                _uiState.update {
+                    it.copy(
+                        loggingIn = false,
+                        error = getApplication<Application>().getString(R.string.auth_cookie_invalid)
+                    )
+                }
+                return@launch
+            }
+            val profile = loadProfile()
+            _uiState.update {
+                it.copy(
+                    loggingIn = false,
+                    codeSent = false,
+                    captcha = "",
+                    isLoggedIn = true,
+                    profile = profile,
+                    loginCompleted = true
+                )
+            }
+        }
+    }
+
     fun login() {
         val state = _uiState.value
         val phone = state.phone.trim()

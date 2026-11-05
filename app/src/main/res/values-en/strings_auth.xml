@@ -50,6 +50,8 @@
     <string name="netease_login_logout">Log out of NetEase account</string>
     <string name="netease_login_failed">Login failed: %s</string>
     <string name="netease_login_code_send_failed">Failed to send code: %s</string>
+    <string name="netease_login_web_login">Log in with web page</string>
+    <string name="netease_login_web_hint">If NetEase asks for extra verification (-462), or the code never arrives, use web login instead.</string>
     <string name="settings_youtube_auth_verifying">Verifying sign-in state, please wait…</string>
     <string name="settings_youtube_status_valid">Saved and last refreshed %1$s</string>
     <string name="settings_youtube_status_saved_invalid">Saved YouTube auth information was found, but it may be invalid. Tap to refresh it or sign out</string>

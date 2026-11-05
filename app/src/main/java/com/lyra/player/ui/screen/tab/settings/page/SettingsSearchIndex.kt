@@ -101,6 +101,10 @@ internal fun AutoSettingInfo.isRemovedYouTubeSetting(): Boolean =
 private val RemovedLyraSettingKeys = setOf(
     "dynamic_color",
     "home_card_continue",
+    // 首页已改为固定 Melox 布局，旧首页栏目开关不再出现在设置搜索里。
+    "home_card_trending",
+    "home_card_radar",
+    "home_card_recommended",
     "always_use_new_tab_style",
     // 已从设置页移除的开关与滑块，仅保留数据键以兼容历史配置。
     "haptic_feedback_enabled",
@@ -326,10 +330,9 @@ private val BackgroundImageHiddenSearchTargets = setOf(
 private fun personalizationCardIndex(targetId: String): Int {
     return when (targetId) {
         in PersonalizationStartTargets -> 0
-        in PersonalizationHomeTargets -> 1
-        in PersonalizationPlaybackInfoTargets -> 2
-        in PersonalizationPlaybackControlTargets -> 3
-        in PersonalizationBackgroundTargets -> 4
+        in PersonalizationPlaybackInfoTargets -> 1
+        in PersonalizationPlaybackControlTargets -> 2
+        in PersonalizationBackgroundTargets -> 3
         else -> 0
     }
 }
@@ -337,12 +340,6 @@ private fun personalizationCardIndex(targetId: String): Int {
 private val PersonalizationStartTargets = setOf(
     "setting:default_start_destination",
     "setting:auto_show_keyboard"
-)
-
-private val PersonalizationHomeTargets = setOf(
-    "setting:home_card_trending",
-    "setting:home_card_radar",
-    "setting:home_card_recommended"
 )
 
 private val PersonalizationPlaybackInfoTargets = setOf(
@@ -703,35 +700,6 @@ private val SettingSearchAliases = mapOf(
     "mobile_data_bili_audio_quality" to listOf("cellular bili", "哔哩哔哩流量", "bzhan liuliang"),
     "default_start_destination" to listOf("start page", "home", "tab", "qidongye"),
     "auto_show_keyboard" to listOf("keyboard", "input", "shurufa", "jianpan"),
-    "home_card_trending" to listOf(
-        "trending",
-        "charts",
-        "hot",
-        "biao sheng",
-        "xin ge",
-        "new song",
-        "guess you like",
-        "猜你喜欢"
-    ),
-    "home_card_radar" to listOf(
-        "radar",
-        "discover",
-        "siren leidar",
-        "fm",
-        "leida gedan",
-        "private",
-        "daily discover",
-        "每日发现"
-    ),
-    "home_card_recommended" to listOf(
-        "recommend",
-        "tuijian",
-        "daily playlist",
-        "high quality",
-        "acg",
-        "more recommendations",
-        "更多推荐"
-    ),
     "nowplaying_song_title_marquee_enabled" to listOf(
         "marquee",
         "scrolling title",

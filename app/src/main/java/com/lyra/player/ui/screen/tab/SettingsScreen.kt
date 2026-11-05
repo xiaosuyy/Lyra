@@ -127,7 +127,6 @@ import com.lyra.player.data.auth.common.SavedCookieAuthState
 import com.lyra.player.data.auth.youtube.YouTubeAuthState
 import com.lyra.player.data.settings.AdvancedBlurQuality
 import com.lyra.player.data.settings.FloatingLyricsPreferences
-import com.lyra.player.data.settings.HomeSectionId
 import com.lyra.player.data.settings.LyricFontScaleTarget
 import com.lyra.player.data.settings.LyricFontScales
 import com.lyra.player.data.settings.PlaybackControlLayoutPreferences
@@ -171,7 +170,6 @@ import com.lyra.player.ui.screen.tab.settings.component.PlaybackServiceIdleShutd
 import com.lyra.player.ui.screen.tab.settings.component.NotificationPermissionSetting
 import com.lyra.player.ui.screen.tab.settings.component.SettingsBackupRestoreSection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsDownloadSection
-import com.lyra.player.ui.screen.tab.settings.component.SettingsHomeLayoutSection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsLyricsSection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsMotionSection
 import com.lyra.player.ui.screen.tab.settings.component.SettingsPlaybackSection
@@ -965,36 +963,6 @@ fun SettingsScreen(
             showHomeRadarCard ||
             showHomeRecommendedCard ||
             homeHasRecentUsage
-    val homeTrendingLabelRes = if (internationalEnabled) {
-        R.string.home_ytmusic_guess_you_like
-    } else {
-        R.string.settings_home_card_netease_trending
-    }
-    val homeRadarLabelRes = if (internationalEnabled) {
-        R.string.home_ytmusic_daily_discover
-    } else {
-        R.string.settings_home_card_netease_radar
-    }
-    val homeRecommendedLabelRes = if (internationalEnabled) {
-        R.string.home_ytmusic_more_recommendations
-    } else {
-        R.string.settings_home_card_netease_recommended
-    }
-    val homeTrendingSupportingRes = if (internationalEnabled) {
-        R.string.settings_home_card_ytmusic_guess_you_like_desc
-    } else {
-        R.string.settings_home_card_netease_trending_desc
-    }
-    val homeRadarSupportingRes = if (internationalEnabled) {
-        R.string.settings_home_card_ytmusic_daily_discover_desc
-    } else {
-        R.string.settings_home_card_netease_radar_desc
-    }
-    val homeRecommendedSupportingRes = if (internationalEnabled) {
-        R.string.settings_home_card_ytmusic_more_recommendations_desc
-    } else {
-        R.string.settings_home_card_netease_recommended_desc
-    }
     val effectiveDefaultStartDestination = remember(defaultStartDestination, homeStartAvailable) {
         if (!homeStartAvailable && defaultStartDestination == "home") {
             "explore"
@@ -1388,27 +1356,13 @@ fun SettingsScreen(
                 }
 
                 SettingsPage.Personalization -> {
-                    for (cardIndex in 0..4) {
+                    for (cardIndex in 0..3) {
                         item(key = "${selectedPage.name}:card:$cardIndex") {
                             SettingsPersonalizationPageContent(
                                 autoSettingsRepository = autoSettingsRepository,
                                 scope = scope,
                                 defaultStartDestinationLabel = defaultStartDestinationLabel,
                                 onOpenDefaultStartDestination = { showDefaultStartDestinationDialog = true },
-                                internationalEnabled = internationalEnabled,
-                                homeTrendingLabelRes = homeTrendingLabelRes,
-                                homeRadarLabelRes = homeRadarLabelRes,
-                                homeRecommendedLabelRes = homeRecommendedLabelRes,
-                                homeTrendingSupportingRes = homeTrendingSupportingRes,
-                                homeRadarSupportingRes = homeRadarSupportingRes,
-                                homeRecommendedSupportingRes = homeRecommendedSupportingRes,
-                                homeStartAvailable = homeStartAvailable,
-                                showHomeTrendingCard = showHomeTrendingCard,
-                                onShowHomeTrendingCardChange = onShowHomeTrendingCardChange,
-                                showHomeRadarCard = showHomeRadarCard,
-                                onShowHomeRadarCardChange = onShowHomeRadarCardChange,
-                                showHomeRecommendedCard = showHomeRecommendedCard,
-                                onShowHomeRecommendedCardChange = onShowHomeRecommendedCardChange,
                                 backgroundImageUri = backgroundImageUri,
                                 onPickBackgroundImage = {
                                     photoPickerLauncher.launch(
@@ -2372,20 +2326,6 @@ private fun SettingsPersonalizationPageContent(
     scope: kotlinx.coroutines.CoroutineScope,
     defaultStartDestinationLabel: String,
     onOpenDefaultStartDestination: () -> Unit,
-    internationalEnabled: Boolean,
-    homeTrendingLabelRes: Int,
-    homeRadarLabelRes: Int,
-    homeRecommendedLabelRes: Int,
-    homeTrendingSupportingRes: Int?,
-    homeRadarSupportingRes: Int?,
-    homeRecommendedSupportingRes: Int?,
-    homeStartAvailable: Boolean,
-    showHomeTrendingCard: Boolean,
-    onShowHomeTrendingCardChange: (Boolean) -> Unit,
-    showHomeRadarCard: Boolean,
-    onShowHomeRadarCardChange: (Boolean) -> Unit,
-    showHomeRecommendedCard: Boolean,
-    onShowHomeRecommendedCardChange: (Boolean) -> Unit,
     backgroundImageUri: String?,
     onPickBackgroundImage: () -> Unit,
     onClearBackgroundImage: () -> Unit,
@@ -2465,65 +2405,6 @@ private fun SettingsPersonalizationPageContent(
 
         if (shouldShowCard(1)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
-                title = stringResource(R.string.settings_personalization_home_section),
-                description = stringResource(R.string.settings_personalization_home_section_desc)
-            )
-            SettingsHomeCardSwitch(
-                title = stringResource(homeTrendingLabelRes),
-                description = homeTrendingSupportingRes?.let { stringResource(it) },
-                icon = Icons.Outlined.Bolt,
-                checked = showHomeTrendingCard,
-                onCheckedChange = onShowHomeTrendingCardChange,
-                targetId = "setting:home_card_trending",
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-
-            SettingsHomeCardSwitch(
-                title = stringResource(homeRadarLabelRes),
-                description = homeRadarSupportingRes?.let { stringResource(it) },
-                icon = if (internationalEnabled) Icons.Outlined.Explore else Icons.Outlined.Radar,
-                checked = showHomeRadarCard,
-                onCheckedChange = onShowHomeRadarCardChange,
-                targetId = "setting:home_card_radar",
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-
-            SettingsHomeCardSwitch(
-                title = stringResource(homeRecommendedLabelRes),
-                description = homeRecommendedSupportingRes?.let { stringResource(it) },
-                icon = Icons.Outlined.Star,
-                checked = showHomeRecommendedCard,
-                onCheckedChange = onShowHomeRecommendedCardChange,
-                targetId = "setting:home_card_recommended",
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-
-            LazyAnimatedVisibility(visible = !homeStartAvailable) {
-                Text(
-                    text = stringResource(R.string.settings_home_hidden_notice),
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            SettingsHomeLayoutSection(
-                enabledSections = buildSet {
-                    add(HomeSectionId.CONTINUE)
-                    if (showHomeTrendingCard) add(HomeSectionId.TRENDING)
-                    if (showHomeRadarCard) add(HomeSectionId.RADAR)
-                    if (showHomeRecommendedCard) add(HomeSectionId.RECOMMENDED)
-                }
-            )
-        }
-
-        if (shouldShowCard(2)) PersonalizationDetailCard {
-            MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_playback_info_section),
                 description = stringResource(R.string.settings_personalization_playback_info_section_desc)
             )
@@ -2563,7 +2444,7 @@ private fun SettingsPersonalizationPageContent(
             )
         }
 
-        if (shouldShowCard(3)) PersonalizationDetailCard {
+        if (shouldShowCard(2)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_playback_controls_section),
                 description = stringResource(R.string.settings_personalization_playback_controls_section_desc)
@@ -2591,7 +2472,7 @@ private fun SettingsPersonalizationPageContent(
             )
         }
 
-        if (shouldShowCard(4)) PersonalizationDetailCard {
+        if (shouldShowCard(3)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_background_section),
                 description = stringResource(R.string.settings_personalization_background_section_desc)
@@ -2952,64 +2833,6 @@ private fun LyricFontScaleSettingsItem(
         highlightTargetId = highlightTargetId,
         highlightPulse = highlightPulse,
         onHighlightFinished = onHighlightFinished
-    )
-}
-
-@Composable
-private fun SettingsHomeCardSwitch(
-    title: String,
-    icon: ImageVector,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    description: String? = null,
-    enabled: Boolean = true,
-    targetId: String,
-    highlightTargetId: String?,
-    highlightPulse: Int,
-    onHighlightFinished: (() -> Unit)?
-) {
-    ListItem(
-        modifier = Modifier
-            .settingsHighlightTarget(
-                targetId = targetId,
-                highlightTargetId = highlightTargetId,
-                highlightPulse = highlightPulse,
-                onHighlightFinished = onHighlightFinished
-            )
-            .then(
-                if (enabled) {
-                    Modifier.settingsItemClickable {
-                        onCheckedChange(!checked)
-                    }
-                } else {
-                    Modifier.alpha(0.5f)
-                }
-            ),
-        leadingContent = {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-        },
-        headlineContent = { Text(title) },
-        supportingContent = description?.let { text ->
-            {
-                Text(
-                    text = text,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        trailingContent = {
-            MiuixSettingsSwitch(
-                checked = checked,
-                enabled = enabled,
-                onCheckedChange = onCheckedChange
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }
 

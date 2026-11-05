@@ -1,6 +1,10 @@
 package com.lyra.player.ui.screen.tab.settings.auth
 
+import android.app.Activity
+import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.lyra.player.R
+import com.lyra.player.activity.auth.NeteaseWebLoginActivity
 import com.lyra.player.ui.viewmodel.auth.NeteaseAccountProfile
 import com.lyra.player.ui.viewmodel.auth.NeteaseLoginUiState
 import com.lyra.player.ui.viewmodel.auth.NeteaseLoginViewModel
@@ -119,6 +125,17 @@ internal fun NeteaseLoginScreen(
     onBack: () -> Unit
 ) {
     val uiState by vm.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val webLoginLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val cookieJson = result.data
+                ?.getStringExtra(NeteaseWebLoginActivity.RESULT_COOKIE)
+                .orEmpty()
+            vm.loginWithCookies(cookieJson)
+        }
+    }
 
     BackHandler(onBack = onBack)
     LaunchedEffect(uiState.loginCompleted) {
@@ -212,7 +229,12 @@ internal fun NeteaseLoginScreen(
                     onPhoneChange = vm::onPhoneChange,
                     onCaptchaChange = vm::onCaptchaChange,
                     onSendCaptcha = vm::sendCaptcha,
-                    onLogin = vm::login
+                    onLogin = vm::login,
+                    onWebLogin = {
+                        webLoginLauncher.launch(
+                            Intent(context, NeteaseWebLoginActivity::class.java)
+                        )
+                    }
                 )
             }
         }
@@ -227,7 +249,8 @@ private fun NeteaseLoginForm(
     onPhoneChange: (String) -> Unit,
     onCaptchaChange: (String) -> Unit,
     onSendCaptcha: () -> Unit,
-    onLogin: () -> Unit
+    onLogin: () -> Unit,
+    onWebLogin: () -> Unit
 ) {
     val foreground = MaterialTheme.colorScheme.onBackground
     OutlinedTextField(
@@ -333,6 +356,31 @@ private fun NeteaseLoginForm(
             fontWeight = FontWeight.SemiBold
         )
     }
+
+    Spacer(Modifier.height(12.dp))
+    OutlinedButton(
+        onClick = onWebLogin,
+        enabled = !uiState.loggingIn && !uiState.sending,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.netease_login_web_login),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = stringResource(R.string.netease_login_web_hint),
+        modifier = Modifier.fillMaxWidth(),
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+        textAlign = TextAlign.Center
+    )
 }
 
 @Composable

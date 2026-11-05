@@ -77,24 +77,16 @@ class SettingsPageTest {
     }
 
     @Test
-    fun homeCardSettingsUseConcreteTitlesForSearch() {
-        fun titleRes(keyName: String): Int {
-            return AutoSettingsMetadata.settings.first { it.keyName == keyName }.titleRes
-        }
+    fun removedHomeCardSettingsAreNoLongerSearchable() {
+        val entries = buildSettingsSearchEntries(settingsStringContext())
 
-        assertEquals(R.string.player_continue, titleRes("home_card_continue"))
-        assertEquals(
-            R.string.settings_home_card_netease_trending,
-            titleRes("home_card_trending")
-        )
-        assertEquals(
-            R.string.settings_home_card_netease_radar,
-            titleRes("home_card_radar")
-        )
-        assertEquals(
-            R.string.settings_home_card_netease_recommended,
-            titleRes("home_card_recommended")
-        )
+        listOf("guess you like", "猜你喜欢", "每日发现", "更多推荐").forEach { query ->
+            assertTrue(
+                searchSettingsEntries(entries, query).none {
+                    it.targetId.startsWith("setting:home_card_")
+                }
+            )
+        }
     }
 
     @Test
@@ -191,32 +183,25 @@ class SettingsPageTest {
             2,
             settingsSearchScrollAnchor(
                 page = SettingsPage.Personalization,
-                targetId = "setting:home_card_radar"
-            ).itemIndex
-        )
-        assertEquals(
-            3,
-            settingsSearchScrollAnchor(
-                page = SettingsPage.Personalization,
                 targetId = "setting:nowplaying_progress_show_audio_spec"
             ).itemIndex
         )
         assertEquals(
-            3,
+            2,
             settingsSearchScrollAnchor(
                 page = SettingsPage.Personalization,
                 targetId = "setting:nowplaying_song_title_marquee_enabled"
             ).itemIndex
         )
         assertEquals(
-            4,
+            3,
             settingsSearchScrollAnchor(
                 page = SettingsPage.Personalization,
                 targetId = "setting:lyrics_control_size"
             ).itemIndex
         )
         assertEquals(
-            5,
+            4,
             settingsSearchScrollAnchor(
                 page = SettingsPage.Personalization,
                 targetId = "setting:background_image_uri"
@@ -439,20 +424,14 @@ class SettingsPageTest {
     }
 
     @Test
-    fun internationalHomeCardTitlesAreSearchable() {
+    fun internationalHomeCardTitlesAreHiddenFromSearch() {
         val entries = buildSettingsSearchEntries(settingsStringContext())
-        val expectedTargets = listOf(
-            "guess you like" to "setting:home_card_trending",
-            "猜你喜欢" to "setting:home_card_trending",
-            "daily discover" to "setting:home_card_radar",
-            "每日发现" to "setting:home_card_radar",
-            "more recommendations" to "setting:home_card_recommended",
-            "更多推荐" to "setting:home_card_recommended"
-        )
 
-        expectedTargets.forEach { (query, targetId) ->
+        listOf("guess you like", "daily discover", "more recommendations").forEach { query ->
             assertTrue(
-                searchSettingsEntries(entries, query).any { it.targetId == targetId }
+                searchSettingsEntries(entries, query).none {
+                    it.targetId.startsWith("setting:home_card_")
+                }
             )
         }
     }

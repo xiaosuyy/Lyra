@@ -50,6 +50,8 @@
     <string name="netease_login_logout">退出网易云账号</string>
     <string name="netease_login_failed">登录失败：%s</string>
     <string name="netease_login_code_send_failed">验证码发送失败：%s</string>
+    <string name="netease_login_web_login">使用网页登录</string>
+    <string name="netease_login_web_hint">如果短信接口提示需要完成验证（-462），或一直收不到验证码，请改用网页登录。</string>
     <string name="settings_youtube_auth_verifying">正在校验登录状态，请稍候…</string>
     <string name="settings_youtube_status_valid">已保存，最近更新于 %1$s</string>
     <string name="settings_youtube_status_saved_invalid">检测到已保存的 YouTube 鉴权信息，但当前可能无效，点击可刷新或退出登录</string>

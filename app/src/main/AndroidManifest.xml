@@ -96,6 +96,12 @@
             </intent-filter>
         </receiver>
         <activity
+            android:name=".activity.auth.NeteaseWebLoginActivity"
+            android:exported="false"
+            android:process=":netease_login"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            />
+        <activity
             android:name=".activity.auth.BiliWebLoginActivity"
             android:exported="false"
             android:process=":bili_web_login"
