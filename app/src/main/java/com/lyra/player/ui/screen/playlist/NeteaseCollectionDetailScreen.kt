@@ -328,18 +328,24 @@ fun NeteaseSongCollectionDetailScreen(
             tracks = songs
         )
     }
-    DetailScreen(
-        ui = ui,
-        playlistId = collectionKey,
-        playlistSource = "neteaseAdhoc",
-        initialCoverUrl = resolvedCoverUrl,
-        onRetry = {},
-        onBack = onBack,
-        onSongClick = onSongClick,
-        offlineMode = offlineMode,
-        heroSubtitleOverride = subtitle,
-        enableFavorite = false
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        DetailScreen(
+            ui = ui,
+            playlistId = collectionKey,
+            playlistSource = "neteaseAdhoc",
+            initialCoverUrl = resolvedCoverUrl,
+            onRetry = {},
+            onBack = onBack,
+            onSongClick = onSongClick,
+            offlineMode = offlineMode,
+            heroSubtitleOverride = subtitle,
+            enableFavorite = false
+        )
+    }
 }
 
 @Composable
