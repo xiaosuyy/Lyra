@@ -1179,6 +1179,12 @@ fun SettingsScreen(
         )
     }
     val settingsHomeContent: LazyListScope.() -> Unit = {
+        item(key = "settings_search_field") {
+            SettingsSearchField(
+                query = settingsSearchQuery,
+                onQueryChange = { settingsSearchQuery = it }
+            )
+        }
         item(key = "settings_netease_account") {
             NeteaseAccountEntryCard(
                 uiState = neteaseLoginUiState,
@@ -1187,12 +1193,6 @@ fun SettingsScreen(
                     showNeteaseLogin = true
                 },
                 modifier = Modifier.animateItem()
-            )
-        }
-        item(key = "settings_search_field") {
-            SettingsSearchField(
-                query = settingsSearchQuery,
-                onQueryChange = { settingsSearchQuery = it }
             )
         }
         if (settingsSearchQuery.isNotBlank()) {
