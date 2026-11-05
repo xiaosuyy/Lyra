@@ -295,6 +295,74 @@ fun NeteaseAlbumDetailScreen(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
+fun NeteaseSongCollectionDetailScreen(
+    title: String,
+    subtitle: String,
+    songs: List<SongItem>,
+    coverUrl: String? = null,
+    onBack: () -> Unit = {},
+    onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
+    offlineMode: Boolean = false
+) {
+    val resolvedCoverUrl = coverUrl?.takeIf { it.isNotBlank() }
+        ?: songs.firstNotNullOfOrNull { song ->
+            song.customCoverUrl?.takeIf { it.isNotBlank() }
+                ?: song.coverUrl?.takeIf { it.isNotBlank() }
+                ?: song.originalCoverUrl?.takeIf { it.isNotBlank() }
+        }.orEmpty()
+    val collectionKey = remember(title, songs.size) {
+        -1_000_000L - (title.hashCode().toLong() and 0x7FFFFFFFL)
+    }
+    val ui = remember(title, subtitle, songs, resolvedCoverUrl) {
+        NeteaseCollectionDetailUiState(
+            loading = false,
+            header = NeteaseCollectionHeader(
+                id = collectionKey,
+                // 临时集合没有播放量，复用专辑样式隐藏播放量元数据
+                isAlbum = true,
+                name = title,
+                coverUrl = resolvedCoverUrl,
+                playCount = 0L,
+                trackCount = songs.size
+            ),
+            tracks = songs
+        )
+    }
+    DetailScreen(
+        ui = ui,
+        playlistId = collectionKey,
+        playlistSource = "neteaseAdhoc",
+        initialCoverUrl = resolvedCoverUrl,
+        onRetry = {},
+        onBack = onBack,
+        onSongClick = onSongClick,
+        offlineMode = offlineMode,
+        heroSubtitleOverride = subtitle,
+        enableFavorite = false
+    )
+}
+
+@Composable
+private fun PlaylistTopBarCircleButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    HapticIconButton(onClick = onClick, modifier = modifier.size(40.dp)) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            content()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
 @Suppress("AssignedValueIsNeverRead")
 fun DetailScreen(
     ui: NeteaseCollectionDetailUiState,
@@ -304,7 +372,9 @@ fun DetailScreen(
     onRetry: () -> Unit,
     onBack: () -> Unit = {},
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
-    offlineMode: Boolean = false
+    offlineMode: Boolean = false,
+    heroSubtitleOverride: String? = null,
+    enableFavorite: Boolean = true
 ) {
 
     val context = LocalContext.current
@@ -544,82 +614,71 @@ fun DetailScreen(
                         TopAppBar(
                             title = {},
                             navigationIcon = {
-                                HapticIconButton(
-                                    onClick = onBack,
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.22f))
-                                ) {
+                                PlaylistTopBarCircleButton(onClick = onBack) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = stringResource(R.string.cd_back),
-                                        modifier = Modifier.size(21.dp)
+                                        tint = playlistTopBarContentColor,
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
                             },
                             actions = {
-                                HapticIconButton(onClick = {
+                                PlaylistTopBarCircleButton(onClick = {
                                     showSearch = !showSearch
                                     if (!showSearch) {
                                         searchQuery = ""
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
                                     }
-                                },
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.16f))
-                                ) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search_songs), modifier = Modifier.size(18.dp)) }
-
-                                Spacer(Modifier.width(8.dp))
-
-                                // 收藏按钮
-                                HapticIconButton(onClick = {
-                                    scope.launch {
-                                        if (isFavorite) {
-                                            favoriteRepo.removeFavorite(playlistId, playlistSource)
-                                        } else {
-                                            ui.header?.let { header ->
-                                                favoriteRepo.addFavorite(
-                                                    id = playlistId,
-                                                    name = header.name,
-                                                    coverUrl = header.coverUrl,
-                                                    trackCount = header.trackCount,
-                                                    source = playlistSource,
-                                                    songs = ui.tracks
-                                                )
-                                            }
-                                        }
-                                    }
-                                },
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.16f))
-                                ) {
+                                }) {
                                     Icon(
-                                        imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
-                                        contentDescription = if (isFavorite) stringResource(R.string.action_unfavorite) else stringResource(R.string.action_favorite_playlist),
+                                        Icons.Filled.Search,
+                                        contentDescription = stringResource(R.string.cd_search_songs),
                                         tint = playlistTopBarContentColor,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(17.dp)
                                     )
                                 }
 
+                                Spacer(Modifier.width(10.dp))
+
+                                // 收藏按钮
+                                if (enableFavorite) {
+                                    PlaylistTopBarCircleButton(onClick = {
+                                        scope.launch {
+                                            if (isFavorite) {
+                                                favoriteRepo.removeFavorite(playlistId, playlistSource)
+                                            } else {
+                                                ui.header?.let { header ->
+                                                    favoriteRepo.addFavorite(
+                                                        id = playlistId,
+                                                        name = header.name,
+                                                        coverUrl = header.coverUrl,
+                                                        trackCount = header.trackCount,
+                                                        source = playlistSource,
+                                                        songs = ui.tracks
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                                            contentDescription = if (isFavorite) stringResource(R.string.action_unfavorite) else stringResource(R.string.action_favorite_playlist),
+                                            tint = playlistTopBarContentColor,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
+                                }
+
                                 if (hasDownloadManagerEntry) {
-                                    Spacer(Modifier.width(8.dp))
-                                    HapticIconButton(onClick = { showDownloadManager = true },
-                                        modifier = Modifier
-                                            .size(34.dp)
-                                            .clip(CircleShape)
-                                            .background(Color.Black.copy(alpha = 0.16f))
-                                    ) {
+                                    Spacer(Modifier.width(10.dp))
+                                    PlaylistTopBarCircleButton(onClick = { showDownloadManager = true }) {
                                         Icon(
                                             Icons.Outlined.Download,
                                             contentDescription = stringResource(R.string.cd_download_manager),
                                             tint = playlistTopBarContentColor,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(17.dp)
                                         )
                                     }
                                 }
@@ -729,7 +788,7 @@ fun DetailScreen(
                     val trackCount = ui.header?.trackCount ?: ui.tracks.size
                     val heroTitle = ui.header?.name ?: stringResource(R.string.playlist_title)
                     val creatorLabel = stringResource(R.string.platform_netease)
-                    val heroSubtitle = stringResource(
+                    val heroSubtitle = heroSubtitleOverride ?: stringResource(
                         R.string.playlist_creator_track_format,
                         creatorLabel,
                         trackCount

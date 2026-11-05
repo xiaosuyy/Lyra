@@ -25,6 +25,7 @@ package com.lyra.player.ui.screen.tab
 
 import android.app.Application
 import android.content.ClipData
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,7 +42,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -85,12 +85,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -166,6 +164,7 @@ import com.lyra.player.ui.theme.designsystem.LyraSongRow
 import com.lyra.player.data.platform.youtube.stableYouTubeMusicId
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.data.model.SongItem
+import com.lyra.player.ui.screen.playlist.NeteaseSongCollectionDetailScreen
 import com.lyra.player.ui.viewmodel.tab.HomeNeteasePlaylistSectionState
 import com.lyra.player.ui.viewmodel.tab.HomeNeteaseSongSectionState
 import com.lyra.player.ui.viewmodel.tab.HomeSectionState
@@ -417,7 +416,7 @@ fun HomeScreen(
     var homeRefreshGeneration by remember { mutableStateOf(0) }
     var isRefreshing by remember { mutableStateOf(false) }
     val isMeloxNeteaseHome = !isInternational && !offlineMode
-    var quickActionSheet by remember { mutableStateOf<Pair<String, List<SongItem>>?>(null) }
+    var quickActionDetail by remember { mutableStateOf<MeloxHomeQuickAction?>(null) }
     val dailyRecommendSongs = ui.radarSongSections
         .firstOrNull { it.source == NeteaseHomeSongSource.DAILY_RECOMMEND }
         ?.section?.items.orEmpty()
@@ -910,7 +909,7 @@ fun HomeScreen(
                                 when {
                                     action.playlist != null -> onItemClick(action.playlist)
                                     action.songs.isNotEmpty() -> {
-                                        quickActionSheet = action.title to action.songs
+                                        quickActionDetail = action
                                     }
                                     else -> {
                                         showHomeSnackbar(
@@ -1087,46 +1086,21 @@ fun HomeScreen(
             }
         }
 
-        quickActionSheet?.let { (title, songs) ->
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            ModalBottomSheet(
-                onDismissRequest = { quickActionSheet = null },
-                sheetState = sheetState
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = LocalMiniPlayerHeight.current)
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-                    )
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 520.dp),
-                        contentPadding = PaddingValues(bottom = 12.dp)
-                    ) {
-                        itemsIndexed(
-                            items = songs,
-                            key = { _, song -> song.stableKey() }
-                        ) { index, song ->
-                            LyraSongRow(
-                                song = song,
-                                isCurrent = currentSong?.sameIdentityAs(song) == true,
-                                onClick = {
-                                    onSongClick(songs, index)
-                                    quickActionSheet = null
-                                },
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
-                    }
-                }
-            }
+        quickActionDetail?.let { action ->
+            BackHandler { quickActionDetail = null }
+            NeteaseSongCollectionDetailScreen(
+                title = action.title,
+                subtitle = stringResource(
+                    R.string.playlist_creator_track_format,
+                    action.title,
+                    action.songs.size
+                ),
+                songs = action.songs,
+                coverUrl = action.songs.firstOrNull()?.coverUrl,
+                onBack = { quickActionDetail = null },
+                onSongClick = onSongClick,
+                offlineMode = offlineMode
+            )
         }
 
         LyraOverlaySnackbarHost(
