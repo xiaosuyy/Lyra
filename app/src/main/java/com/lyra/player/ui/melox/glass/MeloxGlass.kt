@@ -26,6 +26,9 @@ import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
+import com.lyra.player.data.settings.MAX_ENHANCED_ADVANCED_BLUR_RADIUS_DP
+import com.lyra.player.data.settings.MIN_ENHANCED_ADVANCED_BLUR_RADIUS_DP
+import com.lyra.player.ui.effect.glass.LocalAdvancedGlassController
 import com.lyra.player.ui.melox.theme.isMeloxDarkTheme
 
 val LocalMeloxBackdrop = staticCompositionLocalOf<Backdrop?> { null }
@@ -67,19 +70,45 @@ fun Modifier.meloxGlassSurface(
     val backdrop = meloxGlassBackdrop()
     val alphaScale = if (enabled) 1f else 0.48f
     val dark = isMeloxDarkTheme()
+    val controller = LocalAdvancedGlassController.current
+    val adjustableBlurRadiusDp = if (controller.isBaseBlurEnabled) {
+        controller.normalizedBlurAmountDp
+    } else {
+        null
+    }
+    val effectiveSpec = if (adjustableBlurRadiusDp != null) {
+        spec.copy(blurRadius = adjustableBlurRadiusDp.dp)
+    } else {
+        // “高级模糊效果”关闭时不再对底栏采样做模糊，保留轻微玻璃质感即可。
+        spec.copy(blurRadius = 0.dp)
+    }
+    val effectiveSurfaceColor = if (
+        adjustableBlurRadiusDp != null &&
+        surfaceColor != Color.Unspecified
+    ) {
+        val progress = (
+            (adjustableBlurRadiusDp - MIN_ENHANCED_ADVANCED_BLUR_RADIUS_DP) /
+                (MAX_ENHANCED_ADVANCED_BLUR_RADIUS_DP - MIN_ENHANCED_ADVANCED_BLUR_RADIUS_DP)
+            ).coerceIn(0f, 1f)
+        // 模糊度越低，表面越清透，越容易看到底栏后的内容。
+        surfaceColor.copy(alpha = surfaceColor.alpha * (0.25f + 0.75f * progress))
+    } else {
+        surfaceColor
+    }
     val p = if (pressProgress.isNaN() || pressProgress.isInfinite()) {
         0f
     } else {
         pressProgress.coerceIn(0f, 1f)
     }
-    val isPlain = surfaceColor == Color.Transparent && tint == Color.Unspecified
+    val isPlain = effectiveSurfaceColor == Color.Transparent && tint == Color.Unspecified
     if (isPlain) return this
 
     if (backdrop == null) {
         val fallbackAlpha = if (dark) 0.84f else 0.88f
         val tintAlphaFloor = if (dark) 0.18f else 0.22f
         val stableSurface = when {
-            surfaceColor != Color.Unspecified -> surfaceColor.copy(alpha = surfaceColor.alpha * alphaScale)
+            effectiveSurfaceColor != Color.Unspecified ->
+                effectiveSurfaceColor.copy(alpha = effectiveSurfaceColor.alpha * alphaScale)
             tint == Color.Unspecified -> MaterialTheme.colorScheme.surface.copy(alpha = fallbackAlpha * alphaScale)
             else -> tint.copy(alpha = maxOf(tint.alpha, tintAlphaFloor) * alphaScale)
         }
@@ -91,11 +120,11 @@ fun Modifier.meloxGlassSurface(
         shape = { shape },
         effects = {
             vibrancy()
-            blur(spec.blurRadius.toPx())
-            if (spec.useLens) {
+            blur(effectiveSpec.blurRadius.toPx())
+            if (effectiveSpec.useLens) {
                 lens(
-                    spec.lensRadius.toPx(),
-                    spec.refractionHeight.toPx(),
+                    effectiveSpec.lensRadius.toPx(),
+                    effectiveSpec.refractionHeight.toPx(),
                     depthEffect = p > 0.01f,
                     chromaticAberration = false,
                 )
@@ -132,8 +161,8 @@ fun Modifier.meloxGlassSurface(
                 drawRect(tint.copy(alpha = tint.alpha * alphaScale), blendMode = BlendMode.Hue)
                 drawRect(tint.copy(alpha = tint.alpha * 0.75f * alphaScale))
             }
-            if (surfaceColor != Color.Unspecified) {
-                drawRect(surfaceColor.copy(alpha = surfaceColor.alpha * alphaScale))
+            if (effectiveSurfaceColor != Color.Unspecified) {
+                drawRect(effectiveSurfaceColor.copy(alpha = effectiveSurfaceColor.alpha * alphaScale))
             }
         },
     )
