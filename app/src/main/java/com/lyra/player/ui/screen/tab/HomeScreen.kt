@@ -1180,7 +1180,7 @@ private fun MeloxQuickActionRow(
         items(actions, key = { it.key }) { action ->
             Column(
                 modifier = Modifier
-                    .width(300.dp)
+                    .width(310.dp)
                     .clickable { onAction(action) }
             ) {
                 Text(
