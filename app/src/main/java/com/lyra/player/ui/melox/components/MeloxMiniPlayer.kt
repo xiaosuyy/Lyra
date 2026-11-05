@@ -54,7 +54,7 @@ fun MeloxMiniPlayer(
     compactProgress: Float = 0f,
 ) {
     val compact = compactProgress.coerceIn(0f, 1f)
-    val barShape = RoundedCornerShape(lerp(16.dp, 22.dp, compact))
+    val barShape = RoundedCornerShape(lerp(24.dp, 22.dp, compact))
     Row(
         modifier = modifier
             .fillMaxWidth()

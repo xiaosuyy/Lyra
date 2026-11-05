@@ -423,4 +423,4 @@ internal val MeloxDockTint: Color = Color.White.copy(alpha = 0.12f)
 
 /** Kept for callers that animate a rounded-rect into the dock capsule. */
 internal fun meloxMiniPlayerShape(compactProgress: Float): Shape =
-    RoundedCornerShape(lerp(16.dp, 22.dp, compactProgress.coerceIn(0f, 1f)))
+    RoundedCornerShape(lerp(24.dp, 22.dp, compactProgress.coerceIn(0f, 1f)))
