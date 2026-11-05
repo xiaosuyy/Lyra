@@ -253,6 +253,16 @@ class AdvancedGlassControllerTest {
             isDarkTheme = false,
             enhancedBlurRadiusDp = 52f
         )
+        val lowBlurBottom = advancedGlassTokens(
+            role = AdvancedGlassRole.BottomNavigation,
+            isDarkTheme = false,
+            enhancedBlurRadiusDp = 12f
+        )
+        val highBlurBottom = advancedGlassTokens(
+            role = AdvancedGlassRole.BottomNavigation,
+            isDarkTheme = false,
+            enhancedBlurRadiusDp = 64f
+        )
 
         assertEquals(28f, bottom.blurRadiusDp)
         assertEquals(0.75f, bottom.tintAlpha)
@@ -263,6 +273,9 @@ class AdvancedGlassControllerTest {
         assertEquals(0.18f, playlistSheet.tintAlpha)
         assertEquals(0.08f, playlistSheet.edgeAlpha)
         assertEquals(52f, adjustable.blurRadiusDp)
+        assertTrue(lowBlurBottom.tintAlpha < highBlurBottom.tintAlpha)
+        assertTrue(lowBlurBottom.tintAlpha < 0.25f)
+        assertEquals(0.75f, highBlurBottom.tintAlpha)
         assertTrue(bottom.samplesBackdrop)
         assertTrue(playlistSheet.samplesBackdrop)
     }
