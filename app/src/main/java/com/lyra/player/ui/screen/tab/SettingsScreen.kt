@@ -110,6 +110,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
@@ -160,6 +162,8 @@ import com.lyra.player.ui.effect.glass.LocalAdvancedGlassController
 import com.lyra.player.ui.effect.glass.isolatedAdvancedGlassHorizontalTransition
 import com.lyra.player.ui.screen.tab.settings.about.SettingsAboutContent
 import com.lyra.player.ui.screen.tab.settings.auth.LoginSuccessDialog
+import com.lyra.player.ui.screen.tab.settings.auth.NeteaseAccountEntryCard
+import com.lyra.player.ui.screen.tab.settings.auth.NeteaseLoginScreen
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsBiliAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsYouTubeAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.component.LazyAnimatedVisibility
@@ -213,6 +217,7 @@ import com.lyra.player.ui.viewmodel.BackupRestoreViewModel
 import com.lyra.player.ui.viewmodel.ConfigTransferViewModel
 import com.lyra.player.ui.viewmodel.auth.BiliAuthEvent
 import com.lyra.player.ui.viewmodel.auth.BiliAuthViewModel
+import com.lyra.player.ui.viewmodel.auth.NeteaseLoginViewModel
 import com.lyra.player.ui.viewmodel.auth.YouTubeAuthEvent
 import com.lyra.player.ui.viewmodel.auth.YouTubeAuthViewModel
 import kotlin.math.absoluteValue
@@ -650,6 +655,9 @@ fun SettingsScreen(
     var biliSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
     val youtubeVm: YouTubeAuthViewModel = viewModel()
     var youtubeSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
+    val neteaseLoginVm: NeteaseLoginViewModel = viewModel()
+    val neteaseLoginUiState by neteaseLoginVm.uiState.collectAsStateWithLifecycleCompat()
+    var showNeteaseLogin by rememberSaveable { mutableStateOf(false) }
     
     // 备份与恢复
     val backupRestoreVm: BackupRestoreViewModel = viewModel()
@@ -1171,6 +1179,16 @@ fun SettingsScreen(
         )
     }
     val settingsHomeContent: LazyListScope.() -> Unit = {
+        item(key = "settings_netease_account") {
+            NeteaseAccountEntryCard(
+                uiState = neteaseLoginUiState,
+                onClick = {
+                    neteaseLoginVm.clearError()
+                    showNeteaseLogin = true
+                },
+                modifier = Modifier.animateItem()
+            )
+        }
         item(key = "settings_search_field") {
             SettingsSearchField(
                 query = settingsSearchQuery,
@@ -1881,12 +1899,28 @@ fun SettingsScreen(
         }
     }
 
-    SettingsPageHost(
-        activePage = activeSettingsPage,
-        splitLayout = isSettingsSplitLayout,
-        isolateAdvancedGlassTransitions = isolateAdvancedGlassTransitions,
-        content = settingsPageContent
-    )
+    Box(Modifier.fillMaxSize()) {
+        SettingsPageHost(
+            activePage = activeSettingsPage,
+            splitLayout = isSettingsSplitLayout,
+            isolateAdvancedGlassTransitions = isolateAdvancedGlassTransitions,
+            content = settingsPageContent
+        )
+    }
+    if (showNeteaseLogin) {
+        Dialog(
+            onDismissRequest = { showNeteaseLogin = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            NeteaseLoginScreen(
+                vm = neteaseLoginVm,
+                onBack = { showNeteaseLogin = false }
+            )
+        }
+    }
 
     SettingsBiliAuthDialogs(
         showSheet = showBiliSheet,
