@@ -1,3 +1,4 @@
+# Lyra 手动发布：构建签名 APK 并创建 GitHub Release
 name: Lyra Manual Release
 
 on:
