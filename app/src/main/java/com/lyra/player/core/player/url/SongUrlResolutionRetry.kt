@@ -8,6 +8,7 @@ private const val SONG_URL_RESOLUTION_RETRY_DELAY_MS = 250L
 
 internal suspend fun retrySongUrlResolution(
     retryCount: Int = SONG_URL_RESOLUTION_RETRY_COUNT,
+    shouldRetry: (SongUrlResult) -> Boolean = { it is SongUrlResult.Failure },
     delayBeforeRetry: suspend (retryNumber: Int) -> Unit = { retryNumber ->
         delay(SONG_URL_RESOLUTION_RETRY_DELAY_MS * retryNumber)
     },
@@ -17,7 +18,7 @@ internal suspend fun retrySongUrlResolution(
 
     var result = resolveAttempt(0)
     repeat(retryCount) { retryIndex ->
-        if (result !is SongUrlResult.Failure) return result
+        if (!shouldRetry(result)) return result
         val retryNumber = retryIndex + 1
         delayBeforeRetry(retryNumber)
         result = resolveAttempt(retryNumber)

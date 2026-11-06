@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import com.lyra.player.R
 import com.lyra.player.core.api.bili.BiliSponsorBlockTarget
 import com.lyra.player.core.api.bili.resolveBiliSong
@@ -72,6 +73,18 @@ internal const val OFFLINE_CACHE_URL_PREFIX = "http://offline.cache/"
 
 /** 网易云试听片段使用的缓存 key 前缀（与 buildNeteasePreviewCacheKey 保持一致） */
 private const val NETEASE_PREVIEW_CACHE_KEY_PREFIX = "netease-preview-v1-"
+/**
+ * 自定义源单次取链的最长等待时间。
+ *
+ * 脚本可能因为网络或风控一直不回调，如果没有上限，播放会永远停在“加载中”。
+ */
+private const val CUSTOM_SOURCE_QUALITY_TIMEOUT_MS = 6_000L
+/** 自定义源整体取链超时（含音源脚本加载） */
+private const val CUSTOM_SOURCE_TOTAL_TIMEOUT_MS = 20_000L
+/** 网易云受限/试听资源兜底时最多尝试的音质数量 */
+private const val NETEASE_CUSTOM_SOURCE_QUALITY_ATTEMPTS = 3
+/** 网易云受限/试听资源兜底取链的总超时，超时后尽快回落到试听片段 */
+private const val NETEASE_CUSTOM_SOURCE_TIMEOUT_MS = 12_000L
 internal const val YOUTUBE_PLAYBACK_PREFER_M4A = false
 internal const val YOUTUBE_STABLE_RECOVERY_QUALITY = "high"
 
@@ -287,7 +300,11 @@ internal suspend fun PlayerManager.resolveSongUrl(
             return prefetchedResult
         }
     }
-    val result = retrySongUrlResolution { retryAttempt ->
+    var neteasePermanentFailure = false
+    val result = retrySongUrlResolution(
+        shouldRetry = { neteasePermanentFailure.not() && it is SongUrlResult.Failure }
+    ) { retryAttempt ->
+        neteasePermanentFailure = false
         val isFinalAttempt = retryAttempt == SONG_URL_RESOLUTION_RETRY_COUNT
         if (retryAttempt > 0) {
             LyraLogger.w(
@@ -320,7 +337,8 @@ internal suspend fun PlayerManager.resolveSongUrl(
                     getNeteaseSongUrl(
                         song = song,
                         suppressError = suppressError,
-                        sideEffects = sideEffects
+                        sideEffects = sideEffects,
+                        onPermanentFailure = { neteasePermanentFailure = true }
                     )
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
@@ -336,11 +354,14 @@ internal suspend fun PlayerManager.resolveSongUrl(
                 if (neteaseResult is SongUrlResult.Success && !isPreviewClip) {
                     neteaseResult
                 } else {
-                    // 无权限 / 仅试听时，交给自定义源兜底取直链
+                    // 无权限 / 仅试听时，交给自定义源兜底取直链。
+                    // 兜底有明确超时，失败时马上回落到试听片段或报错，避免无限加载。
                     val customResult = getCustomSourceAudioUrl(
                         song = song,
                         sourceId = CUSTOM_SOURCE_NETEASE,
-                        sideEffects = sideEffects
+                        sideEffects = sideEffects,
+                        maxQualityAttempts = NETEASE_CUSTOM_SOURCE_QUALITY_ATTEMPTS,
+                        timeoutMs = NETEASE_CUSTOM_SOURCE_TIMEOUT_MS
                     )
                     if (customResult is SongUrlResult.Success) customResult else neteaseResult
                 }
@@ -1250,42 +1271,56 @@ private suspend fun PlayerManager.invalidateCachedResourceBeforeResolve(
 private suspend fun PlayerManager.getCustomSourceAudioUrl(
     song: SongItem,
     sourceId: String,
-    sideEffects: RefreshResolverSideEffects = RefreshResolverSideEffects()
+    sideEffects: RefreshResolverSideEffects = RefreshResolverSideEffects(),
+    maxQualityAttempts: Int = Int.MAX_VALUE,
+    timeoutMs: Long = CUSTOM_SOURCE_TOTAL_TIMEOUT_MS
 ): SongUrlResult = withContext(Dispatchers.IO) {
     if (sourceId.isBlank()) {
         return@withContext SongUrlResult.Failure
     }
-    val qualities = CustomSourceManager.availableQualities(application, sourceId)
-    if (qualities.isEmpty()) {
-        LyraLogger.i(
-            "LYRA-PlayerManager",
-            "自定义源未声明该音源，无法取直链: source=$sourceId song=${song.name}"
-        )
-        return@withContext SongUrlResult.Failure
-    }
     val musicInfo = buildCustomSourceMusicInfo(sourceId, song)
-    for (quality in qualities) {
-        val url = CustomSourceManager.resolveMusicUrl(
-            context = application,
-            sourceId = sourceId,
-            quality = quality,
-            musicInfo = musicInfo
-        )
-        if (!url.isNullOrBlank()) {
+    val resolvedUrl = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) {
+        val qualities = CustomSourceManager.availableQualities(application, sourceId)
+        if (qualities.isEmpty()) {
             LyraLogger.i(
                 "LYRA-PlayerManager",
-                "自定义源取直链成功: source=$sourceId quality=$quality song=${song.name} " +
-                    "url=${url.take(160)}"
+                "自定义源未声明该音源，无法取直链: source=$sourceId song=${song.name}"
             )
-            return@withContext SongUrlResult.Success(
-                url = url,
-                durationMs = song.durationMs.takeIf { it > 0L }
-            )
+            return@withTimeoutOrNull null
         }
+        val attemptedQualities = qualities.take(maxQualityAttempts.coerceAtLeast(1))
+        var resolved: String? = null
+        for (quality in attemptedQualities) {
+            val url = withTimeoutOrNull(CUSTOM_SOURCE_QUALITY_TIMEOUT_MS) {
+                CustomSourceManager.resolveMusicUrl(
+                    context = application,
+                    sourceId = sourceId,
+                    quality = quality,
+                    musicInfo = musicInfo
+                )
+            }
+            if (!url.isNullOrBlank()) {
+                LyraLogger.i(
+                    "LYRA-PlayerManager",
+                    "自定义源取直链成功: source=$sourceId quality=$quality song=${song.name} " +
+                        "url=${url.take(160)}"
+                )
+                resolved = url
+                break
+            }
+        }
+        resolved
+    }
+    if (!resolvedUrl.isNullOrBlank()) {
+        return@withContext SongUrlResult.Success(
+            url = resolvedUrl,
+            durationMs = song.durationMs.takeIf { it > 0L }
+        )
     }
     LyraLogger.w(
         "LYRA-PlayerManager",
-        "自定义源没有返回可用直链: source=$sourceId song=${song.name} 已尝试音质=$qualities"
+        "自定义源没有返回可用直链: source=$sourceId song=${song.name}, " +
+            "超时上限=${timeoutMs}ms, 最多音质次数=$maxQualityAttempts"
     )
     SongUrlResult.Failure
 }
@@ -1296,7 +1331,8 @@ private suspend fun PlayerManager.getNeteaseSongUrl(
     sideEffects: RefreshResolverSideEffects = RefreshResolverSideEffects(),
     allowLocalFallback: Boolean = true,
     allowPreviewFallback: Boolean = true,
-    allowAutoBiliFallback: Boolean = true
+    allowAutoBiliFallback: Boolean = true,
+    onPermanentFailure: () -> Unit = {}
 ): SongUrlResult = withContext(Dispatchers.IO) {
     try {
         val effectiveQuality = effectiveNeteaseQuality()
@@ -1403,10 +1439,14 @@ private suspend fun PlayerManager.getNeteaseSongUrl(
         }
 
         if (requiresLogin) {
+            onPermanentFailure()
             return@withContext SongUrlResult.RequiresLogin
         }
 
-        if (!suppressError) {
+        // 已经拿到明确的平台响应（无权限 / 无直链）时，重复请求不会改变结果
+        onPermanentFailure()
+        // 平台明确拒绝时即使处于“中间重试”也要提示一次，避免用户只看到无声跳过
+        if (!suppressError || lastFailureReason != null) {
             val messageRes = when (lastFailureReason) {
                 NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION ->
                     R.string.player_netease_no_permission_switch_platform

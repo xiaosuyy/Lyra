@@ -43,4 +43,20 @@ class SongUrlResolutionRetryTest {
         assertEquals(1, attempts)
         assertSame(SongUrlResult.RequiresLogin, result)
     }
+
+    @Test
+    fun `resolution stops retrying when shouldRetry rejects the failure`() = runBlocking {
+        var attempts = 0
+
+        val result = retrySongUrlResolution(
+            shouldRetry = { false },
+            delayBeforeRetry = { error("permanent failure must not retry") }
+        ) {
+            attempts += 1
+            SongUrlResult.Failure
+        }
+
+        assertEquals(1, attempts)
+        assertSame(SongUrlResult.Failure, result)
+    }
 }
