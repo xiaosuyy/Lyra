@@ -142,6 +142,7 @@ import com.lyra.player.R
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.download.toPlaybackSongItem
+import com.lyra.player.core.player.HeartModeRuntime
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.data.playlist.favorite.FavoritePlaylistRepository
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
@@ -417,6 +418,7 @@ fun HomeScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     val isMeloxNeteaseHome = !isInternational && !offlineMode
     var quickActionDetail by remember { mutableStateOf<MeloxHomeQuickAction?>(null) }
+    var heartModeLoading by remember { mutableStateOf(false) }
     val dailyRecommendSongs = ui.radarSongSections
         .firstOrNull { it.source == NeteaseHomeSongSource.DAILY_RECOMMEND }
         ?.section?.items.orEmpty()
@@ -460,6 +462,16 @@ fun HomeScreen(
                 playCount = 0L,
                 trackCount = hotSongs.size
             )
+        ),
+        MeloxHomeQuickAction(
+            key = "heart",
+            title = stringResource(R.string.home_netease_heart_mode),
+            eyebrow = stringResource(R.string.home_eyebrow_heart),
+            subtitle = stringResource(R.string.home_subtitle_heart),
+            icon = Icons.Outlined.FavoriteBorder,
+            colors = listOf(Color(0xFFFF6EAC), Color(0xFF9B5DE5)),
+            songs = emptyList(),
+            requiresLogin = true
         ),
         MeloxHomeQuickAction(
             key = "radar",
@@ -903,8 +915,42 @@ fun HomeScreen(
                         MeloxQuickActionRow(
                             actions = meloxQuickActions,
                             contentPadding = 0.dp,
+                            loadingKey = if (heartModeLoading) "heart" else null,
                             onAction = { action ->
                                 when {
+                                    action.key == "heart" -> {
+                                        when {
+                                            !ui.hasLogin -> showHomeSnackbar(
+                                                context.getString(R.string.home_login_required)
+                                            )
+                                            heartModeLoading -> Unit
+                                            else -> {
+                                                heartModeLoading = true
+                                                scope.launch {
+                                                    try {
+                                                        val songs = vm.loadHeartModeSongs()
+                                                        if (songs.isNotEmpty()) {
+                                                            HeartModeRuntime.markQueue(songs)
+                                                            onSongClick(songs, 0)
+                                                        } else {
+                                                            showHomeSnackbar(
+                                                                context.getString(R.string.home_no_recommendations)
+                                                            )
+                                                        }
+                                                    } catch (error: kotlinx.coroutines.CancellationException) {
+                                                        throw error
+                                                    } catch (error: Exception) {
+                                                        showHomeSnackbar(
+                                                            error.message
+                                                                ?: context.getString(R.string.home_heart_mode_empty)
+                                                        )
+                                                    } finally {
+                                                        heartModeLoading = false
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                     action.playlist != null -> onItemClick(action.playlist)
                                     action.songs.isNotEmpty() -> {
                                         quickActionDetail = action
@@ -1141,6 +1187,7 @@ private fun MeloxSectionTitle(
 private fun MeloxQuickActionRow(
     actions: List<MeloxHomeQuickAction>,
     contentPadding: Dp,
+    loadingKey: String? = null,
     onAction: (MeloxHomeQuickAction) -> Unit
 ) {
     LazyRow(
@@ -1199,6 +1246,20 @@ private fun MeloxQuickActionRow(
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Bold
                     )
+                    if (loadingKey == action.key) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(Color.Black.copy(alpha = 0.28f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(30.dp),
+                                color = Color.White,
+                                strokeWidth = 2.5.dp
+                            )
+                        }
+                    }
                 }
             }
         }

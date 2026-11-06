@@ -110,6 +110,37 @@ class SyncDataChangeDetectorTest {
     }
 
     @Test
+    fun `detects account profile change`() {
+        val remote = syncData()
+        val merged = remote.copy(
+            profileDisplayName = "Lyra",
+            profileAvatarBase64 = "ZmFrZQ==",
+            profileUpdatedAt = 1_000L
+        )
+
+        assertTrue(SyncDataChangeDetector.hasDataChanged(remote, merged))
+    }
+
+    @Test
+    fun `sync serialization preserves account profile`() {
+        val data = syncData().copy(
+            profileDisplayName = "Lyra",
+            profileAvatarBase64 = "ZmFrZQ==",
+            profileUpdatedAt = 1_000L
+        )
+
+        listOf(false, true).forEach { useDataSaver ->
+            val decoded = SyncDataSerializer.deserialize(
+                SyncDataSerializer.serialize(data, useDataSaver)
+            )
+
+            assertEquals("Lyra", decoded.profileDisplayName)
+            assertEquals("ZmFrZQ==", decoded.profileAvatarBase64)
+            assertEquals(1_000L, decoded.profileUpdatedAt)
+        }
+    }
+
+    @Test
     fun `detects observed token change in playlist deletion`() {
         val remote = syncData(
             playlistSongDeletions = listOf(

@@ -83,6 +83,7 @@ import androidx.compose.material.icons.outlined.Settings
 import com.lyra.player.ui.melox.components.MeloxBottomChrome
 import com.lyra.player.ui.melox.components.MeloxMiniPlayer
 import com.lyra.player.ui.melox.components.MeloxTabItem
+import com.lyra.player.ui.component.overlay.AppUpdateStartupHost
 import com.lyra.player.ui.component.overlay.DensityScaledAlertDialog as AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -2185,6 +2186,7 @@ private fun LyraAppContent(
             accentColorHex = themeSeedColor,
             systemDark = systemDark
     ) {
+            AppUpdateStartupHost()
             // changing NavHost's start destination rebuilds its graph and clears the live stack
             val navHostStartDestination = remember { initialMainStartDestination }
             val navController = rememberNavController()

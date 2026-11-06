@@ -57,7 +57,7 @@ jobs:
 
       - name: Build signed Release APKs
         run: |
-          ./gradlew clean assembleRelease \
+          ./gradlew clean :app:assembleStandardRelease \
             -PbuildAllReleaseAbis=true \
             -PbuildVersionTimestamp=${{ steps.meta.outputs.release_time }} \
             -PKEYSTORE_FILE=neri.jks \
@@ -110,7 +110,7 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
 
-          apk_files=(app/build/outputs/apk/release/*.apk)
+          apk_files=(app/build/outputs/apk/standard/release/*.apk)
           if [ "${#apk_files[@]}" -eq 0 ]; then
             echo "No release APKs were produced."
             exit 1

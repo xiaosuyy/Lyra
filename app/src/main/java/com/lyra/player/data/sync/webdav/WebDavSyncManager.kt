@@ -38,6 +38,8 @@ import com.lyra.player.data.local.playlist.model.LocalPlaylist
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.media.LocalSongSupport
 import com.lyra.player.data.platform.bili.BiliVideoSkipRepository
+import com.lyra.player.data.profile.ProfileSyncCodec
+import com.lyra.player.data.profile.UserProfileStore
 import com.lyra.player.data.history.PlayHistoryRepository
 import com.lyra.player.data.local.playlist.system.SystemLocalPlaylists
 import com.lyra.player.data.model.identity
@@ -94,9 +96,12 @@ class WebDavSyncManager private constructor(context: Context) {
     private val localPlaylistPlaybackStatsRepo =
         LocalPlaylistPlaybackStatsRepository.getInstance(appContext)
     private val biliVideoSkipRepo = BiliVideoSkipRepository.getInstance(appContext)
+    private val profileStore = UserProfileStore.getInstance(appContext)
 
     companion object {
         private const val TAG = "WebDavSyncManager"
+        private const val MAX_PROFILE_DISPLAY_NAME_CHARS = 64
+        private const val MAX_PROFILE_AVATAR_BASE64_CHARS = 512 * 1024
 
         @Volatile
         private var instance: WebDavSyncManager? = null
@@ -126,6 +131,7 @@ class WebDavSyncManager private constructor(context: Context) {
 
         try {
             val remoteUrl = webDavStorage.getRemoteFileUrl()
+            val legacyRemoteUrl = webDavStorage.getLegacyRemoteFileUrl()
             val username = webDavStorage.getUsername()
             val password = webDavStorage.getPassword()
             if (remoteUrl == null || username == null || password == null) {
@@ -139,7 +145,8 @@ class WebDavSyncManager private constructor(context: Context) {
             val localData = sanitizeSyncData(buildLocalSyncData(localizedContext))
             val remoteSnapshotResult = fetchRemoteSnapshot(
                 apiClient = apiClient,
-                remoteUrl = remoteUrl
+                remoteUrl = remoteUrl,
+                legacyRemoteUrl = legacyRemoteUrl
             )
             if (remoteSnapshotResult.isFailure) {
                 return@withContext Result.failure(
@@ -170,7 +177,10 @@ class WebDavSyncManager private constructor(context: Context) {
                     }
                 },
                 hasMeaningfulChange = { remoteData, mergeResult ->
-                    remoteData == null || hasDataChanged(remoteData, mergeResult.mergedData)
+                    // 从旧文件名回退读取时强制写一次，完成到 Lyra-sync.json 的迁移
+                    remoteSnapshot?.fromLegacyFileName == true ||
+                        remoteData == null ||
+                        hasDataChanged(remoteData, mergeResult.mergedData)
                 },
                 upload = { mergeResult, version ->
                     if (storage.getSyncMutationVersion() != startMutationVersion) {
@@ -188,7 +198,8 @@ class WebDavSyncManager private constructor(context: Context) {
                 refetch = {
                     fetchRemoteSnapshot(
                         apiClient = apiClient,
-                        remoteUrl = remoteUrl
+                        remoteUrl = remoteUrl,
+                        legacyRemoteUrl = legacyRemoteUrl
                     ).map { snapshot ->
                         val resolvedSnapshot = snapshot ?: WebDavRemoteSnapshot(
                             data = null,
@@ -379,6 +390,9 @@ class WebDavSyncManager private constructor(context: Context) {
         val syncBiliVideoSkipRules = SyncBiliVideoSkipMergePolicy.sanitize(
             biliVideoSkipRepo.snapshot().map { rule -> rule.toSyncBiliVideoSkipRule() }
         )
+        val localProfile = webDavStorage.getUsername()
+            ?.takeIf { it.isNotBlank() }
+            ?.let(profileStore::profileFor)
 
         return SyncData(
             deviceId = getDeviceId(),
@@ -396,7 +410,10 @@ class WebDavSyncManager private constructor(context: Context) {
             playlistUsageStats = syncPlaylistUsageStats,
             localPlaylistPlaybackStats = localPlaylistPlaybackSnapshot.stats,
             localPlaylistPlaybackBuckets = localPlaylistPlaybackSnapshot.buckets,
-            biliVideoSkipRules = syncBiliVideoSkipRules
+            biliVideoSkipRules = syncBiliVideoSkipRules,
+            profileDisplayName = localProfile?.displayName.orEmpty(),
+            profileAvatarBase64 = ProfileSyncCodec.encodeAvatar(localProfile?.avatarUri),
+            profileUpdatedAt = localProfile?.updatedAt ?: 0L
         )
     }
 
@@ -554,6 +571,13 @@ class WebDavSyncManager private constructor(context: Context) {
             local = local.biliVideoSkipRules,
             remote = remote.biliVideoSkipRules
         )
+        val remoteProfileIsNewer = remote.profileUpdatedAt > local.profileUpdatedAt
+        val mergedProfileDisplayName =
+            if (remoteProfileIsNewer) remote.profileDisplayName else local.profileDisplayName
+        val mergedProfileAvatarBase64 =
+            if (remoteProfileIsNewer) remote.profileAvatarBase64 else local.profileAvatarBase64
+        val mergedProfileUpdatedAt =
+            if (remoteProfileIsNewer) remote.profileUpdatedAt else local.profileUpdatedAt
 
         val mergedData = SyncData(
             deviceId = local.deviceId,
@@ -574,7 +598,10 @@ class WebDavSyncManager private constructor(context: Context) {
             playlistUsageStats = mergedPlaylistUsageStats,
             localPlaylistPlaybackStats = finalizedLocalPlaylistPlaybackStats.stats,
             localPlaylistPlaybackBuckets = finalizedLocalPlaylistPlaybackStats.buckets,
-            biliVideoSkipRules = mergedBiliVideoSkipRules
+            biliVideoSkipRules = mergedBiliVideoSkipRules,
+            profileDisplayName = mergedProfileDisplayName,
+            profileAvatarBase64 = mergedProfileAvatarBase64,
+            profileUpdatedAt = mergedProfileUpdatedAt
         )
 
         return MergeResult(
@@ -953,6 +980,18 @@ class WebDavSyncManager private constructor(context: Context) {
             LyraLogger.w(TAG, "Skip applying Bili video skip rules because local state changed")
             return false
         }
+        if (sanitizedMergedData.profileUpdatedAt > 0L) {
+            webDavStorage.getUsername()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { username ->
+                    profileStore.applySyncedProfile(
+                        username = username,
+                        displayName = sanitizedMergedData.profileDisplayName,
+                        avatarBase64 = sanitizedMergedData.profileAvatarBase64,
+                        updatedAt = sanitizedMergedData.profileUpdatedAt
+                    )
+                }
+        }
         return true
     }
 
@@ -1005,7 +1044,12 @@ class WebDavSyncManager private constructor(context: Context) {
             localPlaylistPlaybackBuckets = data.localPlaylistPlaybackBuckets.mapNotNull { bucket ->
                 SyncPlaylistUsageStatsMergePolicy.sanitize(bucket)
             },
-            biliVideoSkipRules = SyncBiliVideoSkipMergePolicy.sanitize(data.biliVideoSkipRules)
+            biliVideoSkipRules = SyncBiliVideoSkipMergePolicy.sanitize(data.biliVideoSkipRules),
+            profileDisplayName = data.profileDisplayName.trim().take(MAX_PROFILE_DISPLAY_NAME_CHARS),
+            profileAvatarBase64 = data.profileAvatarBase64
+                .takeIf { it.isNotBlank() && it.length <= MAX_PROFILE_AVATAR_BASE64_CHARS }
+                .orEmpty(),
+            profileUpdatedAt = data.profileUpdatedAt.coerceAtLeast(0L)
         )
     }
 
@@ -1101,19 +1145,38 @@ class WebDavSyncManager private constructor(context: Context) {
 
     private suspend fun fetchRemoteSnapshot(
         apiClient: WebDavApiClient,
-        remoteUrl: String
+        remoteUrl: String,
+        legacyRemoteUrl: String? = null
     ): Result<WebDavRemoteSnapshot?> {
         val remoteResult = apiClient.getFileContentStrict(remoteUrl)
-        if (remoteResult.isFailure) {
-            val error = remoteResult.exceptionOrNull()
-            return if (error is WebDavFileNotFoundException) {
-                Result.success(null)
-            } else {
-                Result.failure(error ?: IOException("Failed to fetch remote data"))
-            }
+        if (remoteResult.isSuccess) {
+            return parseRemoteSnapshot(remoteResult.getOrThrow(), createOnly = false)
         }
 
-        val snapshot = remoteResult.getOrThrow()
+        val error = remoteResult.exceptionOrNull()
+        if (error !is WebDavFileNotFoundException) {
+            return Result.failure(error ?: IOException("Failed to fetch remote data"))
+        }
+
+        // 新版文件名不存在时回退读取旧文件名，避免升级后把已有备份当成首次同步
+        val fallbackUrl = legacyRemoteUrl?.takeIf { it != remoteUrl }
+        if (fallbackUrl != null) {
+            val legacyResult = apiClient.getFileContentStrict(fallbackUrl)
+            if (legacyResult.isSuccess) {
+                return parseRemoteSnapshot(legacyResult.getOrThrow(), createOnly = true)
+            }
+            val legacyError = legacyResult.exceptionOrNull()
+            if (legacyError !is WebDavFileNotFoundException) {
+                return Result.failure(legacyError ?: IOException("Failed to fetch remote data"))
+            }
+        }
+        return Result.success(null)
+    }
+
+    private fun parseRemoteSnapshot(
+        snapshot: WebDavApiClient.RemoteFileSnapshot,
+        createOnly: Boolean
+    ): Result<WebDavRemoteSnapshot?> {
         if (snapshot.content.isEmpty()) {
             return Result.failure(
                 IOException(LanguageManager.applyLanguage(appContext).getString(R.string.webdav_backup_file_invalid))
@@ -1133,10 +1196,11 @@ class WebDavSyncManager private constructor(context: Context) {
                 data = remoteData,
                 fingerprint = snapshot.fingerprint,
                 version = WebDavRemoteVersion(
-                    token = snapshot.version,
-                    createOnly = false,
+                    token = if (createOnly) null else snapshot.version,
+                    createOnly = createOnly,
                     lastKnownFingerprint = snapshot.fingerprint
-                )
+                ),
+                fromLegacyFileName = createOnly
             )
         )
     }
@@ -1299,7 +1363,8 @@ class WebDavSyncManager private constructor(context: Context) {
     private data class WebDavRemoteSnapshot(
         val data: SyncData?,
         val fingerprint: String,
-        val version: WebDavRemoteVersion
+        val version: WebDavRemoteVersion,
+        val fromLegacyFileName: Boolean = false
     )
 
     private data class PlaylistMergeResult(

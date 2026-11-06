@@ -778,6 +778,33 @@ class NeteaseClient {
         return callWeApi("/v1/radio/get", emptyMap(), usePersistedCookies = true)
     }
 
+    /**
+     * 心动模式/智能播放。
+     *
+     * @param seedSongId 作为推荐种子的歌曲 ID
+     * @param playlistId 种子歌曲所在的歌单 ID（通常是「我喜欢的音乐」）
+     * @param startSongId 从哪一首歌开始播放，默认与种子歌曲相同
+     * @param count 期望返回的推荐数量
+     */
+    @Throws(IOException::class)
+    fun getIntelligenceModeSongs(
+        seedSongId: Long,
+        playlistId: Long?,
+        startSongId: Long = seedSongId,
+        count: Int = 30
+    ): String {
+        val params = mutableMapOf(
+            "songId" to seedSongId.toString(),
+            "type" to "fromPlayOne",
+            "startMusicId" to startSongId.toString(),
+            "count" to count.coerceAtLeast(1).toString()
+        )
+        if (playlistId != null && playlistId > 0L) {
+            params["playlistId"] = playlistId.toString()
+        }
+        return callEApi("/playmode/intelligence/list", params, usePersistedCookies = true)
+    }
+
     @Throws(IOException::class)
     fun getPersonalizedNewSongs(
         limit: Int = 30,

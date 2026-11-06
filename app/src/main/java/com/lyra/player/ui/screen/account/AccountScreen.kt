@@ -125,9 +125,6 @@ fun AccountScreen(
         val configured = state.isConfigured
         if (wasConfigured == false && configured) {
             profileStore.rememberActiveAccount(state.username)
-            if (profileStore.profileFor(state.username).displayName.isBlank()) {
-                profileStore.setName(state.username, state.username)
-            }
             webDavVm.performSync(context)
         }
         if (configured && profileStore.profileFlow.value.username != state.username) {
@@ -143,8 +140,8 @@ fun AccountScreen(
             scope.launch {
                 val savedPath = withContext(Dispatchers.IO) {
                     runCatching {
-                        val dir = File(context.filesDir, "avatars").apply { mkdirs() }
-                        val file = File(dir, "avatar-${state.username.ifBlank { "local" }}.img")
+                        val file = profileStore.avatarFile(state.username)
+                        file.parentFile?.mkdirs()
                         context.contentResolver.openInputStream(uri)?.use { input ->
                             file.outputStream().use { output -> input.copyTo(output) }
                         }

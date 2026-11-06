@@ -5,21 +5,25 @@ import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
 
 /**
  * 与 WebDAV 账号绑定的本地展示资料：昵称与头像。
  * 以账号名为 key，切换 WebDAV 账号时各自保留自己的资料。
  */
 class UserProfileStore private constructor(context: Context) {
-    private val prefs = context.applicationContext
-        .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val _profileFlow = MutableStateFlow(load())
     val profileFlow: StateFlow<Profile> = _profileFlow.asStateFlow()
 
     fun profileFor(username: String): Profile = load(username)
 
     fun setName(username: String, name: String) {
-        prefs.edit { putString(key(username, KEY_NAME), name) }
+        prefs.edit {
+            putString(key(username, KEY_NAME), name)
+            putLong(key(username, KEY_UPDATED_AT), System.currentTimeMillis())
+        }
         _profileFlow.value = load(username)
     }
 
@@ -27,8 +31,38 @@ class UserProfileStore private constructor(context: Context) {
         prefs.edit {
             if (uri.isNullOrBlank()) remove(key(username, KEY_AVATAR)) else
                 putString(key(username, KEY_AVATAR), uri)
+            putLong(key(username, KEY_UPDATED_AT), System.currentTimeMillis())
         }
         _profileFlow.value = load(username)
+    }
+
+    fun avatarFile(username: String): File =
+        File(File(appContext.filesDir, "avatars"), "avatar-${username.ifBlank { "local" }}.img")
+
+    /** 同步数据比本地新时才覆盖，避免旧设备把新头像/昵称冲掉。 */
+    fun applySyncedProfile(
+        username: String,
+        displayName: String,
+        avatarBase64: String,
+        updatedAt: Long
+    ): Boolean {
+        if (username.isBlank() || updatedAt <= 0L) return false
+        val current = load(username)
+        if (updatedAt <= current.updatedAt) return false
+        val avatarUri = when {
+            avatarBase64.isBlank() -> null
+            ProfileSyncCodec.decodeToFile(avatarBase64, avatarFile(username)) ->
+                avatarFile(username).absolutePath
+            else -> current.avatarUri
+        }
+        prefs.edit {
+            putString(key(username, KEY_NAME), displayName)
+            if (avatarUri.isNullOrBlank()) remove(key(username, KEY_AVATAR)) else
+                putString(key(username, KEY_AVATAR), avatarUri)
+            putLong(key(username, KEY_UPDATED_AT), updatedAt)
+        }
+        _profileFlow.value = load(username)
+        return true
     }
 
     private fun load(username: String? = null): Profile {
@@ -37,6 +71,7 @@ class UserProfileStore private constructor(context: Context) {
             username = key,
             displayName = prefs.getString(this.key(key, KEY_NAME), null).orEmpty(),
             avatarUri = prefs.getString(this.key(key, KEY_AVATAR), null),
+            updatedAt = prefs.getLong(this.key(key, KEY_UPDATED_AT), 0L),
         )
     }
 
@@ -56,12 +91,14 @@ class UserProfileStore private constructor(context: Context) {
         val username: String = "",
         val displayName: String = "",
         val avatarUri: String? = null,
+        val updatedAt: Long = 0L,
     )
 
     companion object {
         private const val PREFS_NAME = "user_profile"
         private const val KEY_NAME = "display_name"
         private const val KEY_AVATAR = "avatar_uri"
+        private const val KEY_UPDATED_AT = "updated_at"
         private const val KEY_LAST_USERNAME = "last_username"
 
         @Volatile

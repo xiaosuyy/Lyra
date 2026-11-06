@@ -2,4 +2,25 @@
 <resources>
     <!-- About -->
     <string name="about_app_footer">Lyra • GPLv3 • Powered by You</string>
+
+    <!-- Update check -->
+    <string name="settings_check_update">Check for updates</string>
+    <string name="settings_checking_update">Checking…</string>
+    <string name="update_available_title">New version %1$s: %2$s</string>
+    <string name="update_release_label">%1$s Android %2$s</string>
+    <string name="update_download_action">Download %1$s APK</string>
+    <string name="update_downloading_action">Downloading… %1$d%%</string>
+    <string name="update_up_to_date">You are up to date</string>
+    <string name="update_source_required">No update source configured, cannot check for updates</string>
+    <string name="update_check_failed">Update check failed. Check your network or WebDAV connection.</string>
+    <string name="update_download_failed">Download failed, please retry</string>
+    <string name="update_install_permission_required">Allow installing unknown apps and try again</string>
+    <string name="update_install_failed">Cannot start the installer</string>
+
+    <!-- Startup update dialog -->
+    <string name="update_dialog_title">New version %1$s available</string>
+    <string name="update_dialog_install_now">Update now</string>
+    <string name="update_dialog_later">Later</string>
+    <string name="update_dialog_no_changelog">No release notes</string>
+    <string name="update_changelog_title">What\'s new</string>
 </resources>

@@ -272,6 +272,7 @@ class NeteaseHomeRecommendationsTest {
         assertEquals(
             listOf(
                 NeteaseHomePlaylistSource.PERSONALIZED,
+                NeteaseHomePlaylistSource.CHARTS,
                 NeteaseHomePlaylistSource.HIGH_QUALITY,
                 NeteaseHomePlaylistSource.HOT_PLAYLISTS,
                 NeteaseHomePlaylistSource.ACG_PLAYLISTS
@@ -544,6 +545,56 @@ class NeteaseHomeRecommendationsTest {
                 activeRadarCacheContext = "account-b"
             )
         )
+    }
+
+    @Test
+    fun parseIntelligenceModeSongs_readsFullSongPayload() {
+        val raw = """
+            {
+              "code": 200,
+              "data": [
+                {
+                  "id": 4004,
+                  "name": "心动推荐",
+                  "dt": 198000,
+                  "ar": [{"id": 51, "name": "歌手 C"}],
+                  "al": {
+                    "id": 61,
+                    "name": "专辑 C",
+                    "picUrl": "https://p5.music.126.net/c.jpg"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val songs = parseNeteaseHomeSongs(raw)
+
+        assertEquals(1, songs.size)
+        assertEquals(4004L, songs[0].id)
+        assertEquals("心动推荐", songs[0].name)
+        assertEquals("歌手 C", songs[0].artist)
+        assertEquals("https://p5.music.126.net/c.jpg", songs[0].coverUrl)
+    }
+
+    @Test
+    fun parseIntelligenceModeSongIds_readsIdOnlyPayload() {
+        val ids = parseNeteaseIntelligenceSongIds(
+            """
+                {
+                  "code": 200,
+                  "data": [{"id": 4004}, {"id": 4005}, {"id": 4004}, {"id": 0}]
+                }
+            """.trimIndent()
+        )
+
+        assertEquals(listOf(4004L, 4005L), ids)
+    }
+
+    @Test
+    fun parseHeartModeAccountLookups_readLikedPlaylistId() {
+        assertEquals(501L, parseNeteaseLikedPlaylistId("""{"code":200,"playlistId":501}"""))
+        assertNull(parseNeteaseLikedPlaylistId("""{"code":404}"""))
     }
 
     private fun testSong(id: Long, audioId: String): SongItem {

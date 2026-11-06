@@ -94,7 +94,10 @@ data class SyncData(
     @ProtoNumber(14) val playlistUsageStats: List<SyncPlaylistUsageStat> = emptyList(),
     @ProtoNumber(15) val localPlaylistPlaybackStats: List<SyncLocalPlaylistPlaybackStat> = emptyList(),
     @ProtoNumber(16) val localPlaylistPlaybackBuckets: List<SyncLocalPlaylistPlaybackBucket> = emptyList(),
-    @ProtoNumber(17) val biliVideoSkipRules: List<SyncBiliVideoSkipRule> = emptyList()
+    @ProtoNumber(17) val biliVideoSkipRules: List<SyncBiliVideoSkipRule> = emptyList(),
+    @ProtoNumber(18) val profileDisplayName: String = "",
+    @ProtoNumber(19) val profileAvatarBase64: String = "",
+    @ProtoNumber(20) val profileUpdatedAt: Long = 0L
 )
 
 internal fun SyncData.sanitizeLocalCoverUrls(): SyncData {

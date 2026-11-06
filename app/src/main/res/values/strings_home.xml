@@ -21,6 +21,7 @@
     <string name="home_netease_new_songs">推荐新歌</string>
     <string name="home_netease_hot_rank">热歌榜</string>
     <string name="home_netease_new_rank">新歌榜</string>
+    <string name="home_netease_heart_mode">心动模式</string>
     <string name="home_netease_radar_playlists">雷达歌单</string>
     <string name="home_netease_radar_badge">雷达</string>
     <string name="home_netease_daily_playlists">每日推荐歌单</string>
@@ -54,6 +55,8 @@
     <string name="home_subtitle_daily">为你定制的歌曲</string>
     <string name="home_eyebrow_hot">全站热门</string>
     <string name="home_subtitle_hot">大家都在听</string>
+    <string name="home_eyebrow_heart">为你心动</string>
+    <string name="home_subtitle_heart">喜欢与惊喜交替播放</string>
     <string name="home_eyebrow_radar">私人雷达</string>
     <string name="home_subtitle_radar">根据口味持续更新</string>
     <string name="home_eyebrow_roam">私人漫游</string>
@@ -62,4 +65,7 @@
     <string name="home_no_recommendations">暂无推荐歌曲</string>
     <string name="home_all_recent_trending">全部近期热门</string>
     <string name="home_charts">排行榜</string>
+    <string name="home_heart_mode_no_liked_playlist">没有找到“我喜欢的音乐”歌单</string>
+    <string name="home_heart_mode_empty_likes">收藏歌曲为空</string>
+    <string name="home_heart_mode_empty">心动模式暂时没有推荐歌曲</string>
 </resources>

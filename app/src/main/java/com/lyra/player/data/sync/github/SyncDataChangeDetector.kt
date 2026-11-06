@@ -89,6 +89,10 @@ internal object SyncDataChangeDetector {
             if (!SyncPlaylistUsageStatsMergePolicy.same(remoteStat, mergedStat)) return true
         }
 
+        if (remote.profileDisplayName != merged.profileDisplayName) return true
+        if (remote.profileAvatarBase64 != merged.profileAvatarBase64) return true
+        if (remote.profileUpdatedAt != merged.profileUpdatedAt) return true
+
         val remoteLocalPlaylistBuckets = remote.localPlaylistPlaybackBuckets
             .associateBy { it.playlistId to it.dayStartAt }
         val mergedLocalPlaylistBuckets = merged.localPlaylistPlaybackBuckets

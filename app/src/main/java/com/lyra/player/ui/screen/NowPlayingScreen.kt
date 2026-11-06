@@ -251,6 +251,7 @@ import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.download.ManagedDownloadStorage
 import com.lyra.player.core.download.shouldHideRemoteDownloadAction
+import com.lyra.player.core.player.HeartModeRuntime
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.player.download.AudioDownloadManager
 import com.lyra.player.core.player.metadata.resolveLocalFirstLyricText
@@ -2530,6 +2531,7 @@ fun NowPlayingScreen(
     val isFavorite = favOverride ?: isFavoriteComputed
 
     val queue by PlayerManager.currentQueueFlow.collectAsStateWithLifecycle()
+    val heartModeActive = remember(queue) { HeartModeRuntime.matches(queue) }
     val queueDisplayRevision by PlayerManager.currentQueueDisplayRevisionFlow.collectAsStateWithLifecycle()
     val queueDisplayState = remember(queue, currentSong, shuffleEnabled, queueDisplayRevision) {
         PlayerManager.currentQueueDisplaySnapshot()
@@ -3873,6 +3875,15 @@ fun NowPlayingScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.Start
                         ) {
+                            if (heartModeActive) {
+                                Text(
+                                    text = stringResource(R.string.home_netease_heart_mode),
+                                    color = Color(0xFFFF7BA5),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.height(2.dp))
+                            }
                             Box {
                                 Crossfade(
                                     targetState = currentSong?.customName ?: currentSong?.name ?: "",
@@ -4284,6 +4295,15 @@ fun NowPlayingScreen(
                         ) + fadeIn(animationSpec = tween(durationMillis = 400, delayMillis = 150))
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (heartModeActive) {
+                                Text(
+                                    text = stringResource(R.string.home_netease_heart_mode),
+                                    color = Color(0xFFFF7BA5),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.height(2.dp))
+                            }
                             BoxWithConstraints {
                                 Crossfade(
                                     targetState = currentSong?.customName ?: currentSong?.name ?: "",

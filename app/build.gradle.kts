@@ -73,6 +73,13 @@ android {
         buildConfigField("String", "TAG", "\"LyraPlayer\"")
         buildConfigField("long", "BUILD_TIMESTAMP", "${System.currentTimeMillis()}L")
 
+        // 更新检查默认读取当前 GitHub 仓库：Actions 里自动有 GITHUB_REPOSITORY，
+        // 本地构建可用 -PupdateRepo=owner/repo 覆盖。
+        val updateRepo = ((project.findProperty("updateRepo") as String?)
+            ?: System.getenv("GITHUB_REPOSITORY")
+            ?: "").trim().trim('/')
+        buildConfigField("String", "UPDATE_REPO", "\"${updateRepo}\"")
+
         // 自定义渠道搜索的易失效 / 敏感配置，允许在构建时通过 Gradle 属性覆盖：
         //   -PcustomChannelTencentAggregateKey=xxxx
         //   -PcustomChannelMobileUserAgent="Mozilla/5.0 ..."

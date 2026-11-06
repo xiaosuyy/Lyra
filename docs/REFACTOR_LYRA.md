@@ -34,7 +34,7 @@ Do not change them without a designed data migration.
 | `lib_neri.so` / `_neri` | JNI 库名与 `System.loadLibrary("_neri")` | 与已打包 native 库保持锁定一致 |
 | `Java_com_lyra_player_*` | JNI 导出符号 | 与 Kotlin 新包名同步更新，与库名无关 |
 | `CONFIG_KIND = "moe.ouom.neriplayer.config"` | 完整配置导入/导出 | 历史配置文件的 kind 字段 |
-| `neriplayer-sync.json` | WebDAV 同步远端文件名 | 远端已有同步快照的文件名 |
+| `neriplayer-sync.json` | WebDAV 旧远端文件名 | 仅保留只读兼容；新写入使用 `Lyra-sync.json`，旧文件存在时自动读取并迁移 |
 | `backup/neriplayer`（`webdav_base_path_placeholder`） | WebDAV 默认远端路径 | 远端目录结构兼容 |
 | `neriplayer-radar-cache-v1:` | 平台缓存 key 前缀 | 已落盘的缓存条目 |
 | `neriplayer_playback_widget` | 桌面小组件 SharedPreferences | 已存在的桌面组件状态 |

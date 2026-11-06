@@ -43,3 +43,7 @@ AGENTS.md
 /ksp-annotations/build/
 /ksp-processor/build/
 /docs-private/
+
+# 签名文件不入库
+*.jks
+*.keystore

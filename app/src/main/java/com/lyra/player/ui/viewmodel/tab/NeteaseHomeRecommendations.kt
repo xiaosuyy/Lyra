@@ -145,6 +145,29 @@ internal fun parseNeteaseHomeSongs(raw: String, limit: Int = Int.MAX_VALUE): Lis
     }
 }
 
+/** 心动模式接口既可能返回完整歌曲，也可能只返回歌曲 ID。 */
+internal fun parseNeteaseIntelligenceSongIds(raw: String): List<Long> {
+    val root = JSONObject(raw)
+    val code = root.optInt("code", -1)
+    if (code != 200) {
+        throw ApiCodeException(code)
+    }
+    val data = root.optJSONArray("data") ?: return emptyList()
+    return buildList(data.length()) {
+        for (index in 0 until data.length()) {
+            val item = data.optJSONObject(index) ?: continue
+            val id = item.optLong("id", 0L)
+            if (id > 0L) add(id)
+        }
+    }.distinct()
+}
+
+internal fun parseNeteaseLikedPlaylistId(raw: String): Long? {
+    val root = JSONObject(raw)
+    if (root.optInt("code", -1) != 200) return null
+    return root.optLong("playlistId", 0L).takeIf { it > 0L }
+}
+
 internal fun parseNeteaseHomePlaylists(
     raw: String,
     limit: Int = Int.MAX_VALUE

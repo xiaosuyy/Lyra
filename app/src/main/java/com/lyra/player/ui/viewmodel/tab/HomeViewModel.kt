@@ -1154,6 +1154,66 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         return parseSongsOnWorker(raw)
     }
 
+    /**
+     * 心动模式与 MeloX 一致：只用「我喜欢的音乐」中的随机歌曲做种子，
+     * 且歌单必须是「我喜欢的音乐」——接口不支持榜单等其他歌单类型。
+     */
+    suspend fun loadHeartModeSongs(): List<SongItem> {
+        val localizedContext = localizedAppContext()
+        if (!client.hasLogin()) {
+            throw IllegalStateException(localizedContext.getString(R.string.home_login_required))
+        }
+        val emptyMessage = localizedContext.getString(R.string.home_heart_mode_empty)
+        return try {
+            val userId = withContext(Dispatchers.IO) { client.getCurrentUserId() }
+            val likedPlaylistId = withContext(Dispatchers.IO) {
+                parseNeteaseLikedPlaylistId(client.getLikedPlaylistId(userId))
+            } ?: throw IllegalStateException(
+                localizedContext.getString(R.string.home_heart_mode_no_liked_playlist)
+            )
+            val likedRaw = withContext(Dispatchers.IO) {
+                client.getPlaylistDetail(playlistId = likedPlaylistId, n = 100, s = 0)
+            }
+            val likedSongs = parseSongsOnWorker(likedRaw)
+                .filter { it.channelId == "netease" && it.id > 0L }
+            val seed = likedSongs.randomOrNull() ?: throw IllegalStateException(
+                localizedContext.getString(R.string.home_heart_mode_empty_likes)
+            )
+            fetchHeartModeSongsFor(seed.id, likedPlaylistId)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: ApiCodeException) {
+            LyraLogger.d(TAG, "heart mode api error: ${error.message}")
+            throw IllegalStateException(emptyMessage)
+        } catch (error: IllegalStateException) {
+            throw error
+        } catch (error: Exception) {
+            LyraLogger.d(TAG, "heart mode failed: ${error.message}")
+            throw IllegalStateException(emptyMessage)
+        }
+    }
+
+    private suspend fun fetchHeartModeSongsFor(seedId: Long, playlistId: Long): List<SongItem> {
+        val raw = withContext(Dispatchers.IO) {
+            client.getIntelligenceModeSongs(
+                seedSongId = seedId,
+                playlistId = playlistId,
+                count = HOME_NETEASE_SONG_LIMIT
+            )
+        }
+        // 与 MeloX 一致：接口通常只返回歌曲 ID，需要再查一次详情补全歌手/封面。
+        val ids = withContext(Dispatchers.Default) {
+            parseNeteaseIntelligenceSongIds(raw).take(HOME_NETEASE_SONG_LIMIT)
+        }
+        if (ids.isNotEmpty()) {
+            val detailRaw = withContext(Dispatchers.IO) { client.getSongDetail(ids) }
+            val details = parseSongsOnWorker(detailRaw)
+            if (details.isNotEmpty()) return details
+        }
+        // 接口偶尔直接返回完整歌曲，此时走通用解析兜底。
+        return parseSongsOnWorker(raw)
+    }
+
     /** 将首页来源的请求参数集中在一起，避免登录态契约在调用点分散 */
     private fun fetchSongSourceRaw(source: NeteaseHomeSongSource): String {
         return when (source) {

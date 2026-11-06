@@ -91,6 +91,15 @@ class WebDavStorage(private val context: Context) {
         return WebDavApiClient.buildRemoteFileUrl(serverUrl, getBasePath())
     }
 
+    fun getLegacyRemoteFileUrl(): String? {
+        val serverUrl = getServerUrl()?.takeIf { it.isNotBlank() } ?: return null
+        return WebDavApiClient.buildRemoteFileUrl(
+            serverUrl,
+            getBasePath(),
+            WebDavApiClient.LEGACY_REMOTE_FILE_NAME
+        )
+    }
+
     fun saveLastSyncTime(timestamp: Long) {
         encryptedPrefs.edit { putLong(KEY_LAST_SYNC_TIME, timestamp) }
     }
