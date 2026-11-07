@@ -40,6 +40,8 @@ data class MeloxGlassSpec(
     val lensRadius: Dp = 24.dp,
     val refractionHeight: Dp = 12.dp,
     val useLens: Boolean = true,
+    // 底栏按压透镜用不到景深：它会额外跑一遍取样，整段按住期间持续重绘。
+    val useDepthEffect: Boolean = true,
 )
 
 /**
@@ -125,7 +127,7 @@ fun Modifier.meloxGlassSurface(
                 lens(
                     effectiveSpec.lensRadius.toPx(),
                     effectiveSpec.refractionHeight.toPx(),
-                    depthEffect = p > 0.01f,
+                    depthEffect = effectiveSpec.useDepthEffect && p > 0.01f,
                     chromaticAberration = false,
                 )
             }

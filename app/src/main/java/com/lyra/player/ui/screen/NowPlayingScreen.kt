@@ -101,6 +101,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -177,6 +178,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -191,14 +193,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
@@ -217,8 +223,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp as lerpFloat
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
@@ -234,6 +243,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 import com.lyra.player.R
 import com.lyra.player.core.api.bili.resolveBiliVideoSkipTargetOptions
 import com.lyra.player.core.api.lyrics.EditableLyricMatchRequest
@@ -304,6 +314,7 @@ import com.lyra.player.ui.component.lyrics.LyricsEditorSeed
 import com.lyra.player.ui.component.lyrics.LyricEntry
 import com.lyra.player.ui.component.lyrics.LyricShareSheet
 import com.lyra.player.ui.component.lyrics.LyricVisualSpec
+import com.lyra.player.ui.component.playback.InkSpreadCoverCrossfade
 import com.lyra.player.ui.component.playback.PlaybackSoundSheet
 import com.lyra.player.ui.component.playback.SongMetadataSearchContent
 import com.lyra.player.ui.component.playback.NowPlayingCoverPreviewDialog
@@ -380,7 +391,6 @@ private const val LyricsPageTransitionDurationMs = 300
 private const val CoverSourceBadgeRevealBufferMs = 120
 private const val CoverSourceBadgeRevealDelayMs =
     LyricsPageTransitionDurationMs + CoverSourceBadgeRevealBufferMs
-private const val NowPlayingCoverImageCrossfadeMs = 220
 private const val QueueSheetMaxHeightFraction = 0.9f
 internal val NowPlayingQueueReorderAutoScrollMaxPerFrame = 2.dp
 private val QueueReorderDragCancelStiffness = Spring.StiffnessMediumLow
@@ -435,39 +445,31 @@ private fun StableNowPlayingCoverImage(
             displayedCoverUrl == null -> requestedCoverUrl
             else -> displayedCoverUrl
         }
-        Crossfade(
-            targetState = targetDisplayedCoverUrl,
-            animationSpec = if (targetDisplayedCoverUrl == null) {
-                snap()
-            } else {
-                tween(durationMillis = NowPlayingCoverImageCrossfadeMs)
-            },
-            label = "NowPlayingCoverImage"
-        ) { displayedCover ->
-            if (displayedCover.isNullOrBlank()) {
-                Box(modifier = Modifier.fillMaxSize())
-            } else {
-                AsyncImage(
-                    model = remember(
-                        context,
-                        displayedCover,
-                        coverRequestSizePx,
-                        offlineMode
-                    ) {
-                        offlineCachedImageRequest(
-                            context = context,
-                            data = displayedCover,
-                            sizePx = coverRequestSizePx,
-                            allowHardware = false,
-                            crossfade = false,
-                            offlineMode = offlineMode
-                        )
-                    },
-                    contentDescription = contentDescription,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+        InkSpreadCoverCrossfade(
+            targetUrl = targetDisplayedCoverUrl,
+            contentDescription = contentDescription,
+            modifier = Modifier.fillMaxSize()
+        ) { displayedCover, coverDescription, coverModifier ->
+            AsyncImage(
+                model = remember(
+                    context,
+                    displayedCover,
+                    coverRequestSizePx,
+                    offlineMode
+                ) {
+                    offlineCachedImageRequest(
+                        context = context,
+                        data = displayedCover,
+                        sizePx = coverRequestSizePx,
+                        allowHardware = false,
+                        crossfade = false,
+                        offlineMode = offlineMode
+                    )
+                },
+                contentDescription = coverDescription,
+                contentScale = ContentScale.Crop,
+                modifier = coverModifier
+            )
         }
 
         if (requestedCoverUrl != null && requestedCoverUrl != displayedCoverUrl) {
@@ -2385,12 +2387,83 @@ internal fun shouldBypassCollapsedStoredLyric(rawLyric: String?): Boolean {
     return rawLyric?.let(::hasCollapsedTimedLyricTimeline) == true
 }
 
+private data class NowPlayingDismissGhost(
+    val startCover: Rect,
+    val endCover: Rect,
+)
+
+/**
+ * 播放页收起时的过渡层：封面从播放页位置一路插值到播放栏封面的位置。
+ * 只飞封面这一个共享元素——歌名/歌手留在页面里随页面一起走，
+ * 落点的歌名由播放栏自己显示，避免两组文字在半空中叠在一起。
+ */
+@Composable
+private fun NowPlayingDismissGhostLayer(
+    ghost: NowPlayingDismissGhost,
+    progress: () -> Float,
+    coverUrl: String?,
+    songKey: String?,
+    offlineMode: Boolean,
+    context: Context
+) {
+    val density = LocalDensity.current
+    val startCover = ghost.startCover
+    val endCover = ghost.endCover
+    // 布局尺寸固定在播放页封面尺寸，飞行只走图层变换：
+    // 每帧改请求尺寸会让 Coil 每帧重新解码（下拉时整屏卡一下）。
+    val coverRequestSizePx = startCover.width.roundToInt().coerceAtLeast(256)
+    val startCornerPx = with(density) { 28.dp.toPx() }
+    val endCornerPx = with(density) { 10.dp.toPx() }
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(startCover.left.roundToInt(), startCover.top.roundToInt()) }
+            .size(
+                with(density) { startCover.width.toDp() },
+                with(density) { startCover.height.toDp() },
+            )
+            // progress 只在绘制阶段读：拖动时这段不重组，也不重新解码封面。
+            .graphicsLayer {
+                val p = progress().coerceIn(0f, 1f)
+                val targetScaleX = (endCover.width / startCover.width).coerceAtLeast(0.01f)
+                val targetScaleY = (endCover.height / startCover.height).coerceAtLeast(0.01f)
+                val currentScaleX = lerpFloat(1f, targetScaleX, p)
+                val currentScaleY = lerpFloat(1f, targetScaleY, p)
+                scaleX = currentScaleX
+                scaleY = currentScaleY
+                translationX = (endCover.left - startCover.left) * p
+                translationY = (endCover.top - startCover.top) * p
+                transformOrigin = TransformOrigin(0f, 0f)
+                val averageScale = ((currentScaleX + currentScaleY) / 2f).coerceAtLeast(0.05f)
+                shape = RoundedCornerShape(
+                    CornerSize(lerpFloat(startCornerPx, endCornerPx, p) / averageScale)
+                )
+                clip = true
+            }
+            .background(LocalNeriColors.current.elevatedSurface)
+    ) {
+        StableNowPlayingCoverImage(
+            coverUrl = coverUrl,
+            songKey = songKey,
+            context = context,
+            coverRequestSizePx = coverRequestSizePx,
+            offlineMode = offlineMode,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 @Suppress("AssignedValueIsNeverRead")
 fun NowPlayingScreen(
     onNavigateUp: () -> Unit,
     onOpenCurrentPlaybackSource: (() -> Unit)? = null,
+    onDismissStarted: () -> Unit = {},
+    onDismissCanceled: () -> Unit = {},
+    miniPlayerCoverBounds: Rect? = null,
+    sheetOffsetPx: MutableFloatState? = null,
+    sheetAlpha: MutableFloatState? = null,
     showLyricsScreen: Boolean,
     onShowLyricsScreenChange: (Boolean) -> Unit,
     onEnterAlbum: (AlbumSummary) -> Unit,
@@ -2558,7 +2631,10 @@ fun NowPlayingScreen(
     var portraitDragAnimJob by remember { mutableStateOf<Job?>(null) }
     val portraitDragDismissPx = with(LocalDensity.current) { 120.dp.toPx() }
     val portraitDragRangePx = with(LocalDensity.current) { 360.dp.toPx() }
-    val portraitDragProgress = (portraitDragOffsetPx / portraitDragRangePx).coerceIn(0f, 1f)
+    // 松手后整页继续滑出屏幕，目标位移取一屏高度。
+    val portraitExitOffsetPx = with(LocalDensity.current) {
+        LocalConfiguration.current.screenHeightDp.dp.toPx()
+    }
 
     // Snackbar状态
     val snackbarHostState = remember { SnackbarHostState() }
@@ -2568,6 +2644,100 @@ fun NowPlayingScreen(
 
     val clipboard = LocalClipboard.current
     val screenScope = rememberCoroutineScope()
+
+    // 下拉收起的“落回迷你播放器”过渡：封面飞向播放栏封面。
+    var dismissGhost by remember { mutableStateOf<NowPlayingDismissGhost?>(null) }
+    var dismissProgress by remember { mutableFloatStateOf(0f) }
+    var dismissArmed by remember { mutableStateOf(false) }
+    var dismissReleasing by remember { mutableStateOf(false) }
+    var nowPlayingCoverWindowRect by remember { mutableStateOf<Rect?>(null) }
+    val latestMiniCoverBounds by rememberUpdatedState(miniPlayerCoverBounds)
+
+    fun createDismissGhost(): NowPlayingDismissGhost? {
+        val startCover = nowPlayingCoverWindowRect?.takeIf { it.width > 1f && it.height > 1f }
+            ?: return null
+        val endCover = latestMiniCoverBounds?.takeIf { it.width > 1f && it.height > 1f }
+            ?: return null
+        return NowPlayingDismissGhost(startCover = startCover, endCover = endCover)
+    }
+
+    val runDismissMorph: () -> Unit = {
+        if (!dismissReleasing) {
+            // 手指还在拖时就已经在飞了；没拖过的路径（返回键）在这里补建。
+            val ghost = dismissGhost ?: createDismissGhost().also { dismissGhost = it }
+            if (ghost == null) {
+                onNavigateUp()
+            } else {
+                dismissReleasing = true
+                dismissArmed = false
+                portraitDragAnimJob?.cancel()
+                onDismissStarted()
+                // 从当前拖动进度接着走，不再回到 0，避免松手时封面跳一下。
+                val startProgress = dismissProgress.coerceIn(0f, 1f)
+                val startOffset = portraitDragOffsetPx
+                screenScope.launch {
+                    animate(
+                        initialValue = 0f,
+                        targetValue = 1f,
+                        animationSpec = tween(
+                            durationMillis = 260,
+                            easing = FastOutSlowInEasing
+                        )
+                    ) { value, _ ->
+                        dismissProgress = startProgress + (1f - startProgress) * value
+                        // 整页继续往下滑出屏幕，而不是原地淡在首页上。
+                        val offset =
+                            startOffset + (portraitExitOffsetPx - startOffset) * value
+                        portraitDragOffsetPx = offset
+                        sheetOffsetPx?.floatValue = offset
+                    }
+                    dismissProgress = 1f
+                    // 此刻页面已经滑出屏幕，整层置零看不出变化；
+                    // 置零是为了让随后的导航退出动画不再画出这一页。
+                    sheetAlpha?.floatValue = 0f
+                    // 飞行层此刻正好压在播放栏封面上，撤掉不可见；
+                    // 不撤的话导航退出动画期间会一直盖在迷你播放器上。
+                    dismissGhost = null
+                    dismissProgress = 0f
+                    portraitDragOffsetPx = 0f
+                    sheetOffsetPx?.floatValue = 0f
+                    // 收起过程中若立刻再打开，这个组件不会被销毁而是被复用，
+                    // 不复位的话下拉手势会一直停在“正在收起”状态再也拖不动。
+                    dismissReleasing = false
+                    onNavigateUp()
+                }
+            }
+        }
+    }
+
+    val cancelPortraitDrag: () -> Unit = {
+        if (dismissArmed) {
+            dismissArmed = false
+            onDismissCanceled()
+        }
+        portraitDragAnimJob?.cancel()
+        portraitDragAnimJob = screenScope.launch {
+            animate(
+                initialValue = portraitDragOffsetPx,
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) { value, _ ->
+                portraitDragOffsetPx = value
+                sheetOffsetPx?.floatValue = value
+                if (dismissGhost != null) {
+                    dismissProgress = (value / portraitDragRangePx).coerceIn(0f, 1f)
+                }
+            }
+            // 回弹到位后把封面/歌名交还页面（此刻飞行层与真实位置重合，切换不可见）。
+            dismissGhost = null
+            dismissProgress = 0f
+            portraitDragOffsetPx = 0f
+            sheetOffsetPx?.floatValue = 0f
+        }
+    }
 
     val downloadCurrentCover: () -> Unit = {
         val song = currentSong
@@ -3240,6 +3410,15 @@ fun NowPlayingScreen(
                 BackHandler(enabled = showQueuePage) {
                     showQueuePage = false
                 }
+                // 竖屏播放页的返回键与下拉同一条收起动画，避免两套退出观感。
+                BackHandler(
+                    enabled = nowPlayingPageState == NowPlayingPageState.Player &&
+                        !isLandscape &&
+                        !useWideLandscapeLayout &&
+                        dismissGhost == null
+                ) {
+                    runDismissMorph()
+                }
                 AnimatedContent(
                     targetState = nowPlayingPageState,
                     transitionSpec = {
@@ -3349,34 +3528,43 @@ fun NowPlayingScreen(
                     .padding(horizontal = horizontalPadding, vertical = verticalPadding)
                     .pointerInput(isPortraitMain) {
                         detectVerticalDragGestures(
+                            onDragCancel = {
+                                if (isPortraitMain) cancelPortraitDrag()
+                            },
                             onVerticalDrag = { change, dragAmount ->
                                 if (isPortraitMain) {
                                     change.consume()
-                                    portraitDragAnimJob?.cancel()
-                                    portraitDragOffsetPx =
-                                        (portraitDragOffsetPx + dragAmount).coerceAtLeast(0f)
+                                    if (!dismissReleasing) {
+                                        portraitDragAnimJob?.cancel()
+                                        portraitDragOffsetPx =
+                                            (portraitDragOffsetPx + dragAmount).coerceAtLeast(0f)
+                                        sheetOffsetPx?.floatValue = portraitDragOffsetPx
+                                        if (!dismissArmed) {
+                                            dismissArmed = true
+                                            onDismissStarted()
+                                        }
+                                        // 一开始下拉就让封面/歌名脱离页面飞向播放栏，
+                                        // 而不是留在原地缩小等松手。
+                                        if (dismissGhost == null) {
+                                            dismissGhost = createDismissGhost()
+                                        }
+                                        if (dismissGhost != null) {
+                                            dismissProgress =
+                                                (portraitDragOffsetPx / portraitDragRangePx)
+                                                    .coerceIn(0f, 1f)
+                                        }
+                                    }
                                 } else if (dragAmount > 60) {
                                     onNavigateUp()
                                 }
                             },
                             onDragEnd = {
                                 if (!isPortraitMain) return@detectVerticalDragGestures
+                                if (dismissReleasing) return@detectVerticalDragGestures
                                 if (portraitDragOffsetPx > portraitDragDismissPx) {
-                                    onNavigateUp()
+                                    runDismissMorph()
                                 } else {
-                                    portraitDragAnimJob?.cancel()
-                                    portraitDragAnimJob = screenScope.launch {
-                                        animate(
-                                            initialValue = portraitDragOffsetPx,
-                                            targetValue = 0f,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                                stiffness = Spring.StiffnessMediumLow
-                                            )
-                                        ) { value, _ ->
-                                            portraitDragOffsetPx = value
-                                        }
-                                    }
+                                    cancelPortraitDrag()
                                 }
                             }
                         )
@@ -3770,11 +3958,23 @@ fun NowPlayingScreen(
                         }
                         Box(
                             modifier = Modifier
+                                .onGloballyPositioned { coordinates ->
+                                    nowPlayingCoverWindowRect = coordinates.boundsInWindow()
+                                }
                                 .fillMaxSize()
                                 .graphicsLayer {
-                                    val dragScale = 1f - portraitDragProgress * 0.72f
-                                    scaleX = dragScale
-                                    scaleY = dragScale
+                                    if (dismissGhost != null) {
+                                        // 飞行层接管封面；两边位置完全重合，切换不可见。
+                                        alpha = 0f
+                                    } else {
+                                        // 进度只在绘制阶段读，拖动时不触发这一屏重组。
+                                        val dragProgress =
+                                            (portraitDragOffsetPx / portraitDragRangePx)
+                                                .coerceIn(0f, 1f)
+                                        val dragScale = 1f - dragProgress * 0.72f
+                                        scaleX = dragScale
+                                        scaleY = dragScale
+                                    }
                                 }
                                 .sharedElement(
                                     rememberSharedContentState(
@@ -3894,7 +4094,7 @@ fun NowPlayingScreen(
                                         text = titleText,
                                         style = LocalNeriTextStyles.current.title,
                                         color = targetNowPlayingColorScheme.onSurface,
-                                        maxLines = 2,
+                                        maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         textAlign = TextAlign.Start,
                                         modifier = Modifier
@@ -4133,9 +4333,9 @@ fun NowPlayingScreen(
 
                     // 封面（旧路径保持原实现；竖屏走新展示层）
                     if (newPortraitStyle) {
-                        // 参考播放器口径：余量全部留在封面上方，封面/歌名/控件贴底成组。
-                        Spacer(Modifier.weight(1f))
+                        // 封面贴住顶部抓条，剩余空间留在封面与歌名之间。
                         coverPortraitContent()
+                        Spacer(Modifier.weight(1f))
                     } else {
                     BoxWithConstraints(
                         modifier = if (useWideLandscapeLayout) {
@@ -4789,16 +4989,21 @@ fun NowPlayingScreen(
                         content = { mainColumnContent(false) }
                     )
                 } else {
-                    // 竖屏（Step 1C-R2）：主背景铺满整个窗口（含系统栏区域），避免露出一圈外层容器。
+                    // 竖屏：整层（氛围底 + 内容）随下拉整体下滑，
+                    // 横杠上方露出的就是底下的首页/曲库/设置/搜索页面。
                     Box(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationY = portraitDragOffsetPx
+                                // 和背景层共用同一个淡化值：收起结束时整页一起隐藏，
+                                // 不会只剩一条横杠浮在首页上面。
+                                alpha = sheetAlpha?.floatValue ?: 1f
+                            }
                     ) {
                         NowPlayingAmbientBackground()
                         NowPlayingScaffold(
-                            modifier = contentModifier.graphicsLayer {
-                                translationY = portraitDragOffsetPx
-                                alpha = 1f - portraitDragProgress * 0.2f
-                            },
+                            modifier = contentModifier,
                             drawBackground = false
                         ) {
                             mainColumnContent(true)
@@ -4807,6 +5012,19 @@ fun NowPlayingScreen(
                 }
                     }
                 }
+            }
+
+            // 收起过渡层：封面从播放页位置插值到播放栏封面位置。
+            val ghost = dismissGhost
+            if (ghost != null) {
+                NowPlayingDismissGhostLayer(
+                    ghost = ghost,
+                    progress = { dismissProgress },
+                    coverUrl = currentCoverUrl,
+                    songKey = coverSongKey,
+                    offlineMode = offlineMode,
+                    context = context
+                )
             }
 
             // 音量控制弹窗

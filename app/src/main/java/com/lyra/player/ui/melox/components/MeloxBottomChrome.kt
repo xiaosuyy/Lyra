@@ -5,8 +5,9 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -33,7 +34,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -42,6 +48,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +58,8 @@ import androidx.compose.ui.unit.sp
 import com.lyra.player.ui.melox.glass.MeloxGlassSpec
 import com.lyra.player.ui.melox.glass.meloxGlassSurface
 import com.lyra.player.ui.melox.theme.MeloxShapes
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 data class MeloxTabItem(
     val route: String,
@@ -200,6 +210,7 @@ private fun MeloxTabCapsule(
                 // -1 = 当前页不在三个标签里（搜索页）：水珠与选中态一起隐藏。
                 val selectedIndex = items.indexOfFirst { it.route == selectedRoute }
                 val tabWidth = if (items.isEmpty()) 0.dp else maxWidth / items.size
+                val tabWidthPx = with(LocalDensity.current) { tabWidth.toPx() }
                 // 水珠位置：弹簧移动，速度驱动横向拉伸 / 纵向压缩（MeloX 的关键帧观感）。
                 // 初值直接取当前选中项，避免冷启动落在非首页时水珠先滑一段。
                 val pillPosition = remember {
@@ -214,8 +225,36 @@ private fun MeloxTabCapsule(
                     animationSpec = tween(durationMillis = 200),
                     label = "melox_tab_pill_alpha",
                 )
+                // 按住水珠时的玻璃透镜：按压进度驱动折射/高光，
+                // 手指左右滑可以把它拖到别的标签上，松手才真正切页。
+                var lensActive by remember { mutableStateOf(false) }
+                var lensPreviewIndex by remember { mutableIntStateOf(selectedIndex) }
+                // 按住时手指位置直接写进这个值，松手再交接给 pillPosition 的弹簧。
+                var lensDragIndex by remember {
+                    mutableFloatStateOf(selectedIndex.coerceAtLeast(0).toFloat())
+                }
+                val lensPress by animateFloatAsState(
+                    targetValue = if (lensActive) 1f else 0f,
+                    animationSpec = spring(dampingRatio = 0.82f, stiffness = 520f),
+                    label = "melox_tab_lens_press",
+                )
+                val screenScope = rememberCoroutineScope()
+                // 按住期间底栏若被收起、或标签从外部被切走，pointerInput 会被取消，
+                // 松手那段收尾不会执行；这里兜底把透镜和位置复位。
+                val lensAllowed = expandedAlpha > 0.5f
+                LaunchedEffect(lensAllowed, selectedIndex) {
+                    if (lensActive && (!lensAllowed || selectedIndex != lensPreviewIndex)) {
+                        lensActive = false
+                        if (selectedIndex >= 0) {
+                            pillPosition.animateTo(
+                                targetValue = selectedIndex.toFloat(),
+                                animationSpec = spring(dampingRatio = 0.72f, stiffness = 320f),
+                            )
+                        }
+                    }
+                }
                 LaunchedEffect(selectedIndex) {
-                    if (selectedIndex >= 0) {
+                    if (selectedIndex >= 0 && !lensActive) {
                         pillPosition.animateTo(
                             targetValue = selectedIndex.toFloat(),
                             animationSpec = spring(dampingRatio = 0.72f, stiffness = 320f),
@@ -226,30 +265,120 @@ private fun MeloxTabCapsule(
                     Box(
                         modifier = Modifier
                             .graphicsLayer {
-                                translationX = pillPosition.value * tabWidth.toPx()
+                                translationX = (if (lensActive) {
+                                    lensDragIndex
+                                } else {
+                                    pillPosition.value
+                                }) * tabWidth.toPx()
+                                val press = lensPress
+                                // 按住时水珠略微长大，配合折射读起来像一颗透镜。
+                                scaleX = 1f + 0.14f * press
+                                scaleY = 1f + 0.14f * press
                                 val velocity = (pillPosition.velocity / 10f)
-                                scaleX = 1f / (1f - (velocity * 0.75f).coerceIn(-0.2f, 0.2f))
-                                scaleY = 1f - (velocity * 0.25f).coerceIn(-0.1f, 0.1f)
+                                if (press < 0.01f) {
+                                    scaleX *= 1f / (1f - (velocity * 0.75f).coerceIn(-0.2f, 0.2f))
+                                    scaleY *= 1f - (velocity * 0.25f).coerceIn(-0.1f, 0.1f)
+                                }
                             }
                             .width(tabWidth)
                             .fillMaxHeight()
                             .padding(horizontal = 5.dp, vertical = 6.dp)
                             .alpha(expandedAlpha * pillAlpha)
-                            .background(
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
+                            .meloxGlassSurface(
                                 shape = capsuleShape,
-                            ),
+                                // 按得越深，涂层越淡，透镜的折射和高光越明显。
+                                surfaceColor = MaterialTheme.colorScheme.onBackground
+                                    .copy(alpha = 0.08f * (1f - 0.75f * lensPress)),
+                                pressProgress = lensPress,
+                                spec = MeloxGlassSpec(
+                                    blurRadius = 0.dp,
+                                    lensRadius = 26.dp,
+                                    refractionHeight = 16.dp,
+                                    useDepthEffect = false,
+                                ),
+                            )
                     )
                 }
                 // 展开层：等宽三槽，始终不改变权重，避免每帧重新测量文字。
-                Row(Modifier.fillMaxSize()) {
-                    items.forEach { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(items, selectedIndex, tabWidthPx, expandedAlpha > 0.5f) {
+                            if (items.isEmpty() || selectedIndex < 0 || tabWidthPx <= 0f) {
+                                return@pointerInput
+                            }
+                            val expandedEnough = expandedAlpha > 0.5f
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                // 只在“按住的正是当前选中标签”时进入透镜手势；
+                                // 按别的标签仍然走原来的点击切页。
+                                if (!expandedEnough) return@awaitEachGesture
+                                val downIndex = (down.position.x / tabWidthPx)
+                                    .toInt()
+                                    .coerceIn(0, items.lastIndex)
+                                if (downIndex != selectedIndex) return@awaitEachGesture
+                                down.consume()
+                                lensActive = true
+                                lensPreviewIndex = selectedIndex
+                                lensDragIndex = selectedIndex.toFloat()
+                                var lastX = down.position.x
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes
+                                        .firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) {
+                                        change.consume()
+                                        break
+                                    }
+                                    val x = change.position.x
+                                    if (x != lastX) {
+                                        lastX = x
+                                        change.consume()
+                                        val index = (x / tabWidthPx - 0.5f)
+                                            .coerceIn(0f, items.lastIndex.toFloat())
+                                        lensDragIndex = index
+                                        lensPreviewIndex = index.roundToInt()
+                                            .coerceIn(0, items.lastIndex)
+                                    }
+                                }
+                                val target = lensPreviewIndex
+                                val settleIndex = lensDragIndex
+                                screenScope.launch {
+                                    // 先把弹簧停到手指松开的格上，再交还 pillPosition，
+                                    // 两帧之间位移不变，收尾动画不会跳。
+                                    pillPosition.snapTo(settleIndex)
+                                    lensActive = false
+                                    // 落回原标签也要走一次 onSelect：它同时负责触感反馈，
+                                    // 以及从详情页回弹到该标签根页（原来点击选中标签的行为）。
+                                    onSelect(items[target].route)
+                                    if (target == selectedIndex) {
+                                        pillPosition.animateTo(
+                                            targetValue = selectedIndex.toFloat(),
+                                            animationSpec = spring(
+                                                dampingRatio = 0.72f,
+                                                stiffness = 320f,
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    items.forEachIndexed { index, item ->
+                        val previewing = lensActive && lensPress > 0.35f
                         MeloxTab(
                             item = item,
-                            selected = item.route == selectedRoute,
+                            selected = if (previewing) {
+                                index == lensPreviewIndex
+                            } else {
+                                item.route == selectedRoute
+                            },
                             onClick = { onSelect(item.route) },
                             iconAlpha = expandedAlpha,
                             labelAlpha = labelAlpha * expandedAlpha,
+                            lensPressed = lensActive && lensPress > 0.5f &&
+                                index == lensPreviewIndex,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -344,10 +473,15 @@ private fun MeloxTab(
     onClick: () -> Unit,
     iconAlpha: Float,
     labelAlpha: Float,
+    lensPressed: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val iconScale by animateFloatAsState(
-        targetValue = if (selected) 1.12f else 1f,
+        targetValue = when {
+            lensPressed -> 1.24f
+            selected -> 1.12f
+            else -> 1f
+        },
         animationSpec = spring(dampingRatio = 0.55f, stiffness = 520f),
         label = "melox_tab_scale",
     )

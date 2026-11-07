@@ -65,6 +65,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -82,6 +83,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import com.lyra.player.ui.melox.components.MeloxBottomChrome
 import com.lyra.player.ui.melox.components.MeloxMiniPlayer
+import com.lyra.player.ui.melox.components.MeloxMiniTrack
 import com.lyra.player.ui.melox.components.MeloxTabItem
 import com.lyra.player.ui.component.overlay.AppUpdateStartupHost
 import com.lyra.player.ui.component.overlay.DensityScaledAlertDialog as AlertDialog
@@ -95,6 +97,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -1431,6 +1434,9 @@ private fun LyraAppContent(
         initialValue = initialThemeSnapshot.forceDark
     )
     var showNowPlaying by rememberSaveable { mutableStateOf(false) }
+    // 播放页下拉收起期间：底栏与页面层提前归位，收起动画飞向迷你播放器。
+    var nowPlayingDismissing by remember { mutableStateOf(false) }
+    var miniPlayerCoverBounds by remember { mutableStateOf<Rect?>(null) }
     var showNowPlayingLyrics by rememberSaveable { mutableStateOf(false) }
     var currentPlaybackSourceRoute by rememberSaveable { mutableStateOf<String?>(null) }
     var restoreLyricsAfterAlbumBack by rememberSaveable { mutableStateOf(false) }
@@ -1800,8 +1806,6 @@ private fun LyraAppContent(
     LaunchedEffect(hapticFeedbackEnabled) {
         syncHapticFeedbackSetting(hapticFeedbackEnabled)
     }
-
-    var bottomBarHeightPx by remember { mutableIntStateOf(0) }
 
     val isDark = StartupThemeResolver.resolveModeUseDark(
         mode = themeMode,
@@ -3278,7 +3282,9 @@ private fun LyraAppContent(
 
                 val containerColor = Color.Transparent
 
-                val isMiniPlayerVisible = currentSong != null && !showNowPlaying
+                // 迷你播放器常驻组合：下拉手势一开始它的封面/歌名落点就已经量好，
+                // 不用等首帧布局再去补建飞行层，松手时也不会突然组一整块玻璃而卡一下。
+                val isMiniPlayerVisible = currentSong != null
                 // 下拉/上滑联动底栏：内容向下滚动时收起成图标+迷你播放器。
                 var chromeCollapsed by rememberSaveable { mutableStateOf(false) }
                 val chromeCollapseConnection = remember {
@@ -3328,7 +3334,7 @@ private fun LyraAppContent(
                 // 播放器展开时页面层下沉：0.83 缩放 / 30dp 下移 / 0.24 压暗，
                 // 与参考播放器同一口径；只作用于页面层，底部 chrome 不随之缩放。
                 val playerRecedeProgress by animateFloatAsState(
-                    targetValue = if (showNowPlaying) 1f else 0f,
+                    targetValue = if (showNowPlaying && !nowPlayingDismissing) 1f else 0f,
                     animationSpec = tween(
                         durationMillis = if (showNowPlaying) 350 else 320,
                         easing = FastOutSlowInEasing
@@ -3372,7 +3378,7 @@ private fun LyraAppContent(
                         },
                         bottomBar = {
                             val bottomBarVisibilityProgress by animateFloatAsState(
-                                targetValue = if (showNowPlaying) 0f else 1f,
+                                targetValue = if (showNowPlaying && !nowPlayingDismissing) 0f else 1f,
                                 animationSpec = tween(
                                     durationMillis = if (showNowPlaying) 220 else 280,
                                     easing = FastOutSlowInEasing
@@ -3387,15 +3393,10 @@ private fun LyraAppContent(
                                 Column(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
-                                        .onSizeChanged { size ->
-                                            if (size.height > 0) {
-                                                bottomBarHeightPx = size.height
-                                            }
-                                        }
                                         .graphicsLayer {
-                                            translationY =
-                                                (1f - bottomBarVisibilityProgress) * bottomBarHeightPx
-                                                    .toFloat()
+                                            // 只淡入淡出、不做位移：迷你播放器是用
+                                            // boundsInWindow 量的，底栏一旦位移，量到的
+                                            // 落点会跟着漂，播放页收起的封面就落不准。
                                             alpha = bottomBarVisibilityProgress
                                         }
                                 ) {
@@ -3438,15 +3439,56 @@ private fun LyraAppContent(
                                         },
                                         miniPlayerVisible = isMiniPlayerVisible,
                                         miniPlayer = { compactProgress ->
+                                            val miniQueue by PlayerManager.currentQueueFlow
+                                                .collectAsStateWithLifecycle()
+                                            val miniQueueRevision by
+                                                PlayerManager.currentQueueDisplayRevisionFlow
+                                                    .collectAsStateWithLifecycle()
+                                            // 用播放器自己的队标位置取邻居；按曲目 id 反查在换源/回填后会落空。
+                                            val miniNeighbors = remember(
+                                                miniQueue,
+                                                miniQueueRevision,
+                                                currentSong,
+                                            ) {
+                                                val snapshot = PlayerManager.currentQueueDisplaySnapshot()
+                                                snapshot.items.getOrNull(snapshot.currentDisplayIndex - 1)?.song to
+                                                    snapshot.items.getOrNull(snapshot.currentDisplayIndex + 1)?.song
+                                            }
+                                            val miniPreviousSong = miniNeighbors.first
+                                            val miniNextSong = miniNeighbors.second
+                                            val miniPreviousCover = rememberSongDisplayCoverUrl(miniPreviousSong)
+                                            val miniNextCover = rememberSongDisplayCoverUrl(miniNextSong)
+                                            val miniPreviousTrack = remember(miniPreviousSong, miniPreviousCover) {
+                                                miniPreviousSong?.let { song ->
+                                                    MeloxMiniTrack(
+                                                        title = song.displayName(),
+                                                        artist = song.displayArtist(),
+                                                        coverUrl = miniPreviousCover
+                                                    )
+                                                }
+                                            }
+                                            val miniNextTrack = remember(miniNextSong, miniNextCover) {
+                                                miniNextSong?.let { song ->
+                                                    MeloxMiniTrack(
+                                                        title = song.displayName(),
+                                                        artist = song.displayArtist(),
+                                                        coverUrl = miniNextCover
+                                                    )
+                                                }
+                                            }
                                             AnimatedVisibility(
                                                 visible = isMiniPlayerVisible,
-                                                enter = slideInVertically(
-                                                    animationSpec = tween(
-                                                        durationMillis = 220,
-                                                        easing = FastOutSlowInEasing
-                                                    ),
-                                                    initialOffsetY = { it / 2 }
-                                                ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+                                                enter = if (nowPlayingDismissing) {
+                                                    EnterTransition.None
+                                                } else {
+                                                    slideInVertically(
+                                                        animationSpec = tween(
+                                                            durationMillis = 220,
+                                                            easing = FastOutSlowInEasing
+                                                        ),
+                                                        initialOffsetY = { it / 2 }
+                                                    ) + fadeIn(animationSpec = tween(durationMillis = 180))
+                                                },
                                                 exit = slideOutVertically(
                                                     animationSpec = tween(
                                                         durationMillis = 180,
@@ -3466,8 +3508,14 @@ private fun LyraAppContent(
                                                     playPauseEnabled = !usbPlaybackPreparing,
                                                     onPlayPause = { PlayerManager.togglePlayPause() },
                                                     onNext = { PlayerManager.next() },
+                                                    onPrevious = { PlayerManager.previous() },
+                                                    previousTrack = miniPreviousTrack,
+                                                    nextTrack = miniNextTrack,
                                                     onExpand = { showNowPlaying = true },
-                                                    compactProgress = compactProgress
+                                                    compactProgress = compactProgress,
+                                                    onCoverBoundsChanged = { rect ->
+                                                        miniPlayerCoverBounds = rect
+                                                    }
                                                 )
                                             }
                                         }
@@ -4365,6 +4413,18 @@ private fun LyraAppContent(
 
                         val nowPlayingQueue by PlayerManager.currentQueueFlow.collectAsStateWithLifecycle()
                         val nowPlayingCoverUrl = currentCoverUrl
+                        // 播放页整层（模糊底 + 内容）随下拉一起位移，露出的上方区域
+                        // 才是底下的首页/曲库页面；收起时整层淡出。
+                        val nowPlayingSheetOffsetPx = remember { mutableFloatStateOf(0f) }
+                        val nowPlayingSheetAlpha = remember { mutableFloatStateOf(1f) }
+                        // 收起结束时这份状态是 0；再次打开页面前先复位，
+                        // 否则退出动画还没跑完就点开迷你播放器会得到一张全透明的播放页。
+                        LaunchedEffect(showNowPlaying) {
+                            if (showNowPlaying) {
+                                nowPlayingSheetOffsetPx.floatValue = 0f
+                                nowPlayingSheetAlpha.floatValue = 1f
+                            }
+                        }
 
                         Box(
                             modifier = Modifier
@@ -4474,6 +4534,20 @@ private fun LyraAppContent(
                             val blurBackdropCoverUrl = stableCoverUrl ?: nowPlayingCoverUrl
                             val useCoverBlurBackground = hasCoverBlur && !coverBlurLoadFailed
 
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { alpha = nowPlayingSheetAlpha.floatValue }
+                            ) {
+                            // 背景层单独跟随下拉位移：播放页内容在 NowPlayingScreen 里
+                            // 用同一个位移量自己走，封面飞行层留在位移之外。
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        translationY = nowPlayingSheetOffsetPx.floatValue
+                                    }
+                            ) {
                             if (!useCoverBlurBackground) {
                                 // 背景固定按暗色逻辑渲染
                                 NowPlayingAccentBackdrop(
@@ -4589,11 +4663,23 @@ private fun LyraAppContent(
                                     offlineMode = offlineMode
                                 )
                             }
+                            }
+                            }
 
                             CompositionLocalProvider(LocalMiniPlayerHeight provides 0.dp) {
                                 val currentSourceRoute = currentPlaybackSourceRoute
                                 NowPlayingScreen(
-                                    onNavigateUp = { showNowPlaying = false },
+                                    onNavigateUp = {
+                                        // 不要在这里把 sheetAlpha 复位成 1f：
+                                        // 退出动画还在用这份状态渲染，复位会让播放页整屏闪现一下。
+                                        showNowPlaying = false
+                                        nowPlayingDismissing = false
+                                    },
+                                    onDismissStarted = { nowPlayingDismissing = true },
+                                    onDismissCanceled = { nowPlayingDismissing = false },
+                                    miniPlayerCoverBounds = miniPlayerCoverBounds,
+                                    sheetOffsetPx = nowPlayingSheetOffsetPx,
+                                    sheetAlpha = nowPlayingSheetAlpha,
                                     onOpenCurrentPlaybackSource = currentSourceRoute?.let { route ->
                                         {
                                             navigateToPlaybackSourceRoute(route)
