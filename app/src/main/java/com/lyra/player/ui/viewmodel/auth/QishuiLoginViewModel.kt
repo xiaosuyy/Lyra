@@ -297,9 +297,11 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
         getApplication<Application>().getString(resId, *args)
 
     private companion object {
-        const val QR_POLL_INTERVAL_MS = 3_000L
-        const val QR_POLL_ATTEMPTS = 200
-        const val RATE_LIMIT_BACKOFF_MS = 5_000L
+        // 每次轮询都会在 WebView 里重新生成 a_bogus 签名，3 秒一次会被 passport
+        // 判定为访问频繁（error_code=7）；参考实现两次签名请求之间至少间隔 15 秒。
+        const val QR_POLL_INTERVAL_MS = 15_000L
+        const val QR_POLL_ATTEMPTS = 80
+        const val RATE_LIMIT_BACKOFF_MS = 30_000L
         const val RATE_LIMIT_CODE = 7
         const val NEED_VERIFY_CODE = 2046
         const val MAX_SETUP_FAILURES = 3
