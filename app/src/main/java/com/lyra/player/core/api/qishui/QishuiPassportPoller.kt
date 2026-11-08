@@ -36,6 +36,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.lyra.player.core.logging.LyraLogger
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -227,9 +228,16 @@ internal class QishuiPassportPoller {
     private fun complete(raw: String?) {
         val result = runCatching {
             val payload = JSONObject(raw.orEmpty())
-            val body = payload.optString("body")
+            // signer 页面返回 {status, json, text, ...}，json 为解析后的对象。
+            val body = payload.optString("text")
+                .ifBlank { payload.optJSONObject("json")?.toString().orEmpty() }
             val httpStatus = payload.optInt("status", 0)
             val error = payload.optString("error")
+            LyraLogger.d(
+                "LYRA-QishuiLogin",
+                "poll raw http=$httpStatus error=$error signed=${payload.optBoolean("signed")} " +
+                    "len=${body.length} body=${body.take(240)}"
+            )
             if (body.isBlank() && httpStatus == 0) {
                 throw IOException(error.ifBlank { "汽水音乐安全组件未响应" })
             }
@@ -325,13 +333,12 @@ internal class QishuiPassportPoller {
     private companion object {
         const val ORIGIN = "https://api.qishui.com"
         const val BFF_ORIGIN = "https://bff-pc.qishui.com"
-        const val SIGNER_PATH = "/lyra-passport.html"
+        const val SIGNER_PATH = "/qsyy-poll.html"
         const val PAGE_URL = "https://api.qishui.com$SIGNER_PATH"
         const val POLL_TIMEOUT_MS = 30_000L
         const val PASSPORT_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                "(KHTML, like Gecko) SodaMusic/3.1.0 Chrome/136.0.7103.59 " +
-                "Electron/36.4.0-rs.22.release.main.1 TTElectron/36.4.0-rs.22.release.main.1 " +
-                "Safari/537.36"
+                "(KHTML, like Gecko) SodaMusic/3.2.1 Chrome/136.0.7103.59 " +
+                "Electron/36.4.0 Safari/537.36"
     }
 }
