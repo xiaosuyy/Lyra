@@ -370,6 +370,11 @@ internal class QishuiApiClient(
                 .ifBlank { json.optJSONObject("status_info")?.optString("status_msg").orEmpty() }
                 .ifBlank { json.optString("message") }
             LyraLogger.w("LYRA-QishuiApi", "passport error code=$code message=$message")
+            if (code == NEED_VERIFY_CODE) {
+                // 二次验证的可用方式只在完整响应里，必须整包落日志便于排查。
+                LyraLogger.w("LYRA-QishuiApi", "passport verify body=${response.body}")
+                throw QishuiRequestException(code, verifyMessage(json, data).ifBlank { message })
+            }
             throw QishuiRequestException(
                 code,
                 if (message.isBlank()) {
@@ -402,6 +407,37 @@ internal class QishuiApiClient(
             sessionId = sessionId,
             cookie = merged
         )
+    }
+
+    /**
+     * 2046 的完整响应里有 `description`（例如「请前往抖音 APP 完成验证」）和
+     * `verify_ways`（短信上行/下行），把它们拼成可直接照做的提示。
+     */
+    private fun verifyMessage(json: JSONObject, data: JSONObject): String {
+        val description = data.optString("description")
+            .ifBlank { json.optString("description") }
+        val ways = data.optJSONArray("verify_ways") ?: json.optJSONArray("verify_ways")
+        val hints = mutableListOf<String>()
+        if (ways != null) {
+            for (index in 0 until ways.length()) {
+                val way = ways.optJSONObject(index) ?: continue
+                when (way.optString("verify_way")) {
+                    "mobile_up_sms_verify" -> {
+                        val number = way.optString("channel_mobile")
+                        val content = way.optString("sms_content")
+                        if (number.isNotBlank() && content.isNotBlank()) {
+                            hints += "也可用手机向 $number 发送 $content 完成验证"
+                        }
+                    }
+                    "mobile_sms_verify" -> {
+                        val mobile = way.optString("mobile")
+                        if (mobile.isNotBlank()) hints += "短信验证码会发到 $mobile"
+                    }
+                }
+            }
+        }
+        return (listOf(description.ifBlank { "汽水音乐要求完成二次验证" }) + hints)
+            .joinToString("\n")
     }
 
     private fun encodeParams(params: Map<String, String>): String =
@@ -648,6 +684,7 @@ internal class QishuiApiClient(
         const val PC_LOGIN_NEXT = "https://api.qishui.com"
         const val APP_ORIGIN = "https://beta-luna.douyin.com"
         private const val MAX_LOGIN_REDIRECTS = 8
+        private const val NEED_VERIFY_CODE = 2046
         private val LOGIN_COOKIE_DOMAINS = setOf(
             "qishui.com",
             "douyin.com",

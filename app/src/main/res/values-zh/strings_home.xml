@@ -80,7 +80,7 @@
     <string name="qishui_qr_scan_hint">请使用汽水音乐 App 扫描二维码并确认登录</string>
     <string name="qishui_qr_scanned">已扫码，请在汽水音乐 App 中确认登录</string>
     <string name="qishui_qr_confirmed">已确认，正在获取登录态…</string>
-    <string name="qishui_qr_need_verify">汽水音乐上还需要再确认一次验证</string>
+    <string name="qishui_qr_need_verify">账号安全验证：请在手机上的抖音或汽水音乐 App 中完成验证，完成后会自动登录</string>
     <string name="qishui_qr_expired">二维码已失效，请刷新重试</string>
     <string name="qishui_qr_timeout">登录超时，请刷新二维码</string>
     <string name="qishui_qr_refresh">刷新二维码</string>

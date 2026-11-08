@@ -80,7 +80,7 @@
     <string name="qishui_qr_scan_hint">Scan the QR code with the Qishui Music App and confirm</string>
     <string name="qishui_qr_scanned">Scanned, confirm the sign-in in the Qishui Music App</string>
     <string name="qishui_qr_confirmed">Confirmed, fetching your session…</string>
-    <string name="qishui_qr_need_verify">Qishui needs one more confirmation</string>
+    <string name="qishui_qr_need_verify">Security check: finish the verification in the Douyin or Qishui Music app on your phone, then sign-in continues automatically</string>
     <string name="qishui_qr_expired">The QR code expired, please refresh</string>
     <string name="qishui_qr_timeout">Sign-in timed out, please refresh the QR code</string>
     <string name="qishui_qr_refresh">Refresh QR code</string>

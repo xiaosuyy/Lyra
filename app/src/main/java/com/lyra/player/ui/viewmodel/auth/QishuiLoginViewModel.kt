@@ -162,9 +162,11 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
                             delay(RATE_LIMIT_BACKOFF_MS)
                         }
                         code == NEED_VERIFY_CODE -> {
-                            _uiState.update {
-                                it.copy(statusMessage = getString(R.string.qishui_qr_need_verify))
-                            }
+                            // 服务端会给出具体验证方式（抖音 App 确认 / 短信上行），
+                            // 比通用文案更能告诉用户下一步该做什么。
+                            val hint = message.substringBefore("（错误码 ")
+                                .ifBlank { getString(R.string.qishui_qr_need_verify) }
+                            _uiState.update { it.copy(statusMessage = hint) }
                         }
                         code in TERMINAL_CODES ||
                             TERMINAL_HINTS.any { message.contains(it) } -> {
