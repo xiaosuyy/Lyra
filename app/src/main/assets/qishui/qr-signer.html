@@ -59,11 +59,34 @@ window.qsyyWhenReady = function (timeout) {
   });
 };
 
+function cookieOf(name) {
+  var parts = String(document.cookie || '').split(';');
+  for (var i = 0; i < parts.length; i++) {
+    var part = parts[i].trim();
+    var eq = part.indexOf('=');
+    if (eq > 0 && part.slice(0, eq) === name) {
+      try { return decodeURIComponent(part.slice(eq + 1)); } catch (e) { return part.slice(eq + 1); }
+    }
+  }
+  return '';
+}
+
+function errorCodeOf(json) {
+  if (!json) return -1;
+  var data = json.data && typeof json.data === 'object' ? json.data : json;
+  var code = Number(data.error_code == null ? json.error_code : data.error_code);
+  return isNaN(code) ? -1 : code;
+}
+
 window.qsyyPassportPoll = async function (opts) {
   await window.qsyyWhenReady();
   var headers = Object.assign({}, opts.headers || {});
   delete headers.cookie;
   delete headers.Cookie;
+  // 扫码后 passport 会比对 CSRF 请求头和实际随 XHR 发出的 Cookie，
+  // 页面里的 Cookie 才是真正生效的那个，优先用它覆盖。
+  var csrf = cookieOf('passport_csrf_token') || cookieOf('passport_csrf_token_default');
+  if (csrf) headers['x-tt-passport-csrf-token'] = csrf;
   var result = await window.__qishuiRequest({
     method: 'POST',
     url: opts.postUrl,
@@ -72,15 +95,20 @@ window.qsyyPassportPoll = async function (opts) {
     timeout: 20000,
   });
   var json = parseJson(result.body);
-  if (!json && opts.getUrl) {
-    result = await window.__qishuiRequest({
+  // POST 被风控判成“访问太频繁”时，GET 走的是另一套查询通道，值得补一次。
+  if ((!json || errorCodeOf(json) === 7) && opts.getUrl) {
+    var retry = await window.__qishuiRequest({
       method: 'GET',
       url: opts.getUrl,
       headers: headers,
       body: null,
       timeout: 20000,
     });
-    json = parseJson(result.body);
+    var retryJson = parseJson(retry.body);
+    if (!json || (retryJson && errorCodeOf(retryJson) !== 7)) {
+      result = retry;
+      json = retryJson;
+    }
   }
   var aBogus = aBogusOf(result.responseURL || opts.postUrl || '');
   if (aBogus.length !== 44) {

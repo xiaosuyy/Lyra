@@ -43,6 +43,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.IOException
@@ -109,6 +110,7 @@ internal class QishuiPassportPoller {
     suspend fun poll(request: QishuiPollRequest): QishuiPollResponse = mutex.withLock {
         withContext(Dispatchers.Main.immediate) { ensureView(request) }
         awaitPageReady()
+        val effective = withContext(Dispatchers.Main.immediate) { withLiveCsrf(request) }
         suspendCancellableCoroutine { continuation ->
             main.post {
                 if (!continuation.isActive) return@post
@@ -118,7 +120,7 @@ internal class QishuiPassportPoller {
                     finishPending(pending, IOException("汽水音乐登录轮询超时"))
                 }.also { main.postDelayed(it, POLL_TIMEOUT_MS) }
                 evaluatePoll(
-                    request,
+                    effective,
                     onMissingView = {
                         finishPending(pending, IOException("登录页面已关闭，请重新扫码"))
                     }
@@ -148,6 +150,41 @@ internal class QishuiPassportPoller {
             continuation.invokeOnCancellation { main.post { readyCallback = null } }
         }
     }
+
+    /**
+     * 扫码后 passport 会校验 CSRF 请求头与实际 Cookie 是否一致；
+     * WebView 里的 Cookie 会被页面响应刷新，不能沿用建码时 OkHttp 收到的旧值。
+     */
+    private fun withLiveCsrf(request: QishuiPollRequest): QishuiPollRequest {
+        if (!request.headers.containsKey(CSRF_HEADER)) return request
+        val jar = liveCookieHeader()
+        val live = cookieValue(jar, "passport_csrf_token")
+            .ifBlank { cookieValue(jar, "passport_csrf_token_default") }
+        val seed = request.headers[CSRF_HEADER].orEmpty()
+        LyraLogger.d(
+            "LYRA-QishuiLogin",
+            "poll csrf live=${live.length} seed=${seed.length} match=${live == seed} " +
+                "jarKeys=${jar.split(';').map { it.substringBefore('=').trim() }.filter { it.isNotBlank() }}"
+        )
+        if (live.isBlank()) return request
+        return request.copy(headers = request.headers + (CSRF_HEADER to live))
+    }
+
+    private fun liveCookieHeader(): String {
+        val cookies = CookieManager.getInstance()
+        cookies.flush()
+        return listOf(ORIGIN, BFF_ORIGIN)
+            .mapNotNull { cookies.getCookie(it) }
+            .filter { it.isNotBlank() }
+            .joinToString("; ")
+    }
+
+    private fun cookieValue(header: String, name: String): String =
+        header.split(';')
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("$name=") }
+            ?.substringAfter('=')
+            .orEmpty()
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun ensureView(request: QishuiPollRequest) {
@@ -233,9 +270,13 @@ internal class QishuiPassportPoller {
                 .ifBlank { payload.optJSONObject("json")?.toString().orEmpty() }
             val httpStatus = payload.optInt("status", 0)
             val error = payload.optString("error")
+            val signedUrl = payload.optString("responseURL").toHttpUrlOrNull()
             LyraLogger.d(
                 "LYRA-QishuiLogin",
                 "poll raw http=$httpStatus error=$error signed=${payload.optBoolean("signed")} " +
+                    "aBogus=${signedUrl?.queryParameter("a_bogus")?.length} " +
+                    "msToken=${signedUrl?.queryParameter("msToken")?.length} " +
+                    "urlKeys=${signedUrl?.queryParameterNames?.joinToString(",")} " +
                     "len=${body.length} body=${body.take(240)}"
             )
             if (body.isBlank() && httpStatus == 0) {
@@ -336,6 +377,7 @@ internal class QishuiPassportPoller {
         const val SIGNER_PATH = "/qsyy-poll.html"
         const val PAGE_URL = "https://api.qishui.com$SIGNER_PATH"
         const val POLL_TIMEOUT_MS = 30_000L
+        const val CSRF_HEADER = "x-tt-passport-csrf-token"
         const val PASSPORT_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) SodaMusic/3.2.1 Chrome/136.0.7103.59 " +
