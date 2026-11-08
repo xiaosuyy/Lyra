@@ -229,6 +229,21 @@ object AppContainer {
     val settingsRepo by lazy { SettingsRepository(application) }
     val homeLayoutRepository by lazy { HomeLayoutRepository(application) }
     val neteaseCookieRepo by lazy { NeteaseCookieRepository(application) }
+    val qishuiSessionStore by lazy {
+        com.lyra.player.data.auth.qishui.QishuiSessionStore(application)
+    }
+    internal val qishuiApiClient by lazy {
+        com.lyra.player.core.api.qishui.QishuiApiClient(
+            sessionProvider = qishuiSessionStore::getSessionOnce,
+            httpClient = sharedOkHttpClient
+        )
+    }
+    internal val qishuiRepository by lazy {
+        com.lyra.player.core.api.qishui.QishuiRepository(
+            api = qishuiApiClient,
+            sessionStore = qishuiSessionStore
+        )
+    }
     val biliCookieRepo by lazy { BiliCookieRepository(application) }
     val youtubeAuthRepo by lazy { YouTubeAuthRepository(application) }
     internal val youtubeAuthAutoRefreshManager by lazy {

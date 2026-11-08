@@ -162,6 +162,8 @@ import com.lyra.player.ui.effect.glass.isolatedAdvancedGlassHorizontalTransition
 import com.lyra.player.ui.screen.tab.settings.about.SettingsAboutContent
 import com.lyra.player.ui.screen.tab.settings.auth.LoginSuccessDialog
 import com.lyra.player.ui.screen.tab.settings.auth.NeteaseAccountEntryCard
+import com.lyra.player.ui.screen.tab.settings.auth.QishuiAccountEntryCard
+import com.lyra.player.ui.screen.tab.settings.auth.QishuiLoginScreen
 import com.lyra.player.ui.screen.tab.settings.auth.NeteaseLoginScreen
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsBiliAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsYouTubeAuthDialogs
@@ -216,6 +218,7 @@ import com.lyra.player.ui.viewmodel.ConfigTransferViewModel
 import com.lyra.player.ui.viewmodel.auth.BiliAuthEvent
 import com.lyra.player.ui.viewmodel.auth.BiliAuthViewModel
 import com.lyra.player.ui.viewmodel.auth.NeteaseLoginViewModel
+import com.lyra.player.ui.viewmodel.auth.QishuiLoginViewModel
 import com.lyra.player.ui.viewmodel.auth.YouTubeAuthEvent
 import com.lyra.player.ui.viewmodel.auth.YouTubeAuthViewModel
 import kotlin.math.absoluteValue
@@ -656,6 +659,9 @@ fun SettingsScreen(
     val neteaseLoginVm: NeteaseLoginViewModel = viewModel()
     val neteaseLoginUiState by neteaseLoginVm.uiState.collectAsStateWithLifecycleCompat()
     var showNeteaseLogin by rememberSaveable { mutableStateOf(false) }
+    val qishuiLoginVm: QishuiLoginViewModel = viewModel()
+    val qishuiLoginUiState by qishuiLoginVm.uiState.collectAsStateWithLifecycleCompat()
+    var showQishuiLogin by rememberSaveable { mutableStateOf(false) }
     
     // 备份与恢复
     val backupRestoreVm: BackupRestoreViewModel = viewModel()
@@ -1159,6 +1165,16 @@ fun SettingsScreen(
                 onClick = {
                     neteaseLoginVm.clearError()
                     showNeteaseLogin = true
+                },
+                modifier = Modifier.animateItem()
+            )
+        }
+        item(key = "settings_qishui_account") {
+            QishuiAccountEntryCard(
+                uiState = qishuiLoginUiState,
+                onClick = {
+                    qishuiLoginVm.clearError()
+                    showQishuiLogin = true
                 },
                 modifier = Modifier.animateItem()
             )
@@ -1872,6 +1888,20 @@ fun SettingsScreen(
             NeteaseLoginScreen(
                 vm = neteaseLoginVm,
                 onBack = { showNeteaseLogin = false }
+            )
+        }
+    }
+    if (showQishuiLogin) {
+        Dialog(
+            onDismissRequest = { showQishuiLogin = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            QishuiLoginScreen(
+                vm = qishuiLoginVm,
+                onBack = { showQishuiLogin = false }
             )
         }
     }

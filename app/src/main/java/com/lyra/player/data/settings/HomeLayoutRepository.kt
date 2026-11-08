@@ -28,7 +28,8 @@ enum class HomeSectionId(val titleResId: Int) {
  */
 data class HomeLayoutConfig(
     val order: List<HomeSectionId> = DEFAULT_HOME_ORDER,
-    val sources: Map<HomeSectionId, String> = defaultHomeSources()
+    val sources: Map<HomeSectionId, String> = defaultHomeSources(),
+    val qishuiMode: String = "default"
 ) {
     companion object {
         val DEFAULT_HOME_ORDER: List<HomeSectionId> = listOf(
@@ -78,10 +79,19 @@ class HomeLayoutRepository(context: Context) {
         _config.value = _config.value.copy(sources = sources)
     }
 
+    fun setQishuiMode(mode: String) {
+        val normalized = mode.takeIf(String::isNotBlank) ?: "default"
+        prefs.edit { putString(KEY_QISHUI_MODE, normalized) }
+        _config.value = _config.value.copy(qishuiMode = normalized)
+    }
+
     private fun readConfig(): HomeLayoutConfig {
         val order = decodeOrder(prefs.getString(KEY_ORDER, null))
         val sources = decodeSources(prefs.getString(KEY_SOURCES, null))
-        return HomeLayoutConfig(order = order, sources = sources)
+        val qishuiMode = prefs.getString(KEY_QISHUI_MODE, null)
+            ?.takeIf(String::isNotBlank)
+            ?: "default"
+        return HomeLayoutConfig(order = order, sources = sources, qishuiMode = qishuiMode)
     }
 
     private fun encodeOrder(order: List<HomeSectionId>): String =
@@ -131,5 +141,6 @@ class HomeLayoutRepository(context: Context) {
         const val PREFS_NAME = "home_layout_preferences"
         const val KEY_ORDER = "section_order"
         const val KEY_SOURCES = "section_sources"
+        const val KEY_QISHUI_MODE = "qishui_mode"
     }
 }

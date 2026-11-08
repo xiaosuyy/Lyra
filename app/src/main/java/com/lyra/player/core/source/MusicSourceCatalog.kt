@@ -54,6 +54,11 @@ internal object MusicSourceCatalog {
         supportsPlaylist = true
     )
 
+    private val GDSTUDIO_CAPS = MusicSourceCapabilities(
+        searchable = true,
+        supportsSong = true
+    )
+
     // ---------------- 渠道平台能力（依赖音源脚本） ----------------
 
     private val KUWO_CAPS = MusicSourceCapabilities(
@@ -128,8 +133,12 @@ internal object MusicSourceCatalog {
      * 内置平台音源（无需音源脚本即可搜索 / 播放）。
      *
      * @param youtubeEnabled 关闭 YouTube 后不再产出该音源。
+     * @param gdApiEnabled 开启 GD 音乐台 API 后产出 GD 音源。
      */
-    fun builtinSources(youtubeEnabled: Boolean): List<MusicSource> = buildList {
+    fun builtinSources(
+        youtubeEnabled: Boolean,
+        gdApiEnabled: Boolean = false
+    ): List<MusicSource> = buildList {
         add(
             MusicSource(
                 id = MusicSourceIds.NETEASE,
@@ -165,6 +174,19 @@ internal object MusicSourceCatalog {
                 )
             )
         }
+        if (gdApiEnabled) {
+            add(
+                MusicSource(
+                    id = MusicSourceIds.GDSTUDIO,
+                    kind = MusicSourceKind.BUILTIN,
+                    enabled = true,
+                    status = MusicSourceStatus.READY,
+                    capabilities = GDSTUDIO_CAPS,
+                    nameResId = R.string.explore_tab_gdstudio,
+                    sortOrder = 60
+                )
+            )
+        }
     }
 
     /**
@@ -197,9 +219,10 @@ internal object MusicSourceCatalog {
     fun allSources(
         youtubeEnabled: Boolean,
         declaredCustomSourceIds: Set<String>,
-        qualitiesByCustomSourceId: Map<String, List<String>> = emptyMap()
+        qualitiesByCustomSourceId: Map<String, List<String>> = emptyMap(),
+        gdApiEnabled: Boolean = false
     ): List<MusicSource> = buildList {
-        addAll(builtinSources(youtubeEnabled))
+        addAll(builtinSources(youtubeEnabled, gdApiEnabled))
         addAll(channelSources(declaredCustomSourceIds, qualitiesByCustomSourceId))
     }.sortedBy { it.sortOrder }
 
@@ -209,13 +232,13 @@ internal object MusicSourceCatalog {
 
     /** 静态定义的名称资源（内置 + 渠道），未知音源返回 null。 */
     fun nameResIdFor(sourceId: String): Int? =
-        (builtinSources(youtubeEnabled = true) + channelSources(emptySet()))
+        (builtinSources(youtubeEnabled = true, gdApiEnabled = true) + channelSources(emptySet()))
             .firstOrNull { it.id == sourceId }
             ?.nameResId
 
     /** 静态定义的排序值（内置 + 渠道），未知音源返回较大值。 */
     fun sortOrderFor(sourceId: String): Int =
-        (builtinSources(youtubeEnabled = true) + channelSources(emptySet()))
+        (builtinSources(youtubeEnabled = true, gdApiEnabled = true) + channelSources(emptySet()))
             .firstOrNull { it.id == sourceId }
             ?.sortOrder
             ?: 1000
@@ -233,6 +256,7 @@ internal object MusicSourceCatalog {
         MusicSourceIds.KUGOU -> KUGOU_CAPS
         MusicSourceIds.MIGU -> MIGU_CAPS
         MusicSourceIds.TENCENT -> TENCENT_CAPS
+        MusicSourceIds.GDSTUDIO -> GDSTUDIO_CAPS
         else -> null
     }
 }

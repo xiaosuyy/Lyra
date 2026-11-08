@@ -40,6 +40,7 @@
     <string name="explore_tab_kugou">Kugou</string>
     <string name="explore_tab_migu">Migu</string>
     <string name="explore_tab_tencent">QQ Music</string>
+    <string name="explore_tab_gdstudio">GD Music</string>
     <string name="explore_hot_search">Popular searches</string>
     <string name="explore_hot_artist">Popular artists</string>
     <string name="explore_channel_playlist_unsupported">QQ Music does not expose playlist search here — try the Songs or Artists tab</string>

@@ -63,6 +63,7 @@ import com.lyra.player.core.player.download.AudioDownloadManager
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.data.local.media.LocalMediaSupport
 import com.lyra.player.data.local.media.LocalSongSupport
+import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.model.identity
 import com.lyra.player.data.model.remoteSourceIdentityOrNull
 import com.lyra.player.data.model.stableKey
@@ -70,6 +71,7 @@ import com.lyra.player.data.settings.AutoSettingsSchema
 import com.lyra.player.data.settings.autoSettingFlow
 import com.lyra.player.data.traffic.TrafficNetworkType
 import com.lyra.player.data.model.SongItem
+import com.lyra.player.data.model.displayName
 import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.data.traffic.currentTrafficNetworkType
 
@@ -123,6 +125,24 @@ object GlobalDownloadManager {
         )
     val trafficRiskDownloadRequests: SharedFlow<TrafficRiskDownloadRequest> =
         _trafficRiskDownloadRequests
+
+    /** 本地已存在更高音质同首歌时的下载确认请求。 */
+    data class HigherQualityLocalDownloadRequest(
+        val id: Long,
+        val song: SongItem,
+        val localLabel: String,
+        val localBitrateKbps: Int,
+        val targetBitrateKbps: Int
+    )
+
+    private val _higherQualityLocalDownloadRequests =
+        MutableSharedFlow<HigherQualityLocalDownloadRequest>(
+            extraBufferCapacity = 1,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST
+        )
+    val higherQualityLocalDownloadRequests: SharedFlow<HigherQualityLocalDownloadRequest> =
+        _higherQualityLocalDownloadRequests
+    private val higherQualityRequestIdGenerator = java.util.concurrent.atomic.AtomicLong(0)
 
     data class MobileDataDownloadInterruptionRequest(
         val id: Long,
@@ -906,6 +926,7 @@ object GlobalDownloadManager {
             storedAudio = resolvedStoredAudio,
             sidecarReferences = finalization.sidecarReferences
         )
+        registerCompletedDownloadInLocalLibrary(context, song, resolvedStoredAudio)
         updateTaskStatus(
             songKey,
             DownloadStatus.COMPLETED,
@@ -2136,12 +2157,22 @@ object GlobalDownloadManager {
         song: SongItem,
         skipTrafficRiskPrompt: Boolean,
         cleanupBeforeStart: Boolean = true,
-        deferForNetworkPolicy: Boolean = false
+        deferForNetworkPolicy: Boolean = false,
+        skipHigherQualityPrompt: Boolean = false
     ) {
         val appContext = context.applicationContext
         scope.launch {
             val songKey = song.stableKey()
             clearSongCancellationForFreshStart(appContext, setOf(songKey))
+            if (
+                maybeRequestHigherQualityLocalConfirmation(
+                    context = appContext,
+                    song = song,
+                    skipHigherQualityPrompt = skipHigherQualityPrompt
+                )
+            ) {
+                return@launch
+            }
             if (
                 maybeRequestTrafficRiskDownloadConfirmation(
                     context = appContext,
@@ -2670,6 +2701,90 @@ object GlobalDownloadManager {
             activeBatchDownloadJobs.remove(batchJob)
             taskStore.setActiveBatchDownloadJobCount(activeBatchDownloadJobs.size)
         }
+    }
+
+    /** 用户在"本地已有更高音质"弹窗选择坚持下载后继续。 */
+    fun confirmHigherQualityLocalDownload(
+        context: Context,
+        request: HigherQualityLocalDownloadRequest
+    ) {
+        startDownload(
+            context = context,
+            song = request.song,
+            skipTrafficRiskPrompt = false,
+            skipHigherQualityPrompt = true
+        )
+    }
+
+    private suspend fun maybeRequestHigherQualityLocalConfirmation(
+        context: Context,
+        song: SongItem,
+        skipHigherQualityPrompt: Boolean
+    ): Boolean {
+        if (skipHigherQualityPrompt) return false
+        val targetBps = runCatching {
+            downloadBitrateForQuality(AppContainer.settingsRepo.audioQualityFlow.first())
+        }.getOrDefault(320_000)
+        val existing = findHigherQualityLocalSong(context, song, targetBps) ?: return false
+        _higherQualityLocalDownloadRequests.emit(
+            HigherQualityLocalDownloadRequest(
+                id = higherQualityRequestIdGenerator.incrementAndGet(),
+                song = song,
+                localLabel = existing.first,
+                localBitrateKbps = existing.second / 1000,
+                targetBitrateKbps = targetBps / 1000
+            )
+        )
+        return true
+    }
+
+    /** 返回 (本地曲目展示名, 估算比特率 bps)；仅当明显高于目标音质时命中。 */
+    private suspend fun findHigherQualityLocalSong(
+        context: Context,
+        song: SongItem,
+        targetBps: Int
+    ): Pair<String, Int>? {
+        val thresholdBps = (targetBps * 1.15).toInt()
+        val candidates = LocalPlaylistRepository.getInstance(context.applicationContext)
+            .playlists.value.flatMap { it.songs }
+        for (candidate in candidates) {
+            if (!isSameLocalSongForQualityCheck(song, candidate)) continue
+            val bps = estimateLocalSongBitrateBps(candidate) ?: continue
+            if (bps > thresholdBps) {
+                return candidate.displayName() to bps
+            }
+        }
+        return null
+    }
+
+    private fun isSameLocalSongForQualityCheck(song: SongItem, candidate: SongItem): Boolean {
+        if (!LocalSongSupport.isLocalSong(candidate, null)) return false
+        if (song.durationMs > 0L && candidate.durationMs > 0L &&
+            kotlin.math.abs(song.durationMs - candidate.durationMs) > 8_000L
+        ) {
+            return false
+        }
+        val title = song.name.trim().lowercase()
+        val artist = song.artist.trim().lowercase()
+        if (title.isEmpty() || candidate.name.trim().lowercase() != title) return false
+        return artist.isEmpty() || candidate.artist.trim().lowercase() == artist
+    }
+
+    private fun estimateLocalSongBitrateBps(candidate: SongItem): Int? {
+        if (candidate.durationMs <= 0L) return null
+        val path = candidate.localFilePath?.takeIf { it.startsWith("/") }
+            ?: candidate.mediaUri?.takeIf { it.startsWith("/") }
+            ?: return null
+        val sizeBytes = runCatching { java.io.File(path).length() }.getOrNull() ?: return null
+        if (sizeBytes <= 0L) return null
+        return ((sizeBytes * 8_000L) / candidate.durationMs).toInt()
+    }
+
+    private fun downloadBitrateForQuality(level: String): Int = when (level.lowercase()) {
+        "standard" -> 128_000
+        "exhigh" -> 320_000
+        "lossless", "hires", "jyeffect", "sky", "jymaster" -> 1_411_200
+        else -> 320_000
     }
 
     fun confirmTrafficRiskDownload(
@@ -3570,6 +3685,26 @@ object GlobalDownloadManager {
     ): ManagedDownloadStorage.StoredEntry? {
         val normalized = reference?.takeIf { it.isNotBlank() } ?: return null
         return ManagedDownloadStorage.queryStoredEntry(context, normalized)
+    }
+
+    /** 下载落盘后同步进"本地文件"歌单（曲库-歌曲同源），入库自带去重。 */
+    private fun registerCompletedDownloadInLocalLibrary(
+        context: Context,
+        song: SongItem,
+        storedAudio: ManagedDownloadStorage.StoredEntry
+    ) {
+        val appContext = context.applicationContext
+        val localItem = runCatching {
+            buildOptimisticDownloadedSong(song, storedAudio, null).toPlaybackSongItem()
+        }.getOrNull() ?: return
+        scope.launch {
+            runCatching {
+                LocalPlaylistRepository.getInstance(appContext)
+                    .addSongsToLocalFilesPlaylist(listOf(localItem))
+            }.onFailure {
+                LyraLogger.w(TAG, "下载歌曲写入本地文件歌单失败: song=${song.name}", it)
+            }
+        }
     }
 
     private fun publishCompletedDownloadOptimistically(

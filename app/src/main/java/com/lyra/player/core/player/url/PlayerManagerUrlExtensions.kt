@@ -13,12 +13,16 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import com.lyra.player.R
 import com.lyra.player.core.api.bili.BiliSponsorBlockTarget
 import com.lyra.player.core.api.bili.resolveBiliSong
+import com.lyra.player.core.api.gdstudio.GdStudioApiClient
+import com.lyra.player.core.di.AppContainer
+import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.player.download.AudioDownloadManager
@@ -52,6 +56,7 @@ import com.lyra.player.core.player.quality.effectiveYouTubeQuality
 import com.lyra.player.core.player.resolver.netease.NeteasePlaybackResponseParser
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseAutoBiliSource
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseMatchedLocalSource
+import com.lyra.player.core.player.resolver.qishui.getQishuiAudioUrl
 import com.lyra.player.core.customsource.CUSTOM_SOURCE_NETEASE
 import com.lyra.player.core.customsource.CustomSourceManager
 import com.lyra.player.core.customsource.buildCustomSourceMusicInfo
@@ -82,9 +87,9 @@ private const val CUSTOM_SOURCE_QUALITY_TIMEOUT_MS = 6_000L
 /** 自定义源整体取链超时（含音源脚本加载） */
 private const val CUSTOM_SOURCE_TOTAL_TIMEOUT_MS = 20_000L
 /** 网易云受限/试听资源兜底时最多尝试的音质数量 */
-private const val NETEASE_CUSTOM_SOURCE_QUALITY_ATTEMPTS = 3
+internal const val NETEASE_CUSTOM_SOURCE_QUALITY_ATTEMPTS = 3
 /** 网易云受限/试听资源兜底取链的总超时，超时后尽快回落到试听片段 */
-private const val NETEASE_CUSTOM_SOURCE_TIMEOUT_MS = 12_000L
+internal const val NETEASE_CUSTOM_SOURCE_TIMEOUT_MS = 12_000L
 internal const val YOUTUBE_PLAYBACK_PREFER_M4A = false
 internal const val YOUTUBE_STABLE_RECOVERY_QUALITY = "high"
 
@@ -327,6 +332,15 @@ internal suspend fun PlayerManager.resolveSongUrl(
                 sideEffects = sideEffects,
                 playbackRequestTokenOverride = playbackRequestTokenOverride
             )
+            isQishuiTrack(song) -> getQishuiAudioUrl(
+                song = song,
+                suppressError = suppressError,
+                sideEffects = sideEffects
+            )
+            isGdStudioTrack(song) -> getGdStudioAudioUrl(
+                song = song,
+                sideEffects = sideEffects
+            )
             customSourceIdForSong(song) != null -> getCustomSourceAudioUrl(
                 song = song,
                 sourceId = customSourceIdForSong(song).orEmpty(),
@@ -354,16 +368,27 @@ internal suspend fun PlayerManager.resolveSongUrl(
                 if (neteaseResult is SongUrlResult.Success && !isPreviewClip) {
                     neteaseResult
                 } else {
-                    // 无权限 / 仅试听时，交给自定义源兜底取直链。
-                    // 兜底有明确超时，失败时马上回落到试听片段或报错，避免无限加载。
-                    val customResult = getCustomSourceAudioUrl(
-                        song = song,
-                        sourceId = CUSTOM_SOURCE_NETEASE,
-                        sideEffects = sideEffects,
-                        maxQualityAttempts = NETEASE_CUSTOM_SOURCE_QUALITY_ATTEMPTS,
-                        timeoutMs = NETEASE_CUSTOM_SOURCE_TIMEOUT_MS
-                    )
-                    if (customResult is SongUrlResult.Success) customResult else neteaseResult
+                    // GD API 与自定义音源脚本互斥：
+                    // GD 开启时由 GD 负责兜底，GD 关闭时才继续走自定义音源。
+                    val fallbackResult = if (isGdApiEnabled()) {
+                        getNeteaseGdFallbackAudioUrl(song = song)
+                    } else {
+                        getCustomSourceAudioUrl(
+                            song = song,
+                            sourceId = CUSTOM_SOURCE_NETEASE,
+                            sideEffects = sideEffects,
+                            maxQualityAttempts = NETEASE_CUSTOM_SOURCE_QUALITY_ATTEMPTS,
+                            timeoutMs = NETEASE_CUSTOM_SOURCE_TIMEOUT_MS
+                        )
+                    }
+                    if (fallbackResult is SongUrlResult.Success) {
+                        fallbackResult
+                    } else {
+                        // 兜底都失败时直接播放试听片段，不再弹出“试听资源”提示。
+                        (neteaseResult as? SongUrlResult.Success)
+                            ?.copy(noticeMessage = null)
+                            ?: neteaseResult
+                    }
                 }
             }
         }
@@ -1265,10 +1290,55 @@ private suspend fun PlayerManager.invalidateCachedResourceBeforeResolve(
     shouldApplyMutation: () -> Boolean
 ) = invalidateCachedResourceForPlaybackRecovery(cacheKey, reason, shouldApplyMutation)
 
+/** 是否为 GD 音乐台歌曲（通过 GD API 取直链）。 */
+private fun isGdStudioTrack(song: SongItem): Boolean =
+    song.channelId?.trim()?.lowercase() == MusicSourceIds.GDSTUDIO &&
+        !song.audioId.isNullOrBlank()
+
+/**
+ * 用 GD 音乐台 API 解析播放直链。
+ *
+ * GD 的曲目 ID 与背后的音乐源绑定，因此 [SongItem.subAudioId] 保存了
+ * netease / joox / bilibili 等 GD 音源名，缺省回退到 netease。
+ */
+private suspend fun PlayerManager.getGdStudioAudioUrl(
+    song: SongItem,
+    sideEffects: RefreshResolverSideEffects = RefreshResolverSideEffects()
+): SongUrlResult = withContext(Dispatchers.IO) {
+    val trackId = song.audioId?.takeIf { it.isNotBlank() }
+    if (trackId == null) {
+        LyraLogger.w("LYRA-PlayerManager", "GD 歌曲缺少曲目 ID: song=${song.name}")
+        return@withContext SongUrlResult.Failure
+    }
+    val gdSource = song.subAudioId?.takeIf { it.isNotBlank() } ?: "netease"
+    val api = GdStudioApiClient(AppContainer.sharedOkHttpClient)
+    var url: String? = null
+    for (br in intArrayOf(320, 128)) {
+        url = api.resolveAudioUrl(source = gdSource, trackId = trackId, br = br)
+        if (!url.isNullOrBlank()) break
+    }
+    if (url.isNullOrBlank()) {
+        LyraLogger.w(
+            "LYRA-PlayerManager",
+            "GD 取直链失败: source=$gdSource id=$trackId song=${song.name}"
+        )
+        sideEffects.emitError {
+            postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(R.string.error_no_play_url)))
+        }
+        SongUrlResult.Failure
+    } else {
+        LyraLogger.i(
+            "LYRA-PlayerManager",
+            "GD 取直链成功: source=$gdSource id=$trackId song=${song.name} url=${url.take(160)}"
+        )
+        SongUrlResult.Success(url = url)
+    }
+}
+
 /**
  * 用自定义源（音源脚本）解析播放直链。
  */
-private suspend fun PlayerManager.getCustomSourceAudioUrl(
+internal suspend fun PlayerManager.getCustomSourceAudioUrl(
     song: SongItem,
     sourceId: String,
     sideEffects: RefreshResolverSideEffects = RefreshResolverSideEffects(),
@@ -1325,7 +1395,51 @@ private suspend fun PlayerManager.getCustomSourceAudioUrl(
     SongUrlResult.Failure
 }
 
-private suspend fun PlayerManager.getNeteaseSongUrl(
+/**
+ * 网易云歌曲在「仅试听 / 无权限」时，尝试用 GD API 取完整直链。
+ *
+ * 取不到时静默返回失败，由调用方决定是否回落到试听片段。
+ */
+internal suspend fun PlayerManager.getNeteaseGdFallbackAudioUrl(
+    song: SongItem
+): SongUrlResult = withContext(Dispatchers.IO) {
+    if (!isNeteaseTrack(song) || song.id <= 0L) return@withContext SongUrlResult.Failure
+    val api = GdStudioApiClient(AppContainer.sharedOkHttpClient)
+    var url: String? = null
+    for (br in intArrayOf(320, 128)) {
+        url = api.resolveAudioUrl(
+            source = MusicSourceIds.NETEASE,
+            trackId = song.id.toString(),
+            br = br
+        )
+        if (!url.isNullOrBlank()) break
+    }
+    if (url.isNullOrBlank()) {
+        LyraLogger.d(
+            "LYRA-PlayerManager",
+            "GD 网易云兜底未取到直链: id=${song.id} song=${song.name}"
+        )
+        return@withContext SongUrlResult.Failure
+    }
+    LyraLogger.i(
+        "LYRA-PlayerManager",
+        "GD 网易云兜底成功: id=${song.id} song=${song.name} url=${url.take(160)}"
+    )
+    SongUrlResult.Success(url = url)
+}
+
+/** GD API 当前是否开启（用于决定网易云兜底由 GD 还是自定义音源负责）。 */
+internal suspend fun isGdApiEnabled(): Boolean = runCatching {
+    AppContainer.settingsRepo.gdApiEnabledFlow.first()
+}.getOrDefault(false)
+
+private fun isNeteaseTrack(song: SongItem): Boolean {
+    val channel = song.channelId?.trim()
+    return channel.isNullOrEmpty() ||
+        channel.equals(MusicSourceIds.NETEASE, ignoreCase = true)
+}
+
+internal suspend fun PlayerManager.getNeteaseSongUrl(
     song: SongItem,
     suppressError: Boolean = false,
     sideEffects: RefreshResolverSideEffects = RefreshResolverSideEffects(),
@@ -1419,14 +1533,16 @@ private suspend fun PlayerManager.getNeteaseSongUrl(
             }
         }
 
+        // 本地兜底覆盖试听 / 无权限 / 加载失败等所有未拿到可播直链的出口；
+        // 开关与匹配命中在 tryResolveNeteaseMatchedLocalSource 内部判定。
+        if (allowLocalFallback) {
+            tryResolveNeteaseMatchedLocalSource(song)?.let {
+                return@withContext it
+            }
+        }
         if (previewFallback != null ||
             lastFailureReason == NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION
         ) {
-            if (allowLocalFallback) {
-                tryResolveNeteaseMatchedLocalSource(song)?.let {
-                    return@withContext it
-                }
-            }
             if (allowAutoBiliFallback) {
                 tryResolveNeteaseAutoBiliSource(song, sideEffects)?.let {
                     return@withContext it

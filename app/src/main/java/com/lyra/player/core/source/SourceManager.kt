@@ -24,6 +24,8 @@ internal data class SourceManagerState(
     val youtubeEnabled: Boolean,
     /** 已加载且启用的脚本所声明的音源脚本 id（kw / kg / mg / tx…）。 */
     val declaredCustomSourceIds: Set<String>,
+    /** 是否启用 GD 音乐台 API 音源。 */
+    val gdApiEnabled: Boolean = false,
     /** 各音源脚本 id 的可用音质。 */
     val qualitiesByCustomSourceId: Map<String, List<String>> = emptyMap(),
     /** 用户在音源管理里手动关闭的音源 id。 */
@@ -48,7 +50,8 @@ internal object SourceManager {
         val base = MusicSourceCatalog.allSources(
             youtubeEnabled = state.youtubeEnabled,
             declaredCustomSourceIds = state.declaredCustomSourceIds,
-            qualitiesByCustomSourceId = state.qualitiesByCustomSourceId
+            qualitiesByCustomSourceId = state.qualitiesByCustomSourceId,
+            gdApiEnabled = state.gdApiEnabled
         )
         val withDisabled = base.map { source ->
             if (source.id in state.disabledSourceIds) {

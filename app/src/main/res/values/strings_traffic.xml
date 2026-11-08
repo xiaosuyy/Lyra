@@ -37,6 +37,10 @@
     <string name="traffic_risk_download_title">确认下载</string>
     <string name="traffic_risk_download_single_message">当前正在使用%1$s，下载「%2$s」可能消耗较多流量。</string>
     <string name="traffic_risk_download_confirm">继续下载</string>
+    <string name="download_higher_quality_local_title">已有更高音质</string>
+    <string name="download_higher_quality_local_message">本地已存在更高音质的同一首歌曲「%1$s」（约 %2$d kbps），继续下载会另外保存一份。</string>
+    <string name="download_higher_quality_local_continue">坚持下载</string>
+    <string name="download_higher_quality_local_got_it">明白</string>
     <string name="mobile_data_download_interruption_title">WIFI 已断开</string>
     <string name="mobile_data_download_wait_wifi">等待 WIFI</string>
     <string name="mobile_data_download_cancel_all">取消所有任务</string>

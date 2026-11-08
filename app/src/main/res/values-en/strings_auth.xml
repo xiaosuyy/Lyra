@@ -76,8 +76,8 @@
     <string name="auth_cookie_empty">Cookie is empty</string>
     <string name="settings_netease_auto_source_switch">NetEase Auto Source Switch</string>
     <string name="settings_netease_auto_source_switch_desc">Off by default. When enabled, search Bilibili automatically when a NetEase song is unavailable or only returns a preview clip.</string>
-    <string name="settings_netease_local_source_fallback">Local Audio Fallback</string>
-    <string name="settings_netease_local_source_fallback_desc">Off by default. When enabled, prefer a local audio file matched to the same song when a NetEase song is unavailable or only returns a preview clip.</string>
+    <string name="settings_netease_local_source_fallback">Local Music Fallback</string>
+    <string name="settings_netease_local_source_fallback_desc">Off by default. When enabled, if an online song is preview-only, requires VIP/permission, or fails to load, automatically find and play a matching local copy.</string>
     <string name="settings_youtube_playback_source">YouTube Playback Source</string>
     <string name="settings_youtube_playback_source_desc">Choose the preferred YouTube playback client; unavailable clients fall back to the remaining sources</string>
     <string name="settings_youtube_playback_source_web_remix">Web Remix Low Latency</string>

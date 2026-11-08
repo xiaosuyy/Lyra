@@ -47,6 +47,8 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import com.lyra.player.R
 import com.lyra.player.core.api.netease.mergeNeteaseSessionCookies
+import com.lyra.player.core.api.qishui.QishuiLoginRequiredException
+import com.lyra.player.core.api.qishui.QishuiRecommendationMode
 import com.lyra.player.core.api.youtube.YouTubeMusicHomeShelf
 import com.lyra.player.core.customsource.CustomSourceManager
 import com.lyra.player.core.di.AppContainer
@@ -1152,6 +1154,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             fetchSongSourceRaw(source)
         }
         return parseSongsOnWorker(raw)
+    }
+
+    fun isQishuiLoggedIn(): Boolean = AppContainer.qishuiRepository.isLoggedIn()
+
+    /** 汽水音乐按账号推荐；三种模式共用仓库，低于 50 秒的歌曲在仓库层被过滤。 */
+    suspend fun loadQishuiSongs(modeKey: String): List<SongItem> {
+        val localizedContext = localizedAppContext()
+        if (!AppContainer.qishuiRepository.isLoggedIn()) {
+            throw IllegalStateException(localizedContext.getString(R.string.qishui_login_required))
+        }
+        val mode = QishuiRecommendationMode.fromStorageKey(modeKey)
+        return try {
+            withContext(Dispatchers.IO) { AppContainer.qishuiRepository.loadTracks(mode) }
+        } catch (error: QishuiLoginRequiredException) {
+            throw IllegalStateException(localizedContext.getString(R.string.qishui_login_required))
+        } catch (error: IOException) {
+            LyraLogger.d(TAG, "qishui load failed: ${error.message}")
+            throw IllegalStateException(localizedContext.getString(R.string.qishui_empty))
+        }
     }
 
     /**

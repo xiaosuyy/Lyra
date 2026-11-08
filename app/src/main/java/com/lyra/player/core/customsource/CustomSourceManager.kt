@@ -16,11 +16,14 @@ package com.lyra.player.core.customsource
 
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -30,6 +33,7 @@ import okhttp3.Request
 import org.json.JSONObject
 
 private const val TAG = "CustomSourceManager"
+private const val LATENCY_PROBE_TIMEOUT_MS = 6_000L
 
 internal data class CustomSourceState(
     val id: String,
@@ -37,6 +41,7 @@ internal data class CustomSourceState(
     val version: String,
     val enabled: Boolean,
     val bundled: Boolean,
+    val order: Int,
     val loaded: Boolean,
     val loading: Boolean,
     val declarations: List<CustomSourceDeclaration>,
@@ -55,6 +60,15 @@ internal data class CustomSourceState(
 }
 
 /**
+ * 单个自定义源的探测延迟。
+ */
+internal sealed interface CustomSourceLatency {
+    data object Checking : CustomSourceLatency
+    data class Responded(val millis: Long) : CustomSourceLatency
+    data object Timeout : CustomSourceLatency
+}
+
+/**
  * 自定义源（音源脚本）管理器：负责脚本加载、状态维护和直链解析。
  */
 internal object CustomSourceManager {
@@ -63,6 +77,9 @@ internal object CustomSourceManager {
 
     private val _states = MutableStateFlow<List<CustomSourceState>>(emptyList())
     val states: StateFlow<List<CustomSourceState>> = _states.asStateFlow()
+
+    private val _latencies = MutableStateFlow<Map<String, CustomSourceLatency>>(emptyMap())
+    val latencies: StateFlow<Map<String, CustomSourceLatency>> = _latencies.asStateFlow()
 
     private val _declaredSourceIds = MutableStateFlow<Set<String>>(emptySet())
     val declaredSourceIds: StateFlow<Set<String>> = _declaredSourceIds.asStateFlow()
@@ -125,7 +142,78 @@ internal object CustomSourceManager {
         if (!enabled) {
             runtimes.remove(id)?.release()
         }
+        _latencies.value = _latencies.value - id
         ensureLoaded(context, forceReload = false)
+        if (enabled) {
+            _states.value.firstOrNull { it.id == id }?.let { state ->
+                probeLatencyInternal(state)
+            }
+        }
+    }
+
+    /**
+     * 保存启用音源的检索顺序：越靠前越先尝试解析。
+     */
+    suspend fun reorder(context: Context, orderedIds: List<String>) {
+        CustomSourceStore.reorder(context, orderedIds)
+        publish(CustomSourceStore.list(context))
+        LyraLogger.i(TAG, "自定义源顺序已更新: " + orderedIds.joinToString(","))
+    }
+
+    /**
+     * 重新探测所有已启用音源的响应延迟。
+     */
+    suspend fun refreshLatencies(context: Context) {
+        ensureLoaded(context)
+        val targets = _states.value.filter { it.enabled && it.loaded }
+        _latencies.value = targets.associate { it.id to CustomSourceLatency.Checking }
+        coroutineScope {
+            targets.forEach { state ->
+                launch { probeLatencyInternal(state) }
+            }
+        }
+    }
+
+    private suspend fun probeLatencyInternal(state: CustomSourceState) {
+        val sourceId = state.declarations.firstOrNull()?.sourceId
+        val url = sourceId?.let(::latencyProbeUrl)
+        if (url == null) {
+            _latencies.value = _latencies.value - state.id
+            return
+        }
+        _latencies.value = _latencies.value + (state.id to CustomSourceLatency.Checking)
+        val startedAt = SystemClock.elapsedRealtime()
+        val reachable = withContext(Dispatchers.IO) {
+            runCatching {
+                val request = Request.Builder().url(url).get().build()
+                AppContainer.sharedOkHttpClient.newBuilder()
+                    .callTimeout(LATENCY_PROBE_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .build()
+                    .newCall(request)
+                    .execute()
+                    .use { it.close() }
+                true
+            }.getOrDefault(false)
+        }
+        val elapsed = SystemClock.elapsedRealtime() - startedAt
+        val latency = if (reachable) {
+            CustomSourceLatency.Responded(elapsed)
+        } else {
+            CustomSourceLatency.Timeout
+        }
+        _latencies.value = _latencies.value + (state.id to latency)
+        LyraLogger.i(TAG, "自定义源延迟探测 ${state.name}: $latency (${sourceId})")
+    }
+
+    /**
+     * 用对应平台的一个轻量地址测网络往返，避免为探测而去解析真实歌曲。
+     */
+    private fun latencyProbeUrl(sourceId: String): String? = when (sourceId) {
+        "wy" -> "https://music.163.com/favicon.ico"
+        "tx" -> "https://u.y.qq.com/favicon.ico"
+        "kw", "kg" -> "https://www.kugou.com/favicon.ico"
+        "mg" -> "https://music.migu.cn/favicon.ico"
+        else -> null
     }
 
     suspend fun importScript(context: Context, uri: Uri, displayName: String?): String? {
@@ -175,6 +263,7 @@ internal object CustomSourceManager {
 
     suspend fun delete(context: Context, id: String) {
         runtimes.remove(id)?.release()
+        _latencies.value = _latencies.value - id
         CustomSourceStore.delete(context, id)
         ensureLoaded(context, forceReload = false)
     }
@@ -195,11 +284,15 @@ internal object CustomSourceManager {
         runtimes.values.forEach { it.release() }
         runtimes.clear()
         _declaredSourceIds.value = emptySet()
+        _latencies.value = emptyMap()
         ensureLoaded(context, forceReload = true)
+        refreshLatencies(context)
     }
 
     /**
      * 让自定义源解析歌曲直链，优先使用声明了该音源的脚本。
+     *
+     * 同一音源有多个脚本时，按设置页里的启用顺序依次尝试：越靠前越先使用。
      */
     suspend fun resolveMusicUrl(
         context: Context,
@@ -209,9 +302,12 @@ internal object CustomSourceManager {
     ): String? {
         if (sourceId.isBlank()) return null
         ensureLoaded(context)
-        val candidates = runtimes.entries.filter { (_, runtime) ->
-            runtime.isReady && sourceId in runtime.sourceIds
-        }
+        val orderById = _states.value.associate { it.id to it.order }
+        val candidates = runtimes.entries
+            .filter { (_, runtime) ->
+                runtime.isReady && sourceId in runtime.sourceIds
+            }
+            .sortedBy { (id, _) -> orderById[id] ?: Int.MAX_VALUE }
         for ((id, runtime) in candidates) {
             val url = runtime.resolveMusicUrl(sourceId, quality, musicInfo)
             if (!url.isNullOrBlank()) {
@@ -283,6 +379,7 @@ internal object CustomSourceManager {
                 version = script.version,
                 enabled = script.enabled,
                 bundled = script.bundled,
+                order = script.order,
                 loaded = runtime?.isReady == true,
                 loading = script.enabled && runtime == null,
                 declarations = runtime?.declaredSources.orEmpty(),

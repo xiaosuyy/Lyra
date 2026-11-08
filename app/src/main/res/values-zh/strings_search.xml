@@ -39,6 +39,7 @@
     <string name="explore_tab_kugou">酷狗</string>
     <string name="explore_tab_migu">咪咕</string>
     <string name="explore_tab_tencent">Q音</string>
+    <string name="explore_tab_gdstudio">GD 音乐台</string>
     <string name="explore_hot_search">热门搜索</string>
     <string name="explore_hot_artist">热门歌手</string>
     <string name="explore_channel_playlist_unsupported">QQ音乐暂未开放歌单搜索，可以试试「歌曲」或「歌手」分类</string>

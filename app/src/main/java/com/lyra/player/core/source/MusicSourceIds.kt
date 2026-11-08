@@ -24,10 +24,14 @@ package com.lyra.player.core.source
  */
 internal object MusicSourceIds {
     const val NETEASE = "netease"
+    const val QISHUI = "qishui"
     const val BILIBILI = "bilibili"
     const val YOUTUBE_MUSIC = "youtubeMusic"
     const val KUWO = "kuwo"
     const val KUGOU = "kugou"
     const val MIGU = "migu"
     const val TENCENT = "tencent"
+
+    /** GD 音乐台 API 内置音源。 */
+    const val GDSTUDIO = "gdstudio"
 }

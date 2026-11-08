@@ -33,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import com.lyra.player.core.api.qishui.QishuiParsing
 import com.lyra.player.data.auth.bili.BiliCookieRepository
 import com.lyra.player.data.auth.youtube.YouTubeAuthBundle
 import com.lyra.player.data.auth.youtube.YouTubeAuthRepository
@@ -63,7 +64,8 @@ class ConditionalHttpDataSourceFactory(
     private val baseFactory: HttpDataSource.Factory,
     cookieRepo: BiliCookieRepository,
     youtubeAuthRepo: YouTubeAuthRepository,
-    private val trafficStatsRepository: TrafficStatsRepository? = null
+    private val trafficStatsRepository: TrafficStatsRepository? = null,
+    private val qishuiCookieProvider: () -> String = { "" }
 ) : HttpDataSource.Factory {
 
     companion object {
@@ -71,6 +73,8 @@ class ConditionalHttpDataSourceFactory(
                 "AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/124.0.0.0 Safari/537.36"
         private const val YOUTUBE_WEB_REFERER = "https://www.youtube.com/"
+        private const val QISHUI_REFERER = "https://music.douyin.com/"
+        private const val QISHUI_STREAM_USER_AGENT = "LunaPC/3.0.0(290101097)"
     }
 
     @Volatile
@@ -105,6 +109,11 @@ class ConditionalHttpDataSourceFactory(
                     }
                     shouldInjectYouTubeHeaders(dataSpec.uri) -> {
                         buildYouTubeDataSpec(dataSpec)
+                    }
+                    shouldInjectQishuiHeaders(dataSpec.uri) -> {
+                        dataSpec.buildUpon()
+                            .setHttpRequestHeaders(buildQishuiHeaders(dataSpec.httpRequestHeaders))
+                            .build()
                     }
                     else -> dataSpec
                 }
@@ -148,6 +157,20 @@ class ConditionalHttpDataSourceFactory(
             path.contains("/playlist/index.m3u8") ||
             path.contains("/file/seg.ts") ||
             rawUrl.contains("/videoplayback")
+    }
+
+    private fun shouldInjectQishuiHeaders(uri: Uri): Boolean {
+        val host = uri.host?.lowercase() ?: return false
+        return QishuiParsing.isQishuiAudioHost(host)
+    }
+
+    private fun buildQishuiHeaders(original: Map<String, String>): Map<String, String> {
+        val newHeaders = LinkedHashMap<String, String>(original)
+        newHeaders["Referer"] = QISHUI_REFERER
+        newHeaders["User-Agent"] = QISHUI_STREAM_USER_AGENT
+        val cookie = runCatching { qishuiCookieProvider() }.getOrDefault("")
+        if (cookie.isNotBlank()) newHeaders["Cookie"] = cookie
+        return newHeaders
     }
 
     /**

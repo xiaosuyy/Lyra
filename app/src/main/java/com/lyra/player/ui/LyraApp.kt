@@ -914,6 +914,38 @@ private fun rememberPlaybackVisualCoverUrl(
 }
 
 @Composable
+private fun HigherQualityLocalDownloadDialog(
+    request: GlobalDownloadManager.HigherQualityLocalDownloadRequest,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.download_higher_quality_local_title)) },
+        text = {
+            Text(
+                stringResource(
+                    R.string.download_higher_quality_local_message,
+                    request.localLabel,
+                    request.localBitrateKbps
+                )
+            )
+        },
+        // 右下角：左「坚持下载」、右「明白」。
+        dismissButton = {
+            HapticTextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.download_higher_quality_local_continue))
+            }
+        },
+        confirmButton = {
+            HapticTextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.download_higher_quality_local_got_it))
+            }
+        }
+    )
+}
+
+@Composable
 private fun TrafficRiskDownloadDialog(
     request: GlobalDownloadManager.TrafficRiskDownloadRequest,
     onConfirm: () -> Unit,
@@ -1694,6 +1726,14 @@ private fun LyraAppContent(
     LaunchedEffect(Unit) {
         GlobalDownloadManager.trafficRiskDownloadRequests.collect { request ->
             pendingTrafficRiskDownloadRequest = request
+        }
+    }
+    var pendingHigherQualityDownloadRequest by remember {
+        mutableStateOf<GlobalDownloadManager.HigherQualityLocalDownloadRequest?>(null)
+    }
+    LaunchedEffect(Unit) {
+        GlobalDownloadManager.higherQualityLocalDownloadRequests.collect { request ->
+            pendingHigherQualityDownloadRequest = request
         }
     }
 
@@ -4743,6 +4783,19 @@ private fun LyraAppContent(
                         },
                         onDismiss = {
                             pendingTrafficRiskDownloadRequest = null
+                        }
+                    )
+                }
+
+                pendingHigherQualityDownloadRequest?.let { request ->
+                    HigherQualityLocalDownloadDialog(
+                        request = request,
+                        onConfirm = {
+                            pendingHigherQualityDownloadRequest = null
+                            GlobalDownloadManager.confirmHigherQualityLocalDownload(context, request)
+                        },
+                        onDismiss = {
+                            pendingHigherQualityDownloadRequest = null
                         }
                     )
                 }

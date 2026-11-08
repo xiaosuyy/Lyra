@@ -55,6 +55,7 @@ import com.lyra.player.core.source.SourceManagerState
 import com.lyra.player.core.source.SourceSearchType
 import com.lyra.player.ui.viewmodel.tab.search.BilibiliSearchProvider
 import com.lyra.player.ui.viewmodel.tab.search.CustomChannelSearchProvider
+import com.lyra.player.ui.viewmodel.tab.search.GdStudioSearchProvider
 import com.lyra.player.ui.viewmodel.tab.search.NeteaseSearchProvider
 import com.lyra.player.ui.viewmodel.tab.search.SourceSearchPage
 import com.lyra.player.ui.viewmodel.tab.search.toNeteaseType
@@ -126,6 +127,7 @@ enum class SearchSource {
     KUGOU,
     MIGU,
     TENCENT,
+    GDSTUDIO,
     LINK_RECOGNITION
 }
 
@@ -145,6 +147,7 @@ internal val SearchSource.musicSourceId: String?
         SearchSource.KUGOU -> MusicSourceIds.KUGOU
         SearchSource.MIGU -> MusicSourceIds.MIGU
         SearchSource.TENCENT -> MusicSourceIds.TENCENT
+        SearchSource.GDSTUDIO -> MusicSourceIds.GDSTUDIO
         SearchSource.ALL,
         SearchSource.LINK_RECOGNITION -> null
     }
@@ -158,6 +161,7 @@ internal fun searchSourceForMusicSourceId(sourceId: String): SearchSource? = whe
     MusicSourceIds.KUGOU -> SearchSource.KUGOU
     MusicSourceIds.MIGU -> SearchSource.MIGU
     MusicSourceIds.TENCENT -> SearchSource.TENCENT
+    MusicSourceIds.GDSTUDIO -> SearchSource.GDSTUDIO
     else -> null
 }
 
@@ -204,6 +208,7 @@ internal fun ExploreUiState.selectedSearchTypeOf(source: SearchSource): SourceSe
     // YouTube 入口已移除；这里仅为保持 when 完备，实际不可达。
     SearchSource.YOUTUBE_MUSIC -> SourceSearchType.SONG
     SearchSource.BILIBILI,
+    SearchSource.GDSTUDIO,
     SearchSource.LINK_RECOGNITION -> SourceSearchType.SONG
 }
 
@@ -327,6 +332,14 @@ data class ExploreUiState(
     val selectedYouTubeMusicSearchType: YouTubeExploreSearchType = YouTubeExploreSearchType.SONG,
     /** 「全部」聚合入口的当前搜索类型。 */
     val selectedAllSearchType: SourceSearchType = SourceSearchType.SONG,
+    /** 聚合搜索命中的渠道结果：key 为渠道音源，value 为该渠道返回的原始结果。 */
+    val aggregateItemsBySource: Map<SearchSource, List<ExploreSearchResult>> = emptyMap(),
+    /** 聚合搜索的完整结果（跨渠道去重后），用于「全部」视图。 */
+    val aggregateSearchItems: List<ExploreSearchResult> = emptyList(),
+    /** 本次聚合搜索实际有结果的渠道，按音源顺序排列，用于搜索框渠道筛选菜单。 */
+    val resultSearchSources: List<SearchSource> = emptyList(),
+    /** 当前结果筛选渠道；ALL 表示不过滤。 */
+    val searchResultFilter: SearchSource = SearchSource.ALL,
     /** 当前可用（已启用 / 就绪 / 可搜索）的音源，动态生成，不含「全部」与「链接」。 */
     val availableSearchSources: List<SearchSource> = emptyList(),
     val isNeteaseLoggedIn: Boolean = false,
@@ -485,6 +498,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var ytMusicPlaylistsPending = false
     private var searchRequestVersion = 0L
     private var youtubeEnabled = YouTubeFeatureGate.isEnabled()
+    private var gdApiEnabled = false
 
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState
@@ -493,6 +507,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         // 3B：注册已迁移的搜索 Provider（幂等）。新增平台在此注册即可。
         SourceSearchRegistry.register(NeteaseSearchProvider)
         SourceSearchRegistry.register(BilibiliSearchProvider)
+        SourceSearchRegistry.register(GdStudioSearchProvider)
         CustomChannelSearchProvider.all.forEach(SourceSearchRegistry::register)
         viewModelScope.launch {
             neteaseRepo.authHealthFlow.collect { health ->
@@ -523,6 +538,12 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 refreshAvailableSources()
             }
         }
+        viewModelScope.launch {
+            AppContainer.settingsRepo.gdApiEnabledFlow.collect { enabled ->
+                gdApiEnabled = enabled
+                refreshAvailableSources()
+            }
+        }
         // 动态音源列表：随已启用脚本声明的音源变化刷新（酷我 / 酷狗 / 咪咕 / QQ…）
         viewModelScope.launch {
             CustomSourceManager.declaredSourceIds.collect { refreshAvailableSources() }
@@ -543,7 +564,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         val sources = SourceManager.searchSources(
             SourceManagerState(
                 youtubeEnabled = youtubeEnabled,
-                declaredCustomSourceIds = CustomSourceManager.declaredSourceIds.value
+                declaredCustomSourceIds = CustomSourceManager.declaredSourceIds.value,
+                gdApiEnabled = gdApiEnabled
             )
         )
             .mapNotNull { searchSourceForMusicSourceId(it.id) }
@@ -574,6 +596,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             searching = false,
             searchResults = emptyList(), // 切换源时清空结果
             searchItems = emptyList(),
+            aggregateSearchItems = emptyList(),
+            aggregateItemsBySource = emptyMap(),
+            resultSearchSources = emptyList(),
+            searchResultFilter = SearchSource.ALL,
             searchHasMore = false,
             searchLoadingMore = false,
             searchLoadMoreError = null,
@@ -581,6 +607,35 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             searchKeyword = "",
             searchDisplayQuery = "",
             searchError = null
+        )
+    }
+
+    /**
+     * 只筛选已经聚合回来的搜索结果，不重新请求网络。
+     *
+     * 搜索框渠道菜单只会传入 [ExploreUiState.resultSearchSources] 里的渠道或「全部」。
+     */
+    fun setSearchResultFilter(source: SearchSource) {
+        val state = _uiState.value
+        if (source == SearchSource.LINK_RECOGNITION) return
+        if (source != SearchSource.ALL && source !in state.resultSearchSources) return
+        if (source == state.searchResultFilter) return
+        val items = if (source == SearchSource.ALL) {
+            state.aggregateSearchItems
+        } else {
+            state.aggregateItemsBySource[source].orEmpty()
+        }
+        LyraLogger.d(
+            TAG,
+            "setSearchResultFilter: ${state.searchResultFilter} -> $source, count=${items.size}"
+        )
+        _uiState.value = state.copy(
+            searchResultFilter = source,
+            searchItems = items,
+            searchResults = searchSongItems(items),
+            searchHasMore = false,
+            searchLoadingMore = false,
+            searchLoadMoreError = null
         )
     }
 
@@ -665,6 +720,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 searching = false,
                 searchResults = emptyList(),
                 searchItems = emptyList(),
+                aggregateSearchItems = emptyList(),
+                aggregateItemsBySource = emptyMap(),
+                resultSearchSources = emptyList(),
+                searchResultFilter = SearchSource.ALL,
                 searchHasMore = false,
                 searchLoadingMore = false,
                 searchLoadMoreError = null,
@@ -675,12 +734,19 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             )
             return
         }
-        val source = _uiState.value.selectedSearchSource
-        if (source == SearchSource.YOUTUBE_MUSIC && !youtubeEnabled) {
+        val requestedSource = _uiState.value.selectedSearchSource
+        if (requestedSource == SearchSource.YOUTUBE_MUSIC && !youtubeEnabled) {
             LyraLogger.d(TAG, "skip search: YouTube disabled")
             return
         }
-        val requestVersion = beginSearchRequest(apiKeyword, matchQuery)
+        // 搜索统一先走「全部」聚合：把当前所有启用且可用的音源并发搜一遍，
+        // 出结果后再由搜索框的渠道菜单做本地筛选，避免先选渠道再搜索。
+        val source = if (requestedSource == SearchSource.LINK_RECOGNITION) {
+            SearchSource.LINK_RECOGNITION
+        } else {
+            SearchSource.ALL
+        }
+        val requestVersion = beginSearchRequest(apiKeyword, matchQuery, source)
         LyraLogger.d(
             TAG,
             "search start: source=$source, request=$requestVersion, keyword=$apiKeyword, display=$matchQuery"
@@ -743,8 +809,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             }
             val merged = ArrayList<ExploreSearchResult>()
             val seen = HashSet<String>()
-            pages.forEach { page ->
-                page?.items?.forEach { item ->
+            val itemsBySource = LinkedHashMap<SearchSource, List<ExploreSearchResult>>()
+            pages.forEachIndexed { index, page ->
+                val items = page?.items.orEmpty()
+                if (items.isNotEmpty()) {
+                    itemsBySource[targets[index]] = items
+                }
+                items.forEach { item ->
                     if (seen.add(item.stableKey)) merged.add(item)
                 }
             }
@@ -763,6 +834,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     searchLoadMoreError = null,
                     searchResults = searchSongItems(merged),
                     searchItems = merged,
+                    aggregateSearchItems = merged,
+                    aggregateItemsBySource = itemsBySource,
+                    resultSearchSources = itemsBySource.keys.toList(),
+                    searchResultFilter = SearchSource.ALL,
                     searchPage = 1,
                     searchHasMore = false
                 )
@@ -962,16 +1037,25 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun beginSearchRequest(keyword: String, displayQuery: String): Long {
+    private fun beginSearchRequest(
+        keyword: String,
+        displayQuery: String,
+        source: SearchSource = _uiState.value.selectedSearchSource
+    ): Long {
         searchJob?.cancel()
         searchMoreJob?.cancel()
         val requestVersion = invalidateSearchRequest()
         _uiState.value = _uiState.value.copy(
+            selectedSearchSource = source,
             searching = true,
             searchError = null,
             allSourcesFailed = false,
             searchResults = emptyList(),
             searchItems = emptyList(),
+            aggregateSearchItems = emptyList(),
+            aggregateItemsBySource = emptyMap(),
+            resultSearchSources = emptyList(),
+            searchResultFilter = SearchSource.ALL,
             searchHasMore = false,
             searchLoadingMore = false,
             searchLoadMoreError = null,
@@ -1611,7 +1695,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             SearchSource.KUGOU,
             SearchSource.MIGU,
             SearchSource.KUWO,
-            SearchSource.TENCENT -> fallback
+            SearchSource.TENCENT,
+            SearchSource.GDSTUDIO -> fallback
             SearchSource.LINK_RECOGNITION -> app.getString(R.string.error_link_recognition, fallback)
         }
     }

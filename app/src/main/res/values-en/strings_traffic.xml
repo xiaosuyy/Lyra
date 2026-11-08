@@ -37,6 +37,10 @@
     <string name="traffic_risk_download_title">Confirm download</string>
     <string name="traffic_risk_download_single_message">You are using %1$s. Downloading “%2$s” may use a lot of data.</string>
     <string name="traffic_risk_download_confirm">Continue download</string>
+    <string name="download_higher_quality_local_title">Higher quality available</string>
+    <string name="download_higher_quality_local_message">A higher-quality copy of “%1$s” already exists locally (about %2$d kbps). Downloading again will keep an extra copy.</string>
+    <string name="download_higher_quality_local_continue">Download anyway</string>
+    <string name="download_higher_quality_local_got_it">Got it</string>
     <string name="mobile_data_download_interruption_title">Wi-Fi disconnected</string>
     <string name="mobile_data_download_wait_wifi">Wait for Wi-Fi</string>
     <string name="mobile_data_download_cancel_all">Cancel all tasks</string>

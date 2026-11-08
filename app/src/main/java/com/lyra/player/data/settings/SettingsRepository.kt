@@ -581,6 +581,10 @@ class SettingsRepository(private val context: Context) {
     // YouTube 渠道已从 Lyra 中移除：这里恒定返回关闭，历史设置值不再生效
     val youtubeEnabledFlow: Flow<Boolean> = flowOf(false)
 
+    // GD 音乐台 API：开启后作为内置音源参与搜索 / 播放
+    val gdApiEnabledFlow: Flow<Boolean> =
+        dataStoreSettingFlow { it[SettingsKeys.GD_API_ENABLED] ?: false }
+
     suspend fun setDynamicColor(value: Boolean) {
         context.dataStore.edit { it[SettingsKeys.DYNAMIC_COLOR] = value }
         persistThemeDynamicColor(context, value)
@@ -1357,6 +1361,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setYouTubeEnabled(enabled: Boolean) {
         setSetting(AutoSettingsSchema.general.youtubeEnabled, enabled)
+    }
+
+    suspend fun setGdApiEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[SettingsKeys.GD_API_ENABLED] = enabled }
     }
 }
 

@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +55,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.lyra.player.ui.melox.glass.MeloxGlassSpec
 import com.lyra.player.ui.melox.glass.meloxGlassSurface
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -67,7 +67,6 @@ data class MeloxMiniTrack(
 
 private const val MiniSwipeCommitScreenFraction = 0.28f
 private const val MiniSwipeMaxScreenFraction = 0.86f
-private const val MiniSwipeSettleTimeoutMs = 1_200L
 
 private fun miniSwipeSmoothStep(value: Float): Float {
     val t = value.coerceIn(0f, 1f)
@@ -110,6 +109,12 @@ fun MeloxMiniPlayer(
     val commitThresholdPx = swipeSpanPx * MiniSwipeCommitScreenFraction
     val scope = rememberCoroutineScope()
 
+    // 拖拽闭包只按宽度做 key，会捕获陈旧的邻居/回调；换歌单后松手必须读最新值。
+    val latestPreviousTrack by rememberUpdatedState(previousTrack)
+    val latestNextTrack by rememberUpdatedState(nextTrack)
+    val latestOnPrevious by rememberUpdatedState(onPrevious)
+    val latestOnNext by rememberUpdatedState(onNext)
+
     val contentOffset = remember { Animatable(0f) }
     var accumulatedPx by remember { mutableFloatStateOf(0f) }
     var pendingDirection by remember { mutableIntStateOf(0) }
@@ -125,8 +130,8 @@ fun MeloxMiniPlayer(
     val previewDirection = if (pendingDirection != 0) committedDirection else liveDirection
     val previewTrack = when {
         pendingDirection != 0 -> committedTrack
-        liveDirection > 0 -> previousTrack
-        liveDirection < 0 -> nextTrack
+        liveDirection > 0 -> latestPreviousTrack
+        liveDirection < 0 -> latestNextTrack
         else -> null
     }
     val adjacentAlpha = miniSwipeSmoothStep(
@@ -146,9 +151,10 @@ fun MeloxMiniPlayer(
     }
 
     // 相邻曲目已落到播放状态：把新条目钉回原位，撤掉预览层。
+    // 若横滑提交动画仍在进行，交由该动画收尾，避免中途 snap 打断滑入。
     LaunchedEffect(currentTrackKey) {
+        if (pendingDirection != 0) return@LaunchedEffect
         contentOffset.snapTo(0f)
-        pendingDirection = 0
         committedTrack = null
         committedDirection = 0
     }
@@ -212,23 +218,27 @@ fun MeloxMiniPlayer(
                             }
                             accumulatedPx = 0f
                             val target = when {
-                                direction > 0 -> previousTrack
-                                direction < 0 -> nextTrack
+                                direction > 0 -> latestPreviousTrack
+                                direction < 0 -> latestNextTrack
                                 else -> null
                             }
                             if (direction != 0 && target != null) {
                                 committedTrack = target
                                 committedDirection = direction
                                 pendingDirection = direction
+                                // 松手立即切歌，音频不等滑出动画；视觉由预览层滑入承接。
+                                if (direction > 0) latestOnPrevious() else latestOnNext()
                                 scope.launch {
                                     contentOffset.animateTo(
                                         targetValue = direction * swipeSpanPx,
                                         animationSpec = spring(dampingRatio = 0.7f, stiffness = 380f),
                                     )
-                                    if (direction > 0) onPrevious() else onNext()
-                                    // 条目滑入后若曲目仍未切换（无上一首/加载失败），回弹。
-                                    delay(MiniSwipeSettleTimeoutMs)
-                                    if (pendingDirection != 0) resetSwipe()
+                                    // 滑入完成：新曲目已是 current，钉回原位撤预览；
+                                    // 若加载失败 current 未变，则回弹到原曲目。
+                                    contentOffset.snapTo(0f)
+                                    pendingDirection = 0
+                                    committedTrack = null
+                                    committedDirection = 0
                                 }
                             } else {
                                 resetSwipe()

@@ -24,6 +24,7 @@ private const val TAG = "CustomSourceStore"
 private const val SOURCE_DIR_NAME = "custom_sources"
 private const val META_FILE_NAME = "meta.json"
 private const val BUNDLED_ASSET_DIR = "customsource/sources"
+private const val UNORDERED = Int.MAX_VALUE
 
 internal data class CustomSourceScript(
     val id: String,
@@ -31,6 +32,7 @@ internal data class CustomSourceScript(
     val version: String,
     val enabled: Boolean,
     val bundled: Boolean,
+    val order: Int,
     val file: File
 )
 
@@ -73,9 +75,10 @@ internal object CustomSourceStore {
                     ?: parseHeaderValue(file.readText(), "version").orEmpty(),
                 enabled = entry?.optBoolean("enabled", true) ?: true,
                 bundled = entry?.optBoolean("bundled", false) ?: false,
+                order = entry?.optInt("order", UNORDERED) ?: UNORDERED,
                 file = file
             )
-        }
+        }.sortedWith(compareBy<CustomSourceScript> { it.order }.thenBy { it.name })
     }
 
     fun readScriptText(context: Context, id: String): String? {
@@ -90,6 +93,22 @@ internal object CustomSourceStore {
         val entry = scripts.optJSONObject(id) ?: JSONObject()
         entry.put("enabled", enabled)
         scripts.put(id, entry)
+        meta.put("scripts", scripts)
+        writeMeta(context, meta)
+    }
+
+    /**
+     * 记录启用音源的检索顺序，列表下标越小越先使用。
+     */
+    fun reorder(context: Context, orderedIds: List<String>) {
+        if (orderedIds.isEmpty()) return
+        val meta = readMeta(context)
+        val scripts = meta.optJSONObject("scripts") ?: JSONObject()
+        orderedIds.forEachIndexed { index, id ->
+            val entry = scripts.optJSONObject(id) ?: return@forEachIndexed
+            entry.put("order", index)
+            scripts.put(id, entry)
+        }
         meta.put("scripts", scripts)
         writeMeta(context, meta)
     }

@@ -62,6 +62,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -230,6 +231,34 @@ private data class MeloxHomeQuickAction(
     val songs: List<SongItem>,
     val requiresLogin: Boolean = false,
     val playlist: PlaylistSummary? = null
+)
+
+private data class QishuiModeUi(
+    val key: String,
+    val labelRes: Int,
+    val eyebrowRes: Int,
+    val subtitleRes: Int
+)
+
+private val QishuiModeOptions = listOf(
+    QishuiModeUi(
+        key = "default",
+        labelRes = R.string.qishui_mode_default,
+        eyebrowRes = R.string.qishui_eyebrow_default,
+        subtitleRes = R.string.qishui_subtitle_default
+    ),
+    QishuiModeUi(
+        key = "familiar",
+        labelRes = R.string.qishui_mode_familiar,
+        eyebrowRes = R.string.qishui_eyebrow_familiar,
+        subtitleRes = R.string.qishui_subtitle_familiar
+    ),
+    QishuiModeUi(
+        key = "fresh",
+        labelRes = R.string.qishui_mode_fresh,
+        eyebrowRes = R.string.qishui_eyebrow_fresh,
+        subtitleRes = R.string.qishui_subtitle_fresh
+    )
 )
 
 internal fun shouldShowHomeContinueSection(
@@ -419,6 +448,10 @@ fun HomeScreen(
     val isMeloxNeteaseHome = !isInternational && !offlineMode
     var quickActionDetail by remember { mutableStateOf<MeloxHomeQuickAction?>(null) }
     var heartModeLoading by remember { mutableStateOf(false) }
+    var qishuiLoading by remember { mutableStateOf(false) }
+    val qishuiModeUi = QishuiModeOptions
+        .firstOrNull { it.key == homeLayout.qishuiMode }
+        ?: QishuiModeOptions.first()
     val dailyRecommendSongs = ui.radarSongSections
         .firstOrNull { it.source == NeteaseHomeSongSource.DAILY_RECOMMEND }
         ?.section?.items.orEmpty()
@@ -470,6 +503,16 @@ fun HomeScreen(
             subtitle = stringResource(R.string.home_subtitle_heart),
             icon = Icons.Outlined.FavoriteBorder,
             colors = listOf(Color(0xFFFF6EAC), Color(0xFF9B5DE5)),
+            songs = emptyList(),
+            requiresLogin = true
+        ),
+        MeloxHomeQuickAction(
+            key = "qishui",
+            title = stringResource(R.string.qishui_account_title),
+            eyebrow = stringResource(qishuiModeUi.eyebrowRes),
+            subtitle = stringResource(qishuiModeUi.subtitleRes),
+            icon = Icons.Outlined.MusicNote,
+            colors = listOf(Color(0xFF2BD96A), Color(0xFF09A85B)),
             songs = emptyList(),
             requiresLogin = true
         ),
@@ -915,7 +958,16 @@ fun HomeScreen(
                         MeloxQuickActionRow(
                             actions = meloxQuickActions,
                             contentPadding = 0.dp,
-                            loadingKey = if (heartModeLoading) "heart" else null,
+                            loadingKey = when {
+                                heartModeLoading -> "heart"
+                                qishuiLoading -> "qishui"
+                                else -> null
+                            },
+                            qishuiModeKey = qishuiModeUi.key,
+                            qishuiModes = QishuiModeOptions,
+                            onQishuiModeSelected = { key ->
+                                AppContainer.homeLayoutRepository.setQishuiMode(key)
+                            },
                             onAction = { action ->
                                 when {
                                     action.key == "heart" -> {
@@ -946,6 +998,40 @@ fun HomeScreen(
                                                         )
                                                     } finally {
                                                         heartModeLoading = false
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    action.key == "qishui" -> {
+                                        when {
+                                            !vm.isQishuiLoggedIn() -> showHomeSnackbar(
+                                                context.getString(R.string.qishui_login_required)
+                                            )
+                                            qishuiLoading -> Unit
+                                            else -> {
+                                                qishuiLoading = true
+                                                scope.launch {
+                                                    try {
+                                                        val songs = vm.loadQishuiSongs(
+                                                            homeLayout.qishuiMode
+                                                        )
+                                                        if (songs.isNotEmpty()) {
+                                                            onSongClick(songs, 0)
+                                                        } else {
+                                                            showHomeSnackbar(
+                                                                context.getString(R.string.qishui_empty)
+                                                            )
+                                                        }
+                                                    } catch (error: kotlinx.coroutines.CancellationException) {
+                                                        throw error
+                                                    } catch (error: Exception) {
+                                                        showHomeSnackbar(
+                                                            error.message
+                                                                ?: context.getString(R.string.qishui_empty)
+                                                        )
+                                                    } finally {
+                                                        qishuiLoading = false
                                                     }
                                                 }
                                             }
@@ -1188,6 +1274,9 @@ private fun MeloxQuickActionRow(
     actions: List<MeloxHomeQuickAction>,
     contentPadding: Dp,
     loadingKey: String? = null,
+    qishuiModeKey: String = "default",
+    qishuiModes: List<QishuiModeUi> = emptyList(),
+    onQishuiModeSelected: (String) -> Unit = {},
     onAction: (MeloxHomeQuickAction) -> Unit
 ) {
     LazyRow(
@@ -1237,15 +1326,68 @@ private fun MeloxQuickActionRow(
                         tint = Color.White.copy(alpha = 0.24f),
                         modifier = Modifier.size(72.dp)
                     )
-                    Text(
-                        text = action.title,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(18.dp),
-                        color = Color.White,
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (action.key == "qishui" && qishuiModes.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(18.dp)
+                        ) {
+                            var modeMenuExpanded by remember { mutableStateOf(false) }
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { modeMenuExpanded = true }
+                                    .padding(horizontal = 2.dp, vertical = 1.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = action.title,
+                                    color = Color.White,
+                                    fontSize = 25.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(
+                                    imageVector = Icons.Filled.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.85f),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = modeMenuExpanded,
+                                onDismissRequest = { modeMenuExpanded = false }
+                            ) {
+                                qishuiModes.forEach { mode ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = stringResource(mode.labelRes),
+                                                fontWeight = if (mode.key == qishuiModeKey) {
+                                                    FontWeight.SemiBold
+                                                } else {
+                                                    FontWeight.Normal
+                                                }
+                                            )
+                                        },
+                                        onClick = {
+                                            modeMenuExpanded = false
+                                            onQishuiModeSelected(mode.key)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = action.title,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(18.dp),
+                            color = Color.White,
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     if (loadingKey == action.key) {
                         Box(
                             modifier = Modifier

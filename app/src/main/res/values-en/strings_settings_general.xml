@@ -96,6 +96,8 @@
     <string name="settings_lyrics_offset_section_desc">Calibrate timing differences between lyrics and audio.</string>
     <string name="settings_custom_source_section">Custom Sources (JS plugins)</string>
     <string name="settings_custom_source_section_desc">Load lx-music style JS source scripts to resolve playable stream URLs. Bundled scripts update with the app; enable, disable, or import your own here.</string>
+    <string name="settings_gd_api_enabled">GD Music API</string>
+    <string name="settings_gd_api_enabled_desc">Search and play songs through the GD Music API. Enabling it automatically disables all custom source scripts.</string>
     <string name="settings_custom_source_import">Import source script</string>
     <string name="settings_custom_source_import_from_local">Import from local file</string>
     <string name="settings_custom_source_import_url_label">Script URL</string>
@@ -111,6 +113,10 @@
     <string name="settings_custom_source_import_failed">Import failed, please pick a .js source script</string>
     <string name="settings_custom_source_delete">Delete</string>
     <string name="settings_custom_source_reloaded">Source scripts reloaded</string>
+    <string name="settings_custom_source_latency_checking">Checking…</string>
+    <string name="settings_custom_source_latency_ms">%1$d ms</string>
+    <string name="settings_custom_source_latency_timeout">Timeout</string>
+    <string name="settings_custom_source_order_hint">Press and hold an enabled source to drag it up or down; sources higher in the list are tried first.</string>
     <string name="settings_playback_fade_in">Playback Fade</string>
     <string name="settings_playback_fade_in_desc">Fade audio in when playback starts</string>
     <string name="settings_playback_fade_in_duration">Fade-in Duration</string>

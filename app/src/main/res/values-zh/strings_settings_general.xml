@@ -96,6 +96,8 @@
     <string name="settings_lyrics_offset_section_desc">校准不同来源歌词与歌曲的时间差</string>
     <string name="settings_custom_source_section">自定义源（音源脚本）</string>
     <string name="settings_custom_source_section_desc">加载 lx-music 格式的 JS 音源脚本，用于解析歌曲直链；内置脚本会随应用更新，可在此单独启停或导入自定义脚本</string>
+    <string name="settings_gd_api_enabled">GD 音乐台 API</string>
+    <string name="settings_gd_api_enabled_desc">启用后使用 GD 音乐台 API 搜索与播放歌曲，并自动关闭全部自定义音源脚本</string>
     <string name="settings_custom_source_import">导入音源脚本</string>
     <string name="settings_custom_source_import_from_local">从本地文件导入</string>
     <string name="settings_custom_source_import_url_label">脚本 URL</string>
@@ -111,6 +113,10 @@
     <string name="settings_custom_source_import_failed">导入失败，请确认选择的是 .js 音源脚本</string>
     <string name="settings_custom_source_delete">删除</string>
     <string name="settings_custom_source_reloaded">已重新加载音源脚本</string>
+    <string name="settings_custom_source_latency_checking">检测中…</string>
+    <string name="settings_custom_source_latency_ms">%1$d ms</string>
+    <string name="settings_custom_source_latency_timeout">超时</string>
+    <string name="settings_custom_source_order_hint">按住任意一个已启用的音源即可上下拖动排序，越靠上的音源会越先用于检索。</string>
     <string name="settings_playback_fade_in">播放淡入淡出</string>
     <string name="settings_playback_fade_in_desc">开始播放时使用淡入淡出过渡</string>
     <string name="settings_playback_fade_in_duration">播放淡入时长</string>

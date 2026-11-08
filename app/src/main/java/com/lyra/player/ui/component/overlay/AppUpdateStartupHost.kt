@@ -86,16 +86,6 @@ private fun StartupUpdateDialog(
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                if (isDownloading) {
-                    Text(
-                        text = stringResource(
-                            R.string.update_downloading_action,
-                            (downloadProgress * 100).roundToInt()
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
                 message?.let { errorText ->
                     Text(
                         text = errorText,
@@ -105,10 +95,18 @@ private fun StartupUpdateDialog(
                 }
             }
         },
-        // 左「立即更新」、右「稍后」：M3 中 dismissButton 位于 confirmButton 左侧
+        // 左「立即更新」、右「稍后」：M3 中 dismissButton 位于 confirmButton 左侧。
+        // 点击后后台开始下载，按钮原位改为下载百分比，避免"点了没反应"。
         dismissButton = {
             Text(
-                text = stringResource(R.string.update_dialog_install_now),
+                text = if (isDownloading) {
+                    stringResource(
+                        R.string.update_downloading_action,
+                        (downloadProgress * 100).roundToInt()
+                    )
+                } else {
+                    stringResource(R.string.update_dialog_install_now)
+                },
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .clickable(enabled = !isDownloading, onClick = onInstallNow)

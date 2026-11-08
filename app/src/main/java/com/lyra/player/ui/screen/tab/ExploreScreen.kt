@@ -435,6 +435,7 @@ private fun searchSourceLabel(source: SearchSource): String {
         SearchSource.KUWO -> stringResource(R.string.explore_tab_kuwo)
         SearchSource.KUGOU -> stringResource(R.string.explore_tab_kugou)
         SearchSource.MIGU -> stringResource(R.string.explore_tab_migu)
+        SearchSource.GDSTUDIO -> stringResource(R.string.explore_tab_gdstudio)
         SearchSource.BILIBILI -> stringResource(R.string.platform_bilibili)
         SearchSource.LINK_RECOGNITION -> stringResource(R.string.explore_tab_links)
     }
@@ -584,6 +585,21 @@ fun ExploreScreen(
 
     var showExportSheet by remember { mutableStateOf(false) }
     var showChannelMenu by remember { mutableStateOf(false) }
+    // 只有聚合搜索真正返回了结果、且至少有某个渠道有结果时，才允许按渠道筛选。
+    val filterableSearchSources = remember(ui.resultSearchSources) {
+        buildList {
+            add(SearchSource.ALL)
+            ui.resultSearchSources.forEach { source ->
+                if (source != SearchSource.ALL) add(source)
+            }
+        }
+    }
+    val canFilterSearchSources = ui.selectedSearchSource != SearchSource.LINK_RECOGNITION &&
+        ui.searchItems.isNotEmpty() &&
+        ui.resultSearchSources.isNotEmpty()
+    LaunchedEffect(canFilterSearchSources) {
+        if (!canFilterSearchSources) showChannelMenu = false
+    }
 
     val isInternational by AppContainer.settingsRepo.internationalizationEnabledFlow
         .collectAsStateWithLifecycle(initialValue = false)
@@ -704,6 +720,9 @@ fun ExploreScreen(
     }
 
     LaunchedEffect(pagerState.currentPage, orderedSearchSources, ui.selectedSearchSource) {
+        // 搜索中固定使用「全部」聚合结果，翻页不再反向切换搜索渠道；
+        // 只有空查询（浏览首页）时才允许滑动切源。
+        if (searchQuery.isNotEmpty()) return@LaunchedEffect
         val currentSource = orderedSearchSources.getOrNull(pagerState.currentPage)
             ?: return@LaunchedEffect
         if (ui.selectedSearchSource != currentSource) {
@@ -950,28 +969,31 @@ fun ExploreScreen(
                             )
                         },
                         leadingIcon = {
-                            // 渠道选择并入搜索图标：点击展开可勾选的渠道列表。
+                            // 先搜索，再筛选：没有结果前图标不可点；有结果后只列出真正有结果的渠道。
                             Box {
                                 HapticIconButton(
                                     onClick = { showChannelMenu = true },
+                                    enabled = canFilterSearchSources,
                                     modifier = Modifier.size(44.dp)
                                 ) {
                                     Icon(
                                         Icons.Default.Search,
                                         contentDescription = stringResource(R.string.search_channel_select),
-                                        tint = if (showChannelMenu) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.70f)
+                                        tint = when {
+                                            showChannelMenu -> MaterialTheme.colorScheme.primary
+                                            canFilterSearchSources ->
+                                                MaterialTheme.colorScheme.onBackground.copy(alpha = 0.70f)
+                                            else ->
+                                                MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
                                         }
                                     )
                                 }
                                 DropdownMenu(
-                                    expanded = showChannelMenu,
+                                    expanded = showChannelMenu && canFilterSearchSources,
                                     onDismissRequest = { showChannelMenu = false }
                                 ) {
-                                    orderedSearchSources.forEach { source ->
-                                        val selected = source == ui.selectedSearchSource
+                                    filterableSearchSources.forEach { source ->
+                                        val selected = source == ui.searchResultFilter
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
@@ -995,11 +1017,12 @@ fun ExploreScreen(
                                             },
                                             onClick = {
                                                 showChannelMenu = false
-                                                val targetIndex =
-                                                    orderedSearchSources.indexOf(source)
-                                                if (targetIndex >= 0) {
-                                                    scope.launch {
-                                                        pagerState.animateScrollToPage(targetIndex)
+                                                vm.setSearchResultFilter(source)
+                                                scope.launch {
+                                                    if (
+                                                        searchListState.layoutInfo.totalItemsCount > 0
+                                                    ) {
+                                                        searchListState.scrollToItem(0)
                                                     }
                                                 }
                                             }
@@ -1084,6 +1107,8 @@ fun ExploreScreen(
 
             HorizontalPager(
                 state = pagerState,
+                // 搜索结果页固定显示聚合结果，禁止左右滑动切渠道，避免误触发“先选渠道再搜索”。
+                userScrollEnabled = searchQuery.isEmpty(),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()

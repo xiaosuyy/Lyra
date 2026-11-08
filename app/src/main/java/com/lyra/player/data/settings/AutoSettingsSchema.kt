@@ -197,6 +197,15 @@ object AutoSettingsSchema {
             iconRes = R.drawable.ic_youtube
         )
 
+        @AutoSetting(
+            key = "gd_api_enabled",
+            type = SettingValueType.Boolean,
+            defaultBoolean = false,
+            order = 105,
+            access = SettingAccessMode.KeyOnly
+        )
+        val gdApiEnabled = Unit
+
         @AutoSetting(order = 110)
         val biliSkipSegmentPromptEnabled = autoSwitchSetting(
             key = "bili_skip_segment_prompt_enabled",
