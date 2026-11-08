@@ -156,7 +156,8 @@ internal class QishuiApiClient(
                 throw IOException("汽水音乐请求失败：HTTP ${response.code}（$path）")
             }
             val text = response.body.string()
-            if (text.isBlank() && !passportRedirect) {
+            // passport 偶发空响应，保留给轮询逻辑回落 GET，不要直接失败。
+            if (text.isBlank() && !passportRedirect && !isPassport) {
                 throw IOException("汽水音乐返回了空响应，请稍后重试")
             }
             val json = if (text.isBlank()) {
