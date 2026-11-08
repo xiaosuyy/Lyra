@@ -91,6 +91,8 @@ internal class QishuiApiClient(
     private val qrCookies = linkedMapOf<String, String>()
     private var qrDeviceId = randomDigits(16)
     private var qrInstallId = randomDigits(15)
+    private val webDeviceId = randomDigits(16)
+    private val webInstallId = randomDigits(15)
     private val passportPoller = QishuiPassportPoller()
 
     /** 扫码轮询依赖隐藏 WebView 的安全签名，登录页可见时绑定宿主 Activity。 */
@@ -116,12 +118,15 @@ internal class QishuiApiClient(
         params: Map<String, String> = emptyMap(),
         body: RequestBody? = null,
         app: Boolean = false,
+        web: Boolean = false,
         cookie: String? = null
     ): Pair<JSONObject, String> = withContext(Dispatchers.IO) {
         val isH5 = path.contains("/h5/")
         val isPassport = path.startsWith("/passport")
         val base = if (app) APP_ORIGIN else PC_ORIGIN
+        // 扫码拿到的是网页版会话，只有网页版请求参数才会被 /luna/pc 接受。
         val mergedParams = when {
+            web -> webParams() + params
             !app && !isH5 && !isPassport -> pcAppParams() + params
             else -> params
         }
@@ -131,17 +136,17 @@ internal class QishuiApiClient(
             .build()
         val builder = Request.Builder()
             .url(url)
-            .header("Accept", "application/json")
+            .header("Accept", if (web) "application/json, text/plain, */*" else "application/json")
             .header(
                 "User-Agent",
                 when {
                     isPassport -> PASSPORT_USER_AGENT
-                    isH5 -> WEB_USER_AGENT
+                    web || isH5 -> WEB_LOGIN_USER_AGENT
                     app -> APP_USER_AGENT
                     else -> PC_APP_USER_AGENT
                 }
             )
-        if (!app && !isH5 && !isPassport) {
+        if (!app && !isH5 && !isPassport && !web) {
             builder.header("Content-Type", "application/json; charset=utf-8")
             builder.header("x-luna-background-type", "foreground")
             builder.header("x-luna-is-background-req", "0")
@@ -247,15 +252,28 @@ internal class QishuiApiClient(
         )
     }
 
-    private suspend fun getPc(path: String, params: Map<String, String> = emptyMap()): JSONObject =
-        request(path = path, params = params).first
+    private suspend fun getPc(
+        path: String,
+        params: Map<String, String> = emptyMap(),
+        web: Boolean = false
+    ): JSONObject = request(path = path, params = params, web = web).first
+
+    private fun webParams(): Map<String, String> = linkedMapOf(
+        "aid" to AID,
+        "app_version" to "3.6.0",
+        "channel" to "official",
+        "device_platform" to "MacOS",
+        "os" to "Darwin",
+        "deviceid" to webDeviceId,
+        "installid" to webInstallId
+    )
 
     // ---------------------------------------------------------------- 登录
 
     suspend fun profile(): QishuiProfile? {
         val session = currentSession()
         if (!session.isLoggedIn) return null
-        val response = getPc("/luna/pc/me", mapOf("aid" to AID))
+        val response = getPc("/luna/pc/me", mapOf("aid" to AID), web = true)
         val user = response.optJSONObject("my_info") ?: response.optJSONObject("user") ?: response
         val id = QishuiParsing.text(user, "id").ifBlank { session.userId }
         if (id.isBlank()) throw IOException("汽水音乐账号状态已失效，请重新登录")
@@ -536,7 +554,7 @@ internal class QishuiApiClient(
 
     suspend fun collectionTracks(): List<QishuiTrack> {
         requireLogin()
-        val body = getPc("/luna/pc/me/collection/mixed", mapOf("aid" to AID))
+        val body = getPc("/luna/pc/me/collection/mixed", mapOf("aid" to AID), web = true)
         return QishuiParsing.tracksFromCollection(body)
     }
 
@@ -548,7 +566,8 @@ internal class QishuiApiClient(
                 "aid" to AID,
                 "iid" to "27960026095955",
                 "version_code" to "30020100"
-            )
+            ),
+            web = true
         )
         return QishuiParsing.objects(body.optJSONArray("playlists")).mapNotNull { playlist ->
             val id = QishuiParsing.text(playlist, "id").takeIf(String::isNotBlank)
@@ -638,6 +657,9 @@ internal class QishuiApiClient(
         const val WEB_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        private const val WEB_LOGIN_USER_AGENT =
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         const val PASSPORT_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) SodaMusic/3.1.0 Chrome/136.0.7103.59 " +
