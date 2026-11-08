@@ -8,6 +8,7 @@ import com.lyra.player.data.local.database.entity.PlaylistMemberEntity
 import com.lyra.player.data.local.database.entity.PlaylistMemberTokenEntity
 import com.lyra.player.data.local.database.entity.TrackEntity
 import com.lyra.player.data.local.playlist.model.LocalPlaylist
+import com.lyra.player.data.model.NeteaseArtistSummary
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.model.identity
 import com.lyra.player.data.model.stableKey
@@ -207,14 +208,14 @@ internal class LocalPlaylistRoomMapper(
         track: TrackEntity,
         tokens: List<PlaylistMemberTokenEntity>
     ): SongItem {
-        val payload = requireNotNull(
-            decodeSong(memberPayloadJson) ?: decodeSong(track.durablePayloadJson)
-        ) {
-            "Song payload is missing for ${track.identityKey}"
-        }
+        val decoded = decodeSong(memberPayloadJson) ?: decodeSong(track.durablePayloadJson)
+        // payload 解不出来或与 track 列明显不一致时退回列数据, 保证歌单能打开而不是整份初始化失败
+        val payload = decoded?.takeIf { it.name.isNotBlank() || track.name.isBlank() }
+            ?: track.toFallbackSongItem()
         return payload.copy(
             addedAt = addedAt,
             playlistContextId = playlistContextId,
+            neteaseArtists = payload.neteaseArtists?.filterIsInstance<NeteaseArtistSummary>(),
             syncMembershipTokens = tokens
                 .sortedWith(
                     compareBy<PlaylistMemberTokenEntity> { it.tokenIndex }
@@ -228,6 +229,25 @@ internal class LocalPlaylistRoomMapper(
                     )
                 },
             streamUrl = null
+        )
+    }
+
+    private fun TrackEntity.toFallbackSongItem(): SongItem {
+        return SongItem(
+            id = songId,
+            name = name,
+            artist = artist,
+            album = album,
+            albumId = albumId,
+            durationMs = durationMs,
+            coverUrl = coverUrl,
+            mediaUri = mediaUri,
+            channelId = channelId,
+            audioId = audioId,
+            subAudioId = subAudioId,
+            sourceStableKey = sourceStableKey,
+            localFileName = localFileName,
+            localFilePath = localFilePath
         )
     }
 

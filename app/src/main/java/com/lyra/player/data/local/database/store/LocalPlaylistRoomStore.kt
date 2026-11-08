@@ -7,8 +7,10 @@ import com.lyra.player.data.local.database.entity.SyncOutboxEntity
 import com.lyra.player.data.local.database.entity.SyncOutboxStatus
 import com.lyra.player.data.local.playlist.model.LocalPlaylist
 import com.lyra.player.data.local.playlist.LocalPlaylistSyncMutationOutbox
+import com.lyra.player.data.model.NeteaseArtistSummary
 import com.lyra.player.data.model.identity
 import com.lyra.player.data.model.stableKey
+import com.lyra.player.data.sync.model.SyncCausalToken
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -348,14 +350,18 @@ internal class LocalPlaylistRoomStore(
                     append(song.playlistContextId)
                     append(song.sourceStableKey)
                     append(song.addedAt)
-                    append(song.neteaseArtists?.size ?: 0)
-                    song.neteaseArtists.orEmpty().forEach { artist ->
+                    val artists = song.neteaseArtists.orEmpty()
+                        .filterIsInstance<NeteaseArtistSummary>()
+                    append(artists.size)
+                    artists.forEach { artist ->
                         append(artist.id)
                             append(artist.name)
                         }
-                    append(song.syncMembershipTokens?.size ?: 0)
-                    song.syncMembershipTokens
+                    val membershipTokens = song.syncMembershipTokens
                         .orEmpty()
+                        .filterIsInstance<SyncCausalToken>()
+                    append(membershipTokens.size)
+                    membershipTokens
                         .sortedWith(compareBy({ it.deviceId }, { it.counter }))
                         .forEach { token ->
                             append(token.deviceId)

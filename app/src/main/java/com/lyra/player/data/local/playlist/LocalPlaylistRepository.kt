@@ -302,18 +302,12 @@ class LocalPlaylistRepository private constructor(
             return null
         }
         val activeRoomStore = roomStore
-        return runCatching {
-            runBlocking {
-                activeRoomStore.readIfRoomPrimary()
-            }
-        }.onFailure { error ->
-            roomStorageEnabled = false
-            LyraLogger.e(
-                "LocalPlaylistRepo",
-                "Failed to read Room playlists; falling back to legacy storage",
-                error
-            )
-        }.getOrNull()
+        // 只有确认 Room 不是权威存储时才允许回退 legacy JSON: 若 cutover 已是 room_primary 而读取抛错,
+        // 回退会读到已清理的 JSON 并用空歌单覆盖 Room, 这里直接让初始化失败以保住数据
+        if (!runBlocking { activeRoomStore.isRoomPrimary() }) {
+            return null
+        }
+        return runBlocking { activeRoomStore.readPlaylists() }
     }
 
     private fun readStoredPlaylists(): PlaylistLoadResult {

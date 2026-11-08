@@ -1,5 +1,6 @@
 package com.lyra.player.core.api.search
 
+import com.google.gson.annotations.SerializedName
 import kotlinx.serialization.Serializable
 
 /*
@@ -26,7 +27,10 @@ import kotlinx.serialization.Serializable
  */
 
 enum class MusicPlatform {
-    CLOUD_MUSIC, QQ_MUSIC
+    @SerializedName(value = "CLOUD_MUSIC", alternate = ["m"])
+    CLOUD_MUSIC,
+    @SerializedName(value = "QQ_MUSIC", alternate = ["n"])
+    QQ_MUSIC
 }
 
 @Serializable

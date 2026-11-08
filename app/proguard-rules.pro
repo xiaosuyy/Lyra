@@ -22,15 +22,17 @@
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
--keepclassmembers,allowoptimization class moe.ouom.neriplayer.data.** {
+# 包名已更名为 com.lyra.player, 旧包名规则不会匹配任何类, 会导致 Gson 字段的
+# 泛型 Signature 被裁掉(嵌套 List 被反序列化成 LinkedTreeMap)并在读取歌单时崩溃
+-keepclassmembers,allowoptimization class com.lyra.player.data.** {
     <fields>;
     <init>(...);
 }
--keepclassmembers,allowoptimization class moe.ouom.neriplayer.core.player.model.** {
+-keepclassmembers,allowoptimization class com.lyra.player.core.player.model.** {
     <fields>;
     <init>(...);
 }
--keepclassmembers,allowoptimization class moe.ouom.neriplayer.ui.viewmodel.tab.** {
+-keepclassmembers,allowoptimization class com.lyra.player.ui.viewmodel.tab.** {
     <fields>;
     <init>(...);
 }
@@ -50,7 +52,7 @@
 }
 
 # 当前 JNI 还是静态绑定，桥接类名和 native 方法名都得稳定
--keepclasseswithmembernames,includedescriptorclasses class moe.ouom.neriplayer.** {
+-keepclasseswithmembernames,includedescriptorclasses class com.lyra.player.** {
     native <methods>;
 }
 
