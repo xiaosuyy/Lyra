@@ -74,10 +74,10 @@
     <string name="qishui_account_logged_in">Signed in</string>
     <string name="qishui_login_title">Sign in to Qishui Music</string>
     <string name="qishui_login_failed">Qishui sign-in failed: %s</string>
-    <string name="qishui_login_scan_note">After scanning, tap “Confirm sign-in” on your phone. If the Qishui App cannot confirm, scan with the Douyin App instead.</string>
+    <string name="qishui_login_scan_note">Qishui signs in with a Douyin account. Scan with the Douyin App and tap “Confirm sign-in”; the Qishui App may not confirm this QR code.</string>
     <string name="qishui_qr_loading">Getting a sign-in QR code…</string>
     <string name="qishui_qr_create_failed">Could not get a QR code, please retry</string>
-    <string name="qishui_qr_scan_hint">Scan the QR code with the Qishui App and confirm</string>
+    <string name="qishui_qr_scan_hint">Scan the QR code with the Douyin App and confirm</string>
     <string name="qishui_qr_use_douyin">This account needs Douyin confirmation; scan with the Douyin App instead</string>
     <string name="qishui_qr_scanned">Scanned, confirm the sign-in on your phone</string>
     <string name="qishui_qr_confirmed">Confirmed, signing in…</string>

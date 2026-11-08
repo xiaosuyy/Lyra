@@ -268,7 +268,7 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
     private companion object {
         const val QR_POLL_INTERVAL_MS = 2_000L
         const val QR_POLL_ATTEMPTS = 150
-        const val RATE_LIMIT_BACKOFF_MS = 60_000L
+        const val RATE_LIMIT_BACKOFF_MS = 15_000L
         const val RATE_LIMIT_CODE = 7
         const val DOUYIN_REQUIRED_CODE = 2023
         val TERMINAL_CODES = setOf(1049, 2046)

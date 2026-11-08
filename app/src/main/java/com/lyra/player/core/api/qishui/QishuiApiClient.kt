@@ -138,6 +138,13 @@ internal class QishuiApiClient(
         }
         val credentials = cookie ?: credentialsOf(currentSession())
         if (credentials.isNotBlank()) builder.header("Cookie", credentials)
+        if (isPassport) {
+            // passport 的 axios 实例配置了 xsrfCookieName=passport_csrf_token，
+            // 后续请求必须回传同名请求头，否则扫码确认后会被防刷接口拦下。
+            val csrf = cookieValue(credentials, "passport_csrf_token")
+                .ifBlank { cookieValue(credentials, "passport_csrf_token_default") }
+            if (csrf.isNotBlank()) builder.header("x-tt-passport-csrf-token", csrf)
+        }
         if (body != null) builder.post(body)
         http.newCall(builder.build()).execute().use { response ->
             val passportRedirect = isPassport && response.code in 300..399
