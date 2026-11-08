@@ -23,6 +23,7 @@ package com.lyra.player.core.api.qishui
  * Created: 2026/11/8
  */
 
+import android.app.Activity
 import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.data.auth.qishui.QishuiSession
 import com.lyra.player.util.network.hostMatchesAnyDomain
@@ -88,8 +89,14 @@ internal class QishuiApiClient(
 
     private var qrToken = ""
     private val qrCookies = linkedMapOf<String, String>()
-    private val qrDeviceId = randomDigits(16)
-    private val qrInstallId = randomDigits(15)
+    private var qrDeviceId = randomDigits(16)
+    private var qrInstallId = randomDigits(15)
+    private val passportPoller = QishuiPassportPoller()
+
+    /** 扫码轮询依赖隐藏 WebView 的安全签名，登录页可见时绑定宿主 Activity。 */
+    fun attachLoginHost(activity: Activity) = passportPoller.attach(activity)
+
+    fun detachLoginHost() = passportPoller.detach()
 
     private fun currentSession(): QishuiSession = sessionProvider()
 
@@ -270,6 +277,9 @@ internal class QishuiApiClient(
     suspend fun createQr(computerName: String): QishuiQr {
         qrToken = ""
         qrCookies.clear()
+        // 每个二维码使用独立设备号，避免沿用被风控标记过的 did/iid。
+        qrDeviceId = randomDigits(16)
+        qrInstallId = randomDigits(15)
         val (body, cookies) = request(
             path = "/passport/web/get_qrcode/",
             params = passportParams() + qrClientParams() + qrFlags(),
@@ -291,48 +301,80 @@ internal class QishuiApiClient(
         if (token.isBlank() || token != qrToken) {
             throw IOException("登录二维码已刷新，请重新扫码")
         }
-        val params = passportParams() + qrClientParams() + qrFlags() +
-            mapOf("token" to token, "is_new_login" to "1")
-        // 网页 SDK 先发 POST 表单，服务端未返回可用 JSON 时再回落 GET。
-        val form = listOf(
-            "need_logo" to "false",
-            "need_short_url" to "false",
-            "is_frontier" to "false",
-            "token" to token,
-            "is_new_login" to "1",
-            "next" to PC_LOGIN_NEXT
-        ).joinToString("&") { (key, value) -> "$key=${URLEncoder.encode(value, "UTF-8")}" }
-        var response = request(
-            path = "/passport/web/check_qrconnect/",
-            params = params,
-            body = form.toRequestBody(FORM),
-            cookie = cookieHeader()
-        )
-        collectCookies(response.second)
-        var data = response.first.optJSONObject("data") ?: response.first
-        if (!data.has("status")) {
-            response = request(
-                path = "/passport/web/check_qrconnect/",
-                params = params,
-                cookie = cookieHeader()
+        // 扫码后 check_qrconnect 要求 a_bogus/msToken 动态签名，
+        // 未签名的 OkHttp 轮询会一直返回 error_code=7，因此改由 WebView 内部发请求。
+        val baseQuery = encodeParams(passportParams() + qrClientParams())
+        val getQuery = baseQuery + "&" + encodeParams(qrFlags() + mapOf("token" to token))
+        val form = encodeParams(
+            linkedMapOf(
+                "need_logo" to "false",
+                "need_short_url" to "false",
+                "is_frontier" to "false",
+                "token" to token,
+                "is_new_login" to "1",
+                "next" to PC_LOGIN_NEXT
             )
-            collectCookies(response.second)
-            data = response.first.optJSONObject("data") ?: response.first
-        }
+        )
+        val csrf = qrCookies["passport_csrf_token"].orEmpty()
+            .ifBlank { qrCookies["passport_csrf_token_default"].orEmpty() }
+        val headers = linkedMapOf(
+            "content-type" to "application/x-www-form-urlencoded",
+            "accept" to "application/json, text/javascript",
+            "x-tt-passport-csrf-token" to csrf,
+            "bd-ticket-guard-version" to "2",
+            "bd-ticket-guard-iteration-version" to "2",
+            "bd-ticket-guard-ree-public-key" to BD_TICKET_PUBLIC_KEY,
+            "bd-ticket-guard-server-cert-sn" to "0"
+        )
+        val response = passportPoller.poll(
+            QishuiPollRequest(
+                token = token,
+                postUrl = "$PC_ORIGIN/passport/web/check_qrconnect/?$baseQuery",
+                getUrl = "$PC_ORIGIN/passport/web/check_qrconnect/?$getQuery",
+                body = form,
+                headers = headers,
+                cookieSeed = qrCookies.toMap()
+            )
+        )
+        collectCookies(response.cookie)
+        val json = runCatching { JSONObject(response.body) }.getOrNull()
+            ?: throw IOException("汽水音乐返回了无法解析的数据")
+        val data = json.optJSONObject("data") ?: json
         val status = QishuiParsing.text(data, "status")
         val redirectUrl = QishuiParsing.text(data, "redirect_url")
             .ifBlank { QishuiParsing.text(data, "redirectUrl") }
-        if (isConfirmedStatus(status) && redirectUrl.isNotBlank()) {
-            // 确认后 sessionid 只出现在 redirect_url 的重定向链里，
-            // check_qrconnect 自身不会下发登录态 Cookie。
-            withContext(Dispatchers.IO) { followLoginRedirects(redirectUrl) }
+        val confirmed = isConfirmedStatus(status)
+        val dataCode = data.optInt("error_code", 0)
+        val code = json.optInt("status_code", json.optInt("error_code", dataCode))
+        // 确认成功时可能仍带 error_code（例如限流 7），以 status=3 为准。
+        if (code != 0 && !confirmed) {
+            val message = data.optString("description").orEmpty()
+                .ifBlank { json.optJSONObject("status_info")?.optString("status_msg").orEmpty() }
+                .ifBlank { json.optString("message") }
+            LyraLogger.w("LYRA-QishuiApi", "passport error code=$code message=$message")
+            throw QishuiRequestException(
+                code,
+                if (message.isBlank()) {
+                    "汽水音乐请求未获通过（$code）"
+                } else {
+                    "$message（错误码 $code）"
+                }
+            )
+        }
+        var merged = cookieHeader()
+        if (confirmed && redirectUrl.isNotBlank() &&
+            cookieValue(merged, "sessionid").isBlank() &&
+            cookieValue(merged, "sessionid_ss").isBlank()
+        ) {
+            // 页面内 XHR 通常已跟随 redirect 领取登录态，这里只做兜底。
+            withContext(Dispatchers.IO) { runCatching { followLoginRedirects(redirectUrl) } }
+            merged = cookieHeader()
             LyraLogger.d(
                 "LYRA-QishuiLogin",
                 "QR confirmed redirectHost=${redirectUrl.toHttpUrlOrNull()?.host} " +
                     "cookieKeys=${qrCookies.keys.joinToString(",")}"
             )
         }
-        val merged = cookieHeader()
         val sessionId = cookieValue(merged, "sessionid")
             .ifBlank { cookieValue(merged, "sessionid_ss") }
             .ifBlank { QishuiParsing.text(data, "sessionid") }
@@ -343,6 +385,11 @@ internal class QishuiApiClient(
             cookie = merged
         )
     }
+
+    private fun encodeParams(params: Map<String, String>): String =
+        params.entries.joinToString("&") { (key, value) ->
+            URLEncoder.encode(key, "UTF-8") + "=" + URLEncoder.encode(value, "UTF-8")
+        }
 
     /**
      * passport 网页 SDK（2.4.13 normal）的完整初始化参数。
@@ -598,8 +645,9 @@ internal class QishuiApiClient(
                 "Safari/537.36"
         const val PC_APP_USER_AGENT = "LunaPC/3.3.0(359450208)"
         const val APP_USER_AGENT = "Luna/19.1.0 Android"
+        private const val BD_TICKET_PUBLIC_KEY =
+            "BAnIxKL96Jby5x+Um9i7HZ2c8O6lfZJRxm6yk73Mqcr06l2qIw2iqu2Mtm3U/6OI98usukA9dqxUlsctVWK9rKA="
         private val JSON = "application/json; charset=utf-8".toMediaType()
-        private val FORM = "application/x-www-form-urlencoded".toMediaType()
     }
 }
 

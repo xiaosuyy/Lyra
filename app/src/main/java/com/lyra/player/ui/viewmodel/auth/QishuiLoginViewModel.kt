@@ -23,6 +23,7 @@ package com.lyra.player.ui.viewmodel.auth
  * Created: 2026/11/8
  */
 
+import android.app.Activity
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.AndroidViewModel
@@ -81,6 +82,14 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun attachLoginHost(activity: Activity) {
+        api.attachLoginHost(activity)
+    }
+
+    fun detachLoginHost() {
+        api.detachLoginHost()
+    }
+
     fun startQrLogin() {
         if (_uiState.value.isLoggedIn || qrJob?.isActive == true) {
             return
@@ -119,6 +128,7 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
                 )
             }
             var lastStatus = ""
+            var consecutiveFailures = 0
             repeat(QR_POLL_ATTEMPTS) {
                 delay(QR_POLL_INTERVAL_MS)
                 var failure: Throwable? = null
@@ -126,13 +136,28 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
                     .onFailure { failure = it }
                     .getOrNull()
                 if (state == null) {
+                    consecutiveFailures++
                     val code = (failure as? QishuiRequestException)?.code ?: 0
                     val message = failure?.message.orEmpty()
                     LyraLogger.w("LYRA-QishuiLogin", "QR poll failed: code=$code $message")
                     when {
                         code == RATE_LIMIT_CODE || message.contains("频繁") -> {
+                            // 已扫码后遇到限流要保留“请在手机上确认”，不能退回等待扫码。
+                            val scanned = lastStatus.equals("1", true) ||
+                                lastStatus.equals("scanned", true) ||
+                                lastStatus.equals("scaned", true) ||
+                                lastStatus.equals("3", true) ||
+                                lastStatus.equals("confirmed", true)
                             _uiState.update {
-                                it.copy(statusMessage = getString(R.string.qishui_qr_rate_limited))
+                                it.copy(
+                                    statusMessage = getString(
+                                        if (scanned) {
+                                            R.string.qishui_qr_rate_limited_scanned
+                                        } else {
+                                            R.string.qishui_qr_rate_limited
+                                        }
+                                    )
+                                )
                             }
                             delay(RATE_LIMIT_BACKOFF_MS)
                         }
@@ -146,9 +171,14 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
                             _uiState.update { it.copy(error = message) }
                             return@launch
                         }
+                        message.isNotBlank() && consecutiveFailures >= MAX_SETUP_FAILURES -> {
+                            _uiState.update { it.copy(error = message) }
+                            return@launch
+                        }
                     }
                     return@repeat
                 }
+                consecutiveFailures = 0
                 if (state.status != lastStatus) {
                     lastStatus = state.status
                     LyraLogger.d(
@@ -265,11 +295,12 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
         getApplication<Application>().getString(resId, *args)
 
     private companion object {
-        const val QR_POLL_INTERVAL_MS = 2_500L
-        const val QR_POLL_ATTEMPTS = 120
+        const val QR_POLL_INTERVAL_MS = 3_000L
+        const val QR_POLL_ATTEMPTS = 200
         const val RATE_LIMIT_BACKOFF_MS = 5_000L
         const val RATE_LIMIT_CODE = 7
         const val NEED_VERIFY_CODE = 2046
+        const val MAX_SETUP_FAILURES = 3
         val TERMINAL_CODES = setOf(1049)
         val TERMINAL_HINTS = listOf("版本过低")
     }

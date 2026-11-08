@@ -85,6 +85,7 @@
     <string name="qishui_qr_timeout">Sign-in timed out, please refresh the QR code</string>
     <string name="qishui_qr_refresh">Refresh QR code</string>
     <string name="qishui_qr_rate_limited">Polling too often — confirm in the Qishui App and wait a moment…</string>
+    <string name="qishui_qr_rate_limited_scanned">Scanned — confirm in the Qishui App (retrying automatically)</string>
     <string name="qishui_logout">Sign out</string>
     <string name="qishui_mode_default">Default</string>
     <string name="qishui_mode_familiar">Familiar</string>

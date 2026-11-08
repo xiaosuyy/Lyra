@@ -85,6 +85,7 @@
     <string name="qishui_qr_timeout">登录超时，请刷新二维码</string>
     <string name="qishui_qr_refresh">刷新二维码</string>
     <string name="qishui_qr_rate_limited">查询较频繁，请在汽水音乐上点确认后稍候…</string>
+    <string name="qishui_qr_rate_limited_scanned">已扫码，请在汽水音乐 App 中确认登录（正在自动重试）</string>
     <string name="qishui_logout">退出登录</string>
     <string name="qishui_mode_default">默认模式</string>
     <string name="qishui_mode_familiar">熟悉模式</string>

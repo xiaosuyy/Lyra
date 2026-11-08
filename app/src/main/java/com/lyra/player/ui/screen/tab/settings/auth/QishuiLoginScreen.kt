@@ -23,6 +23,9 @@ package com.lyra.player.ui.screen.tab.settings.auth
  * Created: 2026/11/8
  */
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -68,6 +71,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -165,9 +169,14 @@ internal fun QishuiLoginScreen(
             latestOnBack()
         }
     }
+    val context = LocalContext.current
     DisposableEffect(Unit) {
+        context.findActivity()?.let(vm::attachLoginHost)
         vm.startQrLogin()
-        onDispose { vm.stopQrLogin() }
+        onDispose {
+            vm.stopQrLogin()
+            vm.detachLoginHost()
+        }
     }
 
     val background = MaterialTheme.colorScheme.background
@@ -328,6 +337,12 @@ private fun QrCard(uiState: QishuiLoginUiState) {
             )
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 private fun decodeQr(link: String): ImageBitmap? {
