@@ -44,10 +44,8 @@ import java.util.concurrent.TimeUnit
 
 internal data class QishuiQr(
     val token: String,
-    /** 二维码内容：普通登录用 light/invoke/scan_login，身份验证用 passport 的 sdk-next 链接。 */
-    val link: String,
-    /** 服务端要求用哪个 App 扫码，空串表示沿用默认提示。 */
-    val hint: String = ""
+    /** light/invoke/scan_login 链接，由客户端本地渲染成二维码。 */
+    val link: String
 )
 
 internal data class QishuiQrState(
@@ -310,31 +308,11 @@ internal class QishuiApiClient(
         if (token.isBlank()) throw IOException("汽水音乐未返回登录二维码")
         qrToken = token
         collectCookies(cookies)
-        // 命中账号风控时 passport 会要求「抖音 APP 扫码验证」，此时必须展示
-        // 官方 sdk-next 二维码；本地拼的 scan_login 深链只有汽水 App 能识别。
-        val copywriting = runCatching {
-            JSONObject(data.optString("copywriting"))
-        }.getOrNull()
-        val verifyHint = copywriting?.optString("desc").orEmpty()
-            .replace(Regex("\\[/?color[^]]*]|\\[/]"), "")
-            .trim()
-        val passportLink = QishuiParsing.text(data, "qrcode_index_url")
-        val needsDouyin = verifyHint.contains("抖音")
-        val link = if (needsDouyin && passportLink.isNotBlank()) {
-            passportLink
-        } else {
-            scanLoginUrl(token, computerName)
-        }
         LyraLogger.d(
             "LYRA-QishuiLogin",
-            "QR created tokenLength=${token.length} hasCookies=${cookies.isNotBlank()} " +
-                "douyinVerify=$needsDouyin"
+            "QR created tokenLength=${token.length} hasCookies=${cookies.isNotBlank()}"
         )
-        return QishuiQr(
-            token = token,
-            link = link,
-            hint = if (needsDouyin) verifyHint else ""
-        )
+        return QishuiQr(token = token, link = scanLoginUrl(token, computerName))
     }
 
     suspend fun pollQr(token: String): QishuiQrState {
