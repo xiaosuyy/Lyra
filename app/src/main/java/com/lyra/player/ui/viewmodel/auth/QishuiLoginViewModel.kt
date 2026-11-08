@@ -124,7 +124,9 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
                 it.copy(
                     loading = false,
                     qrLink = qr.link,
-                    statusMessage = getString(R.string.qishui_qr_scan_hint)
+                    statusMessage = qr.hint.ifBlank {
+                        getString(R.string.qishui_qr_scan_hint)
+                    }
                 )
             }
             var lastStatus = ""
