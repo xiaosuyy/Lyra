@@ -326,6 +326,11 @@ internal class QishuiApiClient(
             // 确认后 sessionid 只出现在 redirect_url 的重定向链里，
             // check_qrconnect 自身不会下发登录态 Cookie。
             withContext(Dispatchers.IO) { followLoginRedirects(redirectUrl) }
+            LyraLogger.d(
+                "LYRA-QishuiLogin",
+                "QR confirmed redirectHost=${redirectUrl.toHttpUrlOrNull()?.host} " +
+                    "cookieKeys=${qrCookies.keys.joinToString(",")}"
+            )
         }
         val merged = cookieHeader()
         val sessionId = cookieValue(merged, "sessionid")
