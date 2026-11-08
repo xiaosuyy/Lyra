@@ -136,11 +136,10 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
                             }
                             delay(RATE_LIMIT_BACKOFF_MS)
                         }
-                        code == DOUYIN_REQUIRED_CODE -> {
+                        code == NEED_VERIFY_CODE -> {
                             _uiState.update {
-                                it.copy(error = getString(R.string.qishui_qr_use_douyin))
+                                it.copy(statusMessage = getString(R.string.qishui_qr_need_verify))
                             }
-                            return@launch
                         }
                         code in TERMINAL_CODES ||
                             TERMINAL_HINTS.any { message.contains(it) } -> {
@@ -162,13 +161,13 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
                     return@launch
                 }
                 when (state.status.lowercase()) {
-                    "2", "scanned", "scaned" -> _uiState.update {
+                    "1", "scanned", "scaned" -> _uiState.update {
                         it.copy(statusMessage = getString(R.string.qishui_qr_scanned))
                     }
                     "3", "confirmed" -> _uiState.update {
                         it.copy(statusMessage = getString(R.string.qishui_qr_confirmed))
                     }
-                    "expired", "cancelled", "canceled", "refused" -> {
+                    "2", "5", "expired", "cancelled", "canceled", "refused" -> {
                         _uiState.update {
                             it.copy(statusMessage = getString(R.string.qishui_qr_expired))
                         }
@@ -266,12 +265,12 @@ class QishuiLoginViewModel(application: Application) : AndroidViewModel(applicat
         getApplication<Application>().getString(resId, *args)
 
     private companion object {
-        const val QR_POLL_INTERVAL_MS = 2_000L
-        const val QR_POLL_ATTEMPTS = 150
-        const val RATE_LIMIT_BACKOFF_MS = 15_000L
+        const val QR_POLL_INTERVAL_MS = 2_500L
+        const val QR_POLL_ATTEMPTS = 120
+        const val RATE_LIMIT_BACKOFF_MS = 5_000L
         const val RATE_LIMIT_CODE = 7
-        const val DOUYIN_REQUIRED_CODE = 2023
-        val TERMINAL_CODES = setOf(1049, 2046)
-        val TERMINAL_HINTS = listOf("版本过低", "二次验证")
+        const val NEED_VERIFY_CODE = 2046
+        val TERMINAL_CODES = setOf(1049)
+        val TERMINAL_HINTS = listOf("版本过低")
     }
 }
