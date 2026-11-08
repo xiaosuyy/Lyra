@@ -20,6 +20,7 @@ import com.lyra.player.R
 import com.lyra.player.core.api.gdstudio.GdStudioApiClient
 import com.lyra.player.core.api.gdstudio.GdStudioSong
 import com.lyra.player.core.api.search.CustomChannelSearchApi
+import com.lyra.player.core.api.search.MusicPlatform
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.core.source.MusicSourceCapabilities
@@ -134,6 +135,10 @@ internal fun GdStudioSong.toSongItem(
     metadata: GdStudioTrackMetadata? = null
 ): SongItem {
     val fallbackAlbum = app.getString(R.string.explore_tab_gdstudio)
+    // netease 源的曲目 ID 就是网易云歌曲 ID, 但 SongItem.id 是稳定的渠道合成 ID,
+    // 歌词链路默认拿 id 去查网易云会永远查不到, 这里显式给出歌词匹配来源
+    val neteaseSongId = id.toLongOrNull()
+        ?.takeIf { gdSource.equals("netease", ignoreCase = true) }
     return SongItem(
         id = CustomChannelSearchApi.stableChannelSongId("${MusicSourceIds.GDSTUDIO}|$gdSource|$id"),
         name = name,
@@ -145,6 +150,8 @@ internal fun GdStudioSong.toSongItem(
         channelId = MusicSourceIds.GDSTUDIO,
         audioId = id,
         // 播放时需要用 GD 背后的音源名称取直链。
-        subAudioId = gdSource
+        subAudioId = gdSource,
+        matchedLyricSource = neteaseSongId?.let { MusicPlatform.CLOUD_MUSIC },
+        matchedSongId = neteaseSongId?.toString()
     )
 }

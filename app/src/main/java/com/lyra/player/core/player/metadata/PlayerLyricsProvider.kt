@@ -1402,10 +1402,16 @@ internal object PlayerLyricsProvider {
                 }
             }
 
+            // 跨平台匹配的歌曲(如 GD/bilibili)歌词用 matchedSongId, 翻译也必须跟随,
+            // 否则会拿渠道合成 ID 去请求网易云
             when (song.matchedLyricSource) {
                 null,
                 MusicPlatform.CLOUD_MUSIC -> getNeteaseTranslatedLyrics(
-                    song.id,
+                    if (song.matchedLyricSource == null) {
+                        song.id
+                    } else {
+                        song.matchedSongId?.toLongOrNull() ?: song.id
+                    },
                     neteaseClient,
                     neteaseLyricsCache
                 )
@@ -1474,7 +1480,11 @@ internal object PlayerLyricsProvider {
             when (song.matchedLyricSource) {
                 null,
                 MusicPlatform.CLOUD_MUSIC -> getNeteaseRomanizedLyrics(
-                    song.id,
+                    if (song.matchedLyricSource == null) {
+                        song.id
+                    } else {
+                        song.matchedSongId?.toLongOrNull() ?: song.id
+                    },
                     neteaseClient,
                     neteaseLyricsCache
                 )
