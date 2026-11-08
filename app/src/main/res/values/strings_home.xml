@@ -68,35 +68,4 @@
     <string name="home_heart_mode_no_liked_playlist">没有找到“我喜欢的音乐”歌单</string>
     <string name="home_heart_mode_empty_likes">收藏歌曲为空</string>
     <string name="home_heart_mode_empty">心动模式暂时没有推荐歌曲</string>
-    <!-- 汽水音乐 -->
-    <string name="qishui_account_title">汽水音乐</string>
-    <string name="qishui_account_subtitle">登录后获取账号个性化推荐</string>
-    <string name="qishui_account_logged_in">已登录</string>
-    <string name="qishui_login_title">登录汽水音乐</string>
-    <string name="qishui_login_failed">汽水音乐登录失败：%s</string>
-    <string name="qishui_login_scan_note">请使用汽水音乐 App 扫描二维码，并在手机上点「确认登录」；用抖音扫码会提示改用汽水音乐 App。</string>
-    <string name="qishui_qr_loading">正在获取登录二维码…</string>
-    <string name="qishui_qr_create_failed">获取二维码失败，请重试</string>
-    <string name="qishui_qr_scan_hint">请使用汽水音乐 App 扫描二维码并确认登录</string>
-    <string name="qishui_qr_scanned">已扫码，请在汽水音乐 App 中确认登录</string>
-    <string name="qishui_qr_confirmed">已确认，正在获取登录态…</string>
-    <string name="qishui_qr_need_verify">账号安全验证：请在手机上的抖音或汽水音乐 App 中完成验证，完成后会自动登录</string>
-    <string name="qishui_qr_expired">二维码已失效，请刷新重试</string>
-    <string name="qishui_qr_timeout">登录超时，请刷新二维码</string>
-    <string name="qishui_qr_refresh">刷新二维码</string>
-    <string name="qishui_qr_rate_limited">查询较频繁，请在汽水音乐上点确认后稍候…</string>
-    <string name="qishui_qr_rate_limited_scanned">已扫码，请在汽水音乐 App 中确认登录（正在自动重试）</string>
-    <string name="qishui_logout">退出登录</string>
-    <string name="qishui_mode_default">默认模式</string>
-    <string name="qishui_mode_familiar">熟悉模式</string>
-    <string name="qishui_mode_fresh">新鲜模式</string>
-    <string name="qishui_eyebrow_default">每日为你</string>
-    <string name="qishui_subtitle_default">按账号口味持续更新</string>
-    <string name="qishui_eyebrow_familiar">熟悉旋律</string>
-    <string name="qishui_subtitle_familiar">收藏与常听歌曲</string>
-    <string name="qishui_eyebrow_fresh">新鲜发现</string>
-    <string name="qishui_subtitle_fresh">换个口味听点新的</string>
-    <string name="qishui_login_required">请先登录汽水音乐</string>
-    <string name="qishui_empty">汽水音乐暂时没有可推荐的歌曲</string>
-    <string name="qishui_load_failed">汽水音乐加载失败：%s</string>
 </resources>

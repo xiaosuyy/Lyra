@@ -410,8 +410,7 @@ internal fun PlayerManager.initializeImpl(
             upstreamFactory,
             biliCookieRepo,
             AppContainer.youtubeAuthRepo,
-            trafficStatsRepository = AppContainer.trafficStatsRepo,
-            qishuiCookieProvider = { AppContainer.qishuiSessionStore.getSessionOnce().cookie }
+            trafficStatsRepository = AppContainer.trafficStatsRepo
         )
         conditionalHttpFactory = conditionalFactory
 

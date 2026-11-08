@@ -24,7 +24,6 @@ package com.lyra.player.core.source
  */
 internal object MusicSourceIds {
     const val NETEASE = "netease"
-    const val QISHUI = "qishui"
     const val BILIBILI = "bilibili"
     const val YOUTUBE_MUSIC = "youtubeMusic"
     const val KUWO = "kuwo"

@@ -70,7 +70,6 @@ import com.lyra.player.core.api.search.SongSearchInfo
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.di.AppContainer.settingsRepo
 import com.lyra.player.core.lyricon.LyriconManager
-import com.lyra.player.core.player.resolver.qishui.buildQishuiPlaybackCacheKey
 import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.core.player.audio.focus.StartupAudioFocusController
 import com.lyra.player.core.player.effects.AudioReactive
@@ -1265,9 +1264,6 @@ object PlayerManager {
             song.album.startsWith(BILI_SOURCE_TAG)
     }
 
-    internal fun isQishuiTrack(song: SongItem): Boolean {
-        return song.channelId == MusicSourceIds.QISHUI && !song.audioId.isNullOrBlank()
-    }
     internal fun shouldPersistEmbeddedLyrics(song: SongItem): Boolean {
         return song.matchedLyric != null ||
             song.matchedTranslatedLyric != null ||
@@ -2129,7 +2125,6 @@ object PlayerManager {
                     preferM4a = youtubePreferM4aOverride ?: YOUTUBE_PLAYBACK_PREFER_M4A
                 )
             }
-            isQishuiTrack(song) -> buildQishuiPlaybackCacheKey(song.audioId.orEmpty())
             isBiliTrack(song) -> {
                 val cidPart = song.subAudioId ?: song.album
                     .substringAfter('|', "")

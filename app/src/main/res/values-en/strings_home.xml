@@ -68,35 +68,4 @@
     <string name="home_heart_mode_no_liked_playlist">Couldn\'t find "My Favorite Music"</string>
     <string name="home_heart_mode_empty_likes">No liked songs yet</string>
     <string name="home_heart_mode_empty">Heart Mode has no recommendations right now</string>
-    <!-- Qishui Music -->
-    <string name="qishui_account_title">Qishui Music</string>
-    <string name="qishui_account_subtitle">Sign in for account-based recommendations</string>
-    <string name="qishui_account_logged_in">Signed in</string>
-    <string name="qishui_login_title">Sign in to Qishui Music</string>
-    <string name="qishui_login_failed">Qishui sign-in failed: %s</string>
-    <string name="qishui_login_scan_note">Scan the QR code with the Qishui Music App and tap “Confirm sign-in”. Scanning with Douyin will ask you to use the Qishui Music App instead.</string>
-    <string name="qishui_qr_loading">Getting a sign-in QR code…</string>
-    <string name="qishui_qr_create_failed">Could not get a QR code, please retry</string>
-    <string name="qishui_qr_scan_hint">Scan the QR code with the Qishui Music App and confirm</string>
-    <string name="qishui_qr_scanned">Scanned, confirm the sign-in in the Qishui Music App</string>
-    <string name="qishui_qr_confirmed">Confirmed, fetching your session…</string>
-    <string name="qishui_qr_need_verify">Security check: finish the verification in the Douyin or Qishui Music app on your phone, then sign-in continues automatically</string>
-    <string name="qishui_qr_expired">The QR code expired, please refresh</string>
-    <string name="qishui_qr_timeout">Sign-in timed out, please refresh the QR code</string>
-    <string name="qishui_qr_refresh">Refresh QR code</string>
-    <string name="qishui_qr_rate_limited">Polling too often — confirm in the Qishui App and wait a moment…</string>
-    <string name="qishui_qr_rate_limited_scanned">Scanned — confirm in the Qishui App (retrying automatically)</string>
-    <string name="qishui_logout">Sign out</string>
-    <string name="qishui_mode_default">Default</string>
-    <string name="qishui_mode_familiar">Familiar</string>
-    <string name="qishui_mode_fresh">Fresh</string>
-    <string name="qishui_eyebrow_default">Daily for you</string>
-    <string name="qishui_subtitle_default">Updated for your account</string>
-    <string name="qishui_eyebrow_familiar">Familiar tunes</string>
-    <string name="qishui_subtitle_familiar">Saved and frequently played</string>
-    <string name="qishui_eyebrow_fresh">Fresh finds</string>
-    <string name="qishui_subtitle_fresh">A different flavor today</string>
-    <string name="qishui_login_required">Please sign in to Qishui Music first</string>
-    <string name="qishui_empty">Qishui Music has no recommendations right now</string>
-    <string name="qishui_load_failed">Qishui Music failed to load: %s</string>
 </resources>

@@ -56,7 +56,6 @@ import com.lyra.player.core.player.quality.effectiveYouTubeQuality
 import com.lyra.player.core.player.resolver.netease.NeteasePlaybackResponseParser
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseAutoBiliSource
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseMatchedLocalSource
-import com.lyra.player.core.player.resolver.qishui.getQishuiAudioUrl
 import com.lyra.player.core.customsource.CUSTOM_SOURCE_NETEASE
 import com.lyra.player.core.customsource.CustomSourceManager
 import com.lyra.player.core.customsource.buildCustomSourceMusicInfo
@@ -331,11 +330,6 @@ internal suspend fun PlayerManager.resolveSongUrl(
                 suppressError = suppressError,
                 sideEffects = sideEffects,
                 playbackRequestTokenOverride = playbackRequestTokenOverride
-            )
-            isQishuiTrack(song) -> getQishuiAudioUrl(
-                song = song,
-                suppressError = suppressError,
-                sideEffects = sideEffects
             )
             isGdStudioTrack(song) -> getGdStudioAudioUrl(
                 song = song,
