@@ -761,6 +761,9 @@ private fun LibrarySongsContent(
         } else {
             var startIndex = 0
             groups.forEachIndexed { groupIndex, group ->
+                // item 内容在布局阶段才组合, 读可变的 startIndex 会拿到循环结束后的总长度,
+                // 导致点击索引越界并被钳到最后一首; 这里按组捕获不可变起点。
+                val groupStartIndex = startIndex
                 item(key = "letter_${group.letter}") {
                     LibraryLetterHeader(
                         letter = group.letter,
@@ -771,7 +774,7 @@ private fun LibrarySongsContent(
                     items = group.items,
                     key = { index, song -> "letter_${group.letter}-${song.id}-$index" }
                 ) { index, song ->
-                    val displayIndex = startIndex + index
+                    val displayIndex = groupStartIndex + index
                     val itemKey = "letter_${group.letter}-${song.id}-$index"
                     Column {
                         LibraryInlineSongRow(
