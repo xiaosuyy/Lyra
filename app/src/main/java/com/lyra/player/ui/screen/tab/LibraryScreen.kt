@@ -168,6 +168,9 @@ import kotlin.math.roundToInt
 import com.lyra.player.R
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.data.history.toSongItem
+import com.lyra.player.data.library.LibrarySortMode
+import com.lyra.player.data.library.LibrarySortPreferences
+import com.lyra.player.data.library.groupByLibrarySortLetter
 import com.lyra.player.data.stats.PlaybackStatsPeriod
 import com.lyra.player.data.stats.PlaybackStatsHotPlaylist
 import com.lyra.player.data.stats.buildPlaybackStatsHotPlaylist
@@ -686,6 +689,19 @@ private fun LibrarySongsContent(
             }
         }
     }
+    val context = LocalContext.current
+    val sortPreferences = remember(context) { LibrarySortPreferences.getInstance(context) }
+    val sortMode by sortPreferences.sortMode.collectAsStateWithLifecycle()
+    val sortGroups = remember(filteredSongs, sortMode) {
+        if (sortMode == LibrarySortMode.ALPHABETICAL) {
+            groupByLibrarySortLetter(filteredSongs) { song -> song.displayName() }
+        } else {
+            null
+        }
+    }
+    val displayedSongs = remember(sortGroups, filteredSongs) {
+        sortGroups?.flatMap { group -> group.items } ?: filteredSongs
+    }
     val miniPlayerHeight = LocalMiniPlayerHeight.current
     var expandedKey by remember { mutableStateOf<String?>(null) }
     var pendingDeleteSong by remember { mutableStateOf<SongItem?>(null) }
@@ -717,38 +733,70 @@ private fun LibrarySongsContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = miniPlayerHeight + LyraSpacing.MD)
     ) {
-        item(key = "library_songs_play_all") {
-            Column {
-                LibraryPlayAllRow(
-                    onClick = {
-                        if (expandedKey != null) expandedKey = null
-                        else onSongClick(filteredSongs, 0)
-                    }
-                )
-                LibraryInsetDivider(leading = 68.dp)
+        val groups = sortGroups
+        if (groups == null) {
+            itemsIndexed(
+                items = displayedSongs,
+                key = { index, song -> "${song.id}-$index" }
+            ) { index, song ->
+                val itemKey = "${song.id}-$index"
+                Column {
+                    LibraryInlineSongRow(
+                        song = song,
+                        onClick = {
+                            if (expandedKey != null) expandedKey = null
+                            else onSongClick(displayedSongs, index)
+                        },
+                        swipeKey = itemKey,
+                        expandedKey = expandedKey,
+                        onExpandedChange = { expandedKey = it },
+                        onDeleteClick = {
+                            expandedKey = null
+                            pendingDeleteSong = song
+                        }
+                    )
+                    LibraryInsetDivider(leading = 68.dp)
+                }
             }
-        }
-        itemsIndexed(
-            items = filteredSongs,
-            key = { index, song -> "${song.id}-$index" }
-        ) { index, song ->
-            val itemKey = "${song.id}-$index"
-            Column {
-                LibraryInlineSongRow(
-                    song = song,
-                    onClick = {
-                        if (expandedKey != null) expandedKey = null
-                        else onSongClick(filteredSongs, index)
-                    },
-                    swipeKey = itemKey,
-                    expandedKey = expandedKey,
-                    onExpandedChange = { expandedKey = it },
-                    onDeleteClick = {
-                        expandedKey = null
-                        pendingDeleteSong = song
+        } else {
+            var startIndex = 0
+            groups.forEachIndexed { groupIndex, group ->
+                item(key = "letter_${group.letter}") {
+                    LibraryLetterHeader(
+                        letter = group.letter,
+                        topSpacing = if (groupIndex == 0) 4.dp else 18.dp
+                    )
+                }
+                itemsIndexed(
+                    items = group.items,
+                    key = { index, song -> "letter_${group.letter}-${song.id}-$index" }
+                ) { index, song ->
+                    val displayIndex = startIndex + index
+                    val itemKey = "letter_${group.letter}-${song.id}-$index"
+                    Column {
+                        LibraryInlineSongRow(
+                            song = song,
+                            onClick = {
+                                if (expandedKey != null) expandedKey = null
+                                else onSongClick(displayedSongs, displayIndex)
+                            },
+                            swipeKey = itemKey,
+                            expandedKey = expandedKey,
+                            onExpandedChange = { expandedKey = it },
+                            onDeleteClick = {
+                                expandedKey = null
+                                pendingDeleteSong = song
+                            }
+                        )
+                        LibraryInsetDivider(leading = 68.dp)
                     }
-                )
-                LibraryInsetDivider(leading = 68.dp)
+                }
+                startIndex += group.items.size
+                if (groupIndex != groups.lastIndex) {
+                    item(key = "letter_gap_${group.letter}") {
+                        Spacer(Modifier.height(14.dp))
+                    }
+                }
             }
         }
     }
@@ -989,6 +1037,15 @@ private fun LibraryArtistsContent(
             artists.filter { it.name.contains(normalizedQuery, ignoreCase = true) }
         }
     }
+    val sortPreferences = remember(context) { LibrarySortPreferences.getInstance(context) }
+    val sortMode by sortPreferences.sortMode.collectAsStateWithLifecycle()
+    val artistGroups = remember(filteredArtists, sortMode) {
+        if (sortMode == LibrarySortMode.ALPHABETICAL) {
+            groupByLibrarySortLetter(filteredArtists) { artist -> artist.name }
+        } else {
+            null
+        }
+    }
     val miniPlayerHeight = LocalMiniPlayerHeight.current
 
     if (filteredArtists.isEmpty()) {
@@ -1028,20 +1085,64 @@ private fun LibraryArtistsContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = miniPlayerHeight + LyraSpacing.MD)
     ) {
-        items(
-            items = filteredArtists,
-            key = { "${it.source}:${it.id}" }
-        ) { artist ->
-            Column {
-                LibraryArtistRow(
-                    artist = artist,
-                    offlineMode = offlineMode,
-                    onClick = { onArtistClick(artist) }
-                )
-                LibraryInsetDivider(leading = 68.dp)
+        val groups = artistGroups
+        if (groups == null) {
+            items(
+                items = filteredArtists,
+                key = { "${it.source}:${it.id}" }
+            ) { artist ->
+                Column {
+                    LibraryArtistRow(
+                        artist = artist,
+                        offlineMode = offlineMode,
+                        onClick = { onArtistClick(artist) }
+                    )
+                    LibraryInsetDivider(leading = 68.dp)
+                }
+            }
+        } else {
+            groups.forEachIndexed { groupIndex, group ->
+                item(key = "artist_letter_${group.letter}") {
+                    LibraryLetterHeader(
+                        letter = group.letter,
+                        topSpacing = if (groupIndex == 0) 4.dp else 18.dp
+                    )
+                }
+                items(
+                    items = group.items,
+                    key = { artist -> "${group.letter}:${artist.source}:${artist.id}" }
+                ) { artist ->
+                    Column {
+                        LibraryArtistRow(
+                            artist = artist,
+                            offlineMode = offlineMode,
+                            onClick = { onArtistClick(artist) }
+                        )
+                        LibraryInsetDivider(leading = 68.dp)
+                    }
+                }
+                if (groupIndex != groups.lastIndex) {
+                    item(key = "artist_letter_gap_${group.letter}") {
+                        Spacer(Modifier.height(14.dp))
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun LibraryLetterHeader(letter: Char, topSpacing: Dp) {
+    Text(
+        text = letter.toString(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 18.dp)
+            .padding(top = topSpacing, bottom = 2.dp),
+        fontSize = 20.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+    )
 }
 
 @Composable

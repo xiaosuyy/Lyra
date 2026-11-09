@@ -152,6 +152,7 @@ import com.lyra.player.data.storage.StorageCacheClearOptions
 import com.lyra.player.data.storage.StorageUsageSummary
 import com.lyra.player.data.storage.analyzeStorageUsage
 import com.lyra.player.ui.component.settings.LanguageSettingItem
+import com.lyra.player.ui.component.settings.LibrarySortSettingItem
 import com.lyra.player.util.platform.LanguageManager
 import com.lyra.player.ui.effect.glass.AdvancedGlassNavigationHandoff
 import com.lyra.player.ui.effect.glass.AdvancedGlassRole
@@ -1267,6 +1268,14 @@ fun SettingsScreen(
                                 onHighlightFinished = onSettingsHighlightFinished
                             ),
                             onLanguageChanged = onLanguageChanged
+                        )
+                        LibrarySortSettingItem(
+                            modifier = Modifier.settingsHighlightTarget(
+                                targetId = "manual:library_sort",
+                                highlightTargetId = settingsHighlightTargetId,
+                                highlightPulse = settingsHighlightPulse,
+                                onHighlightFinished = onSettingsHighlightFinished
+                            )
                         )
                         MiuixSettingsSectionIntro(
                             title = stringResource(R.string.settings_ui_scale),

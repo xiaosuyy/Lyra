@@ -405,4 +405,8 @@
     <string name="settings_build_uuid">构建 UUID</string>
     <string name="settings_version_debug_suffix">调试模式</string>
     <string name="settings_github_repo_url">github.com/cwuom/LyraPlayer</string>
+    <string name="settings_library_sort">曲库排序</string>
+    <string name="settings_library_sort_dialog_title">曲库排序</string>
+    <string name="settings_library_sort_added">按添加时间</string>
+    <string name="settings_library_sort_alphabetical">按字母</string>
 </resources>

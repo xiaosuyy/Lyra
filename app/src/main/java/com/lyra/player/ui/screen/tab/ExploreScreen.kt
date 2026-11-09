@@ -2071,7 +2071,6 @@ internal fun ExploreSearchTypeBar(
             itemsIndexed(types) { _, type ->
                 ExploreTagChip(
                     label = sourceSearchTypeLabel(type),
-                    icon = sourceSearchTypeIcon(type),
                     selected = selectedType == type,
                     onClick = {
                         if (source == displayedSource) {
@@ -2095,15 +2094,6 @@ private fun sourceSearchTypeLabel(type: SourceSearchType): String = when (type) 
     SourceSearchType.ALBUM -> stringResource(R.string.explore_search_type_album)
     SourceSearchType.PLAYLIST -> stringResource(R.string.explore_search_type_playlist)
     SourceSearchType.RANKING -> stringResource(R.string.explore_search_type_ranking)
-}
-
-/** 搜索类型子标签图标（与平台无关）。 */
-private fun sourceSearchTypeIcon(type: SourceSearchType): ImageVector = when (type) {
-    SourceSearchType.SONG -> Icons.Outlined.MusicNote
-    SourceSearchType.ARTIST -> Icons.Filled.AccountCircle
-    SourceSearchType.ALBUM -> Icons.Filled.Album
-    SourceSearchType.PLAYLIST -> Icons.AutoMirrored.Outlined.QueueMusic
-    SourceSearchType.RANKING -> Icons.Filled.BarChart
 }
 
 @Composable
@@ -2344,8 +2334,7 @@ private fun ExploreTagChip(
     onClick: () -> Unit,
     selectedAlpha: Float,
     unselectedAlpha: Float,
-    borderAlpha: Float,
-    icon: ImageVector? = null
+    borderAlpha: Float
 ) {
     val containerColor = if (selected) {
         MaterialTheme.colorScheme.secondaryContainer.copy(alpha = selectedAlpha)
@@ -2381,14 +2370,6 @@ private fun ExploreTagChip(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
