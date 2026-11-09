@@ -49,8 +49,10 @@ internal class GitHubReleaseChecker(
         onProgress: (Float) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
+            val downloadUrl = appContext.resolveUpdateDownloadSource()
+                .routedDownloadUrl(update.remoteUrl)
             val request = Request.Builder()
-                .url(update.remoteUrl)
+                .url(downloadUrl)
                 .header("User-Agent", USER_AGENT)
                 .get()
                 .build()

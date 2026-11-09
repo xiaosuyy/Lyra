@@ -7,6 +7,8 @@ import com.lyra.player.core.player.model.DEFAULT_PLAYBACK_PITCH
 import com.lyra.player.core.player.model.DEFAULT_PLAYBACK_SPEED
 import com.lyra.player.core.player.model.DEFAULT_PLAYBACK_VOLUME_BALANCE
 import com.lyra.player.core.player.model.PlaybackEqualizerPresetId
+import com.lyra.player.data.update.DEFAULT_UPDATE_DOWNLOAD_SOURCE
+import com.lyra.player.data.update.UpdateDownloadSourcePolicy
 import com.lyra.player.ksp.annotations.AutoSetting
 import com.lyra.player.ksp.annotations.AutoSettingIcon
 import com.lyra.player.ksp.annotations.AutoSettingsCatalog
@@ -1299,6 +1301,21 @@ object AutoSettingsSchema {
         val bypassProxy = autoSetting(
             titleRes = R.string.settings_bypass_proxy,
             descriptionRes = R.string.settings_bypass_proxy_desc
+        )
+
+        @AutoSetting(
+            key = "update_download_source",
+            type = SettingValueType.String,
+            defaultString = DEFAULT_UPDATE_DOWNLOAD_SOURCE,
+            order = 20,
+            ui = SettingUiType.Custom,
+            normalizer = UpdateDownloadSourcePolicy::class
+        )
+        val updateDownloadSource = autoStringSetting(
+            key = "update_download_source",
+            defaultValue = DEFAULT_UPDATE_DOWNLOAD_SOURCE,
+            titleRes = R.string.settings_update_download_source,
+            icon = AutoSettingIcon.Cloud
         )
     }
 

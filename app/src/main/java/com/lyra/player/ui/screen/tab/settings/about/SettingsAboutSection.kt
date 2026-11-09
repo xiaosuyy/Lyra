@@ -56,6 +56,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lyra.player.BuildConfig
 import com.lyra.player.R
+import com.lyra.player.core.di.AppContainer
+import com.lyra.player.ui.screen.tab.settings.component.UpdateDownloadSourceSetting
 import com.lyra.player.ui.screen.tab.settings.component.settingsItemClickable
 import com.lyra.player.ui.viewmodel.AppUpdateViewModel
 import com.lyra.player.util.format.convertTimestampToDate
@@ -89,6 +91,7 @@ internal fun SettingsAboutContent(
         onCopyValue = onCopyValue
     )
     SettingsBuildTimeItem(onCopyValue)
+    UpdateDownloadSourceSetting(AppContainer.settingsRepo)
     SettingsUpdateSection()
 }
 

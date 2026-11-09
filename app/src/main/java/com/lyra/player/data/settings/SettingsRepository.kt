@@ -49,6 +49,8 @@ import com.lyra.player.core.player.model.normalizePlaybackPitch
 import com.lyra.player.core.player.model.normalizePlaybackSpeed
 import com.lyra.player.core.player.model.normalizePlaybackVolumeBalance
 import com.lyra.player.data.settings.generated.AutoSettingsRepository
+import com.lyra.player.data.update.UpdateDownloadSource
+import com.lyra.player.data.update.UpdateDownloadSourcePolicy
 import com.lyra.player.ksp.annotations.AutoSettingSpec
 import java.util.Locale
 
@@ -138,6 +140,10 @@ class SettingsRepository(private val context: Context) {
     val youtubePlaybackSourceFlow: Flow<YouTubePlaybackSourcePreference> =
         settingFlow(AutoSettingsSchema.playback.youtubePlaybackSource)
             .map(YouTubePlaybackSourcePreferencePolicy::fromStorage)
+
+    val updateDownloadSourceFlow: Flow<UpdateDownloadSource> =
+        settingFlow(AutoSettingsSchema.network.updateDownloadSource)
+            .map(UpdateDownloadSourcePolicy::fromStorage)
 
     val biliAudioQualityFlow: Flow<String> =
         dataStoreSettingFlow { it[SettingsKeys.BILI_AUDIO_QUALITY] ?: "high" }
@@ -664,6 +670,13 @@ class SettingsRepository(private val context: Context) {
     suspend fun setYouTubePlaybackSource(source: YouTubePlaybackSourcePreference) {
         setSetting(
             setting = AutoSettingsSchema.playback.youtubePlaybackSource,
+            value = source.storageValue
+        )
+    }
+
+    suspend fun setUpdateDownloadSource(source: UpdateDownloadSource) {
+        setSetting(
+            setting = AutoSettingsSchema.network.updateDownloadSource,
             value = source.storageValue
         )
     }
