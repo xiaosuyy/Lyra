@@ -26,10 +26,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.lyra.player.R
 import com.lyra.player.data.local.media.displayAlbum
@@ -40,6 +39,19 @@ import com.lyra.player.data.model.SongItem
 import com.lyra.player.ui.viewmodel.tab.AlbumSummary
 import com.lyra.player.util.format.formatDuration
 import com.lyra.player.util.media.offlineCachedImageRequest
+
+private val ArtistRowHeight = 66.dp
+private val ArtistRowCoverSize = 44.dp
+private val ArtistRowCoverShape = RoundedCornerShape(6.dp)
+
+@Composable
+private fun ArtistInsetDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 68.dp, end = 18.dp),
+        thickness = 0.6.dp,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
+    )
+}
 
 @Composable
 internal fun ArtistSongRow(
@@ -53,77 +65,67 @@ internal fun ArtistSongRow(
     val displayAlbum = song.displayAlbum(context)
         .replace("Netease", "")
         .takeIf { it.isNotBlank() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AsyncImage(
-            model = offlineCachedImageRequest(
-                context = context,
-                data = coverUrl,
-                offlineMode = offlineMode
-            ),
-            contentDescription = song.displayName(),
-            contentScale = ContentScale.Crop,
+    val subtitle = buildList {
+        displayArtist?.let(::add)
+        displayAlbum
+            ?.takeIf { !it.equals(displayArtist, ignoreCase = true) }
+            ?.let(::add)
+    }.joinToString(" · ")
+    Column {
+        Row(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = song.displayName(),
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                .fillMaxWidth()
+                .height(ArtistRowHeight)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            AsyncImage(
+                model = offlineCachedImageRequest(
+                    context = context,
+                    data = coverUrl,
+                    offlineMode = offlineMode
+                ),
+                contentDescription = song.displayName(),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(ArtistRowCoverSize)
+                    .clip(ArtistRowCoverShape)
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
             )
-            ArtistSongSubtitle(
-                artist = displayArtist,
-                album = displayAlbum
-            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = song.displayName(),
+                    fontSize = 17.sp,
+                    lineHeight = 21.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 13.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                    )
+                }
+            }
+            if (song.durationMs > 0L) {
+                Text(
+                    text = formatDuration(song.durationMs),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                )
+            }
         }
-        Text(
-            text = formatDuration(song.durationMs),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun ArtistSongSubtitle(
-    artist: String?,
-    album: String?
-) {
-    if (artist == null && album == null) return
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (artist != null) {
-            Text(
-                text = artist,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-        }
-        if (album != null) {
-            Text(
-                text = if (artist == null) album else " · $album",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        ArtistInsetDivider()
     }
 }
 
@@ -138,9 +140,11 @@ internal fun ArtistAlbumRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(ArtistRowHeight)
                 .clickable(onClick = onClick)
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             AsyncImage(
                 model = offlineCachedImageRequest(
@@ -151,28 +155,33 @@ internal fun ArtistAlbumRow(
                 contentDescription = album.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(58.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .size(ArtistRowCoverSize)
+                    .clip(ArtistRowCoverShape)
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
             )
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
                 Text(
                     text = album.name,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    fontSize = 17.sp,
+                    lineHeight = 21.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
                     text = pluralStringResource(R.plurals.count_songs_format, album.size, album.size),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
                 )
             }
         }
-        HorizontalDivider(
-            modifier = Modifier.padding(start = 88.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        )
+        ArtistInsetDivider()
     }
 }
 

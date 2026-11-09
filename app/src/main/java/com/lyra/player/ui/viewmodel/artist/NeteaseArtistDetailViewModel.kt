@@ -198,7 +198,8 @@ class NeteaseArtistDetailViewModel(application: Application) : AndroidViewModel(
                             trackCount = header.musicSize,
                             source = FAVORITE_SOURCE_NETEASE_ARTIST,
                             subtitle = preferredArtistSubtitle(header),
-                            songs = emptyList()
+                            songs = emptyList(),
+                            albumCount = header.albumSize
                         )
                     } else {
                         favoriteRepo.removeFavorite(header.id, FAVORITE_SOURCE_NETEASE_ARTIST)
@@ -238,6 +239,14 @@ class NeteaseArtistDetailViewModel(application: Application) : AndroidViewModel(
         val detailHeader = parseArtistDetail(detailDeferred.await(), summary)
         val songsPage = parseArtistSongs(songsDeferred.await())
         val albumsPage = parseArtistAlbums(albumsDeferred.await())
+
+        if (favoriteRepo.isFavorite(detailHeader.id, FAVORITE_SOURCE_NETEASE_ARTIST)) {
+            favoriteRepo.updateFavoriteAlbumCount(
+                id = detailHeader.id,
+                source = FAVORITE_SOURCE_NETEASE_ARTIST,
+                albumCount = detailHeader.albumSize
+            )
+        }
 
         NeteaseArtistDetailUiState(
             loading = false,

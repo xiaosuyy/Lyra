@@ -1,21 +1,25 @@
 package com.lyra.player.ui.screen.artist
 
 import android.app.Application
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -23,26 +27,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Favorite
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.LibraryMusic
-import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,33 +47,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil.compose.AsyncImage
 import com.lyra.player.R
 import com.lyra.player.ui.LocalMiniPlayerHeight
-import com.lyra.player.ui.effect.glass.AdvancedGlassRole
-import com.lyra.player.ui.effect.glass.AdvancedGlassSurface
+import com.lyra.player.ui.melox.theme.MeloxShapes
+import com.lyra.player.ui.screen.playlist.PlaylistGlassMaskInk
+import com.lyra.player.ui.screen.playlist.PlaylistModernTopBarCircleButton
+import com.lyra.player.ui.screen.playlist.rememberPlaylistModernHeroBackgroundColor
 import com.lyra.player.ui.viewmodel.artist.NeteaseArtistDetailUiState
 import com.lyra.player.ui.viewmodel.artist.NeteaseArtistDetailViewModel
 import com.lyra.player.ui.viewmodel.artist.NeteaseArtistHeader
 import com.lyra.player.data.model.NeteaseArtistSummary
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.ui.viewmodel.tab.AlbumSummary
-import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.ui.util.currentWindowWidthDp
 import com.lyra.player.util.media.offlineCachedImageRequest
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NeteaseArtistDetailScreen(
     artist: NeteaseArtistSummary,
@@ -108,29 +105,10 @@ fun NeteaseArtistDetailScreen(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = ui.header?.name ?: artist.name,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    HapticIconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_back)
-                        )
-                    }
-                },
-                windowInsets = WindowInsets.statusBars,
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-
+        Box(modifier = Modifier.fillMaxSize()) {
             ArtistContent(
                 ui = ui,
+                artistName = artist.name,
                 listState = listState,
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
@@ -143,14 +121,29 @@ fun NeteaseArtistDetailScreen(
                 offlineMode = offlineMode,
                 isTabletLayout = isTabletLayout
             )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, top = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PlaylistModernTopBarCircleButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.cd_back),
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ArtistContent(
     ui: NeteaseArtistDetailUiState,
+    artistName: String,
     listState: LazyListState,
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
@@ -164,6 +157,7 @@ private fun ArtistContent(
     isTabletLayout: Boolean
 ) {
     val miniPlayerHeight = LocalMiniPlayerHeight.current
+    val horizontalInset = if (isTabletLayout) 36.dp else 0.dp
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -176,21 +170,34 @@ private fun ArtistContent(
                 .widthIn(max = 1080.dp)
                 .fillMaxSize(),
             contentPadding = PaddingValues(
-                start = if (isTabletLayout) 36.dp else 20.dp,
-                end = if (isTabletLayout) 36.dp else 20.dp,
-                top = 4.dp,
+                start = horizontalInset,
+                end = horizontalInset,
                 bottom = 40.dp + miniPlayerHeight
-            ),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            )
         ) {
         item {
-            ArtistHeaderCard(
+            ArtistHero(
                 header = ui.header,
+                fallbackName = artistName,
                 followUpdating = ui.followUpdating,
                 offlineMode = offlineMode,
                 isTabletLayout = isTabletLayout,
                 onToggleFollow = onToggleFollow
             )
+        }
+
+        ui.header?.briefDesc?.takeIf { it.isNotBlank() }?.let { description ->
+            item {
+                Text(
+                    text = description,
+                    modifier = Modifier.padding(start = 20.dp, top = 16.dp, end = 20.dp),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         if (ui.error != null && !ui.loading && (ui.songs.isNotEmpty() || ui.albums.isNotEmpty())) {
@@ -199,7 +206,7 @@ private fun ArtistContent(
                     text = ui.error,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
                 )
             }
         }
@@ -219,40 +226,11 @@ private fun ArtistContent(
         }
 
         item {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                shape = RoundedCornerShape(24.dp),
-                color = Color.Transparent
-            ) {
-                AdvancedGlassSurface(
-                    role = AdvancedGlassRole.ScreenTopTab,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    fallbackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
-                    tintColor = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    PrimaryTabRow(
-                        selectedTabIndex = selectedTab,
-                        containerColor = Color.Transparent,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Tab(
-                            selected = selectedTab == 0,
-                            onClick = { onTabSelected(0) },
-                            text = { Text(stringResource(R.string.artist_tab_songs)) },
-                            icon = { Icon(Icons.Outlined.MusicNote, contentDescription = null) }
-                        )
-                        Tab(
-                            selected = selectedTab == 1,
-                            onClick = { onTabSelected(1) },
-                            text = { Text(stringResource(R.string.artist_tab_albums)) },
-                            icon = { Icon(Icons.Outlined.LibraryMusic, contentDescription = null) }
-                        )
-                    }
-                }
-            }
+            ArtistTabChips(
+                selectedTab = selectedTab,
+                onSelect = onTabSelected,
+                modifier = Modifier.padding(start = 16.dp, top = 18.dp, end = 16.dp, bottom = 8.dp)
+            )
         }
 
         if (selectedTab == 0) {
@@ -301,8 +279,9 @@ private fun ArtistContent(
 }
 
 @Composable
-private fun ArtistHeaderCard(
+private fun ArtistHero(
     header: NeteaseArtistHeader?,
+    fallbackName: String,
     followUpdating: Boolean,
     offlineMode: Boolean,
     isTabletLayout: Boolean,
@@ -310,144 +289,223 @@ private fun ArtistHeaderCard(
 ) {
     val context = LocalContext.current
     val coverUrl = header?.coverUrl?.takeIf { it.isNotBlank() } ?: header?.avatarUrl.orEmpty()
-    val heroHeight = if (isTabletLayout) 300.dp else 240.dp
-    val avatarSize = if (isTabletLayout) 82.dp else 64.dp
-    ElevatedCard(
+    val heroColor = rememberPlaylistModernHeroBackgroundColor(
+        coverUrl = coverUrl,
+        offlineMode = offlineMode
+    )
+    val background = MaterialTheme.colorScheme.background
+    val avatarModel = header?.avatarUrl?.takeIf { it.isNotBlank() } ?: coverUrl
+    val avatarSize = if (isTabletLayout) 176.dp else 148.dp
+    val followed = header?.followed == true
+    val followContentColor = if (followed) Color.White else PlaylistGlassMaskInk
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp)
+            .background(
+                Brush.verticalGradient(
+                    0f to heroColor,
+                    0.72f to heroColor,
+                    1f to background
+                )
+            )
+            .statusBarsPadding()
+            .padding(top = 24.dp, bottom = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            AsyncImage(
-                model = offlineCachedImageRequest(
-                    context = context,
-                    data = coverUrl,
-                    offlineMode = offlineMode
-                ),
-                contentDescription = header?.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(heroHeight)
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(heroHeight)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.55f)
-                            )
-                        )
-                    )
-            )
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(20.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(
-                        model = offlineCachedImageRequest(
-                            context = context,
-                            data = header?.avatarUrl ?: coverUrl,
-                            offlineMode = offlineMode
-                        ),
-                        contentDescription = header?.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(avatarSize)
-                            .clip(CircleShape)
-                    )
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = header?.name.orEmpty(),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (!header?.alias.isNullOrBlank()) {
-                            Text(
-                                text = header.alias.orEmpty(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.82f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
+        Box(
+            modifier = Modifier
+                .size(avatarSize)
+                .shadow(
+                    elevation = 18.dp,
+                    shape = CircleShape,
+                    clip = false,
+                    ambientColor = Color.Black.copy(alpha = 0.22f),
+                    spotColor = Color.Black.copy(alpha = 0.22f)
+                )
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.08f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (avatarModel.isNotBlank()) {
+                AsyncImage(
+                    model = offlineCachedImageRequest(
+                        context = context,
+                        data = avatarModel,
+                        sizePx = 480,
+                        allowHardware = false,
+                        crossfade = true,
+                        offlineMode = offlineMode
+                    ),
+                    contentDescription = header?.name ?: fallbackName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.55f),
+                    modifier = Modifier.size(64.dp)
+                )
             }
         }
 
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            pluralStringResource(
-                                R.plurals.artist_song_count,
-                                header?.musicSize ?: 0,
-                                header?.musicSize ?: 0
-                            )
-                        )
-                    }
+        Text(
+            text = header?.name?.takeIf { it.isNotBlank() } ?: fallbackName,
+            modifier = Modifier.padding(top = 20.dp, start = 24.dp, end = 24.dp),
+            color = Color.White,
+            fontSize = 24.sp,
+            lineHeight = 30.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (!header?.alias.isNullOrBlank()) {
+            Text(
+                text = header.alias.orEmpty(),
+                modifier = Modifier.padding(top = 6.dp, start = 24.dp, end = 24.dp),
+                color = Color.White.copy(alpha = 0.62f),
+                fontSize = 15.sp,
+                lineHeight = 19.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (header != null) {
+            val meta = listOf(
+                pluralStringResource(
+                    R.plurals.artist_song_count,
+                    header.musicSize,
+                    header.musicSize
+                ),
+                pluralStringResource(
+                    R.plurals.artist_album_count,
+                    header.albumSize,
+                    header.albumSize
                 )
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            pluralStringResource(
-                                R.plurals.artist_album_count,
-                                header?.albumSize ?: 0,
-                                header?.albumSize ?: 0
-                            )
-                        )
-                    }
-                )
-            }
-            if (!header?.briefDesc.isNullOrBlank()) {
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = header.briefDesc.orEmpty(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-            FilledTonalButton(
-                enabled = header != null && !followUpdating,
-                onClick = onToggleFollow
+            ).joinToString(" · ")
+            Text(
+                text = meta,
+                modifier = Modifier.padding(top = 8.dp),
+                color = Color.White.copy(alpha = 0.58f),
+                fontSize = 14.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier
+                    .height(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (followed) {
+                            Color.White.copy(alpha = 0.18f)
+                        } else {
+                            Color.White.copy(alpha = 0.94f)
+                        },
+                        CircleShape
+                    )
+                    .border(
+                        width = 0.75.dp,
+                        color = if (followed) {
+                            Color.White.copy(alpha = 0.26f)
+                        } else {
+                            Color.Transparent
+                        },
+                        shape = CircleShape
+                    )
+                    .clickable(enabled = !followUpdating, onClick = onToggleFollow)
+                    .padding(horizontal = 22.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 if (followUpdating) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
+                        modifier = Modifier.size(17.dp),
+                        strokeWidth = 2.dp,
+                        color = followContentColor
                     )
                 } else {
                     Icon(
-                        imageVector = if (header?.followed == true) {
-                            Icons.Outlined.Favorite
+                        imageVector = if (followed) {
+                            Icons.Filled.Star
                         } else {
-                            Icons.Outlined.FavoriteBorder
+                            Icons.Outlined.StarOutline
                         },
-                        contentDescription = null
+                        contentDescription = null,
+                        tint = followContentColor,
+                        modifier = Modifier.size(19.dp)
                     )
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (header?.followed == true) {
+                    text = if (followed) {
                         stringResource(R.string.artist_followed)
                     } else {
                         stringResource(R.string.artist_follow)
+                    },
+                    color = followContentColor,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtistTabChips(
+    selectedTab: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = MeloxShapes.capsule
+    val labels = listOf(
+        R.string.artist_tab_songs to 0,
+        R.string.artist_tab_albums to 1
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(30.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f), shape)
+            .padding(1.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        labels.forEach { (labelRes, index) ->
+            val isSelected = selectedTab == index
+            val highlight by animateColorAsState(
+                targetValue = if (isSelected) {
+                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
+                } else {
+                    Color.Transparent
+                },
+                animationSpec = tween(durationMillis = 200),
+                label = "artist_tab_chip"
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(shape)
+                    .background(highlight)
+                    .clickable(
+                        interactionSource = null,
+                        indication = null
+                    ) { onSelect(index) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = stringResource(labelRes),
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.onBackground
+                    } else {
+                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f)
                     }
                 )
             }

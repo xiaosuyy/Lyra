@@ -85,6 +85,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -170,6 +171,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -2588,6 +2590,7 @@ private fun NeteaseArtistSearchRow(
         ).joinToString(" · "),
         coverUrl = result.picUrl,
         offlineMode = offlineMode,
+        circularCover = true,
         fallbackIcon = {
             Icon(
                 imageVector = Icons.Filled.AccountCircle,
@@ -2611,6 +2614,7 @@ private fun ChannelArtistSearchRow(
         subtitle = stringResource(R.string.explore_search_type_artist),
         coverUrl = artist.coverUrl,
         offlineMode = offlineMode,
+        circularCover = true,
         fallbackIcon = {
             Icon(
                 imageVector = Icons.Filled.AccountCircle,
@@ -2671,6 +2675,7 @@ private fun YouTubeCreatorSearchRow(
         },
         coverUrl = creator.coverUrl,
         offlineMode = offlineMode,
+        circularCover = true,
         fallbackIcon = {
             Icon(
                 imageVector = Icons.Filled.AccountCircle,
@@ -2690,57 +2695,72 @@ private fun LinkedCollectionRow(
     coverUrl: String?,
     offlineMode: Boolean,
     fallbackIcon: @Composable () -> Unit,
+    circularCover: Boolean = false,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                context.performHapticFeedback()
-                onClick()
-            }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+    val coverShape = if (circularCover) CircleShape else RoundedCornerShape(6.dp)
+    Column {
+        Row(
             modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(LyraRadius.Medium)),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .height(66.dp)
+                .clickable {
+                    context.performHapticFeedback()
+                    onClick()
+                }
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (!coverUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = fastScrollableImageRequest(
-                        context = context,
-                        data = coverUrl,
-                        sizePx = 144,
-                        offlineMode = offlineMode
-                    ),
-                    contentDescription = title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(coverShape)
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!coverUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = fastScrollableImageRequest(
+                            context = context,
+                            data = coverUrl,
+                            sizePx = 160,
+                            offlineMode = offlineMode
+                        ),
+                        contentDescription = title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(coverShape)
+                    )
+                } else {
+                    fallbackIcon()
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 17.sp,
+                    lineHeight = 21.sp,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
-            } else {
-                fallbackIcon()
+                Text(
+                    text = subtitle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                )
             }
         }
-        Spacer(Modifier.width(LyraSpacing.MD))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = LocalNeriTextStyles.current.body,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = subtitle,
-                style = LocalNeriTextStyles.current.captionSecondary,
-                color = LocalNeriColors.current.secondaryText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        ExploreInsetDivider()
     }
 }
 
@@ -2821,75 +2841,81 @@ internal fun SongRow(
     val scope = rememberCoroutineScope()
     val coverUrl = rememberSongDisplayCoverUrl(song)
     var showMoreMenu by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                context.performHapticFeedback()
-                onClick()
-            }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (!coverUrl.isNullOrBlank()) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(66.dp)
+                .clickable {
+                    context.performHapticFeedback()
+                    onClick()
+                }
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             AsyncImage(
                 model = fastScrollableImageRequest(
                     context = context,
                     data = coverUrl,
-                    sizePx = 128,
+                    sizePx = 192,
                     offlineMode = offlineMode
                 ),
                 contentDescription = song.displayName(),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(LyraRadius.Medium))
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
             )
             Spacer(Modifier.width(12.dp))
-        } else {
-            Spacer(Modifier.width(12.dp))
-        }
 
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = song.displayName(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = LocalNeriTextStyles.current.body
-            )
-            Text(
-                text = listOfNotNull(
-                    song.displayArtist().takeIf { it.isNotBlank() },
-                    song.displayAlbum(context).takeIf { it.isNotBlank() }
-                ).joinToString(" · "),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = LocalNeriTextStyles.current.captionSecondary,
-                color = LocalNeriColors.current.secondaryText
-            )
-        }
-
-        if (song.durationMs > 0L) {
-            Text(
-                text = formatDuration(song.durationMs),
-                style = LocalNeriTextStyles.current.captionSecondary,
-                color = LocalNeriColors.current.tertiaryText
-            )
-        }
-
-        Spacer(Modifier.width(8.dp))
-        Box {
-            HapticIconButton(onClick = { showMoreMenu = true }) {
-                Icon(
-                    imageVector = Icons.Filled.MoreVert,
-                    contentDescription = stringResource(R.string.cd_more_actions),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = song.displayName(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 17.sp,
+                    lineHeight = 21.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = listOfNotNull(
+                        song.displayArtist().takeIf { it.isNotBlank() },
+                        song.displayAlbum(context).takeIf { it.isNotBlank() }
+                    ).joinToString(" · "),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
                 )
             }
-            DropdownMenu(
-                expanded = showMoreMenu,
-                onDismissRequest = { showMoreMenu = false }
-            ) {
+
+            if (song.durationMs > 0L) {
+                Text(
+                    text = formatDuration(song.durationMs),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                )
+            }
+
+            Spacer(Modifier.width(4.dp))
+            Box {
+                HapticIconButton(onClick = { showMoreMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.cd_more_actions),
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMoreMenu,
+                    onDismissRequest = { showMoreMenu = false }
+                ) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.search_result_play_keep_queue)) },
                     leadingIcon = {
@@ -3003,9 +3029,20 @@ internal fun SongRow(
                         showMoreMenu = false
                     }
                 )
+                }
             }
         }
+        ExploreInsetDivider()
     }
+}
+
+@Composable
+private fun ExploreInsetDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 68.dp, end = 18.dp),
+        thickness = 0.6.dp,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
+    )
 }
 
 internal fun buildExploreSongInfo(song: SongItem): String {

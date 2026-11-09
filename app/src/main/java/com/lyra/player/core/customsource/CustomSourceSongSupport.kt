@@ -101,16 +101,19 @@ internal fun buildCustomSourceMusicInfo(
         ?.takeIf { it.isNotBlank() }
         ?: song.audioId?.takeIf { it.isNotBlank() }
         ?: song.id.toString()
+    // 酷狗用 album_audio_id、QQ 用数字 songId，搜索结果都存在 subAudioId 里；
+    // 平台主 id（hash / songmid）拿不到这两个字段时退回主 id。
+    val subAudioId = song.subAudioId?.takeIf { it.isNotBlank() } ?: platformId
     val durationSeconds = (song.durationMs / 1000L).coerceAtLeast(0L)
     return JSONObject()
         .put("source", sourceId)
         .put("songmid", platformId)
-        .put("songId", platformId)
+        .put("songId", subAudioId)
         .put("id", song.id)
         .put("hash", platformId)
         .put("album_id", song.albumId)
         .put("albumId", song.albumId)
-        .put("album_audio_id", platformId)
+        .put("album_audio_id", subAudioId)
         .put("copyrightId", platformId)
         .put("name", song.name)
         .put("songname", song.name)

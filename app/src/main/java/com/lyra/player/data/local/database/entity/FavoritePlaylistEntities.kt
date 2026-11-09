@@ -30,6 +30,8 @@ internal data class FavoritePlaylistEntity(
     val coverUrl: String?,
     @ColumnInfo(name = "track_count")
     val trackCount: Int,
+    @ColumnInfo(name = "album_count", defaultValue = "0")
+    val albumCount: Int = 0,
     @ColumnInfo(name = "browse_id")
     val browseId: String?,
     @ColumnInfo(name = "remote_playlist_id")

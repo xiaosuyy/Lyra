@@ -81,6 +81,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -1289,10 +1290,7 @@ private fun MeloxSongCarousel(
             items = columns,
             key = { _, column -> column.joinToString("-") { it.stableKey() } }
         ) { columnIndex, column ->
-            Column(
-                modifier = Modifier.width(columnWidth),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Column(modifier = Modifier.width(columnWidth)) {
                 column.forEachIndexed { rowIndex, song ->
                     val songIndex = columnIndex * 3 + rowIndex
                     Row(
@@ -1338,6 +1336,11 @@ private fun MeloxSongCarousel(
                             )
                         }
                     }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 54.dp, end = 10.dp),
+                        thickness = 0.6.dp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
+                    )
                 }
             }
         }

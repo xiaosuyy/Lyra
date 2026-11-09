@@ -66,7 +66,8 @@
     <string name="library_coming_soon">敬请期待</string>
     <string name="library_recent_played">最近播放</string>
     <string name="library_delete_playlist_confirm">确定要删除歌单“%1$s”吗？</string>
-    <string name="library_section_songs">歌曲</string>
+    <string name="library_section_songs">本地</string>
+    <string name="library_section_artists">艺人</string>
     <string name="library_section_playlists">歌单</string>
     <string name="library_section_cloud">云端</string>
     <string name="library_section_download">下载</string>

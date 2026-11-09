@@ -94,7 +94,7 @@ import com.lyra.player.data.local.database.entity.PlatformPlaylistCacheTrackEnti
         PlatformPlaylistCacheTrackEntity::class,
         PlatformPlaylistCacheTrackArtistEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 internal abstract class LyraUserDataDatabase : RoomDatabase() {
@@ -162,7 +162,8 @@ internal abstract class LyraUserDataDatabase : RoomDatabase() {
                 MIGRATION_11_12,
                 MIGRATION_12_13,
                 MIGRATION_13_14,
-                MIGRATION_14_15
+                MIGRATION_14_15,
+                MIGRATION_15_16
             ).build()
         }
 
@@ -1002,6 +1003,15 @@ internal abstract class LyraUserDataDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `download_snapshot_metadata` " +
                         "ADD COLUMN `romanized_lyric_path` TEXT"
+                )
+            }
+        }
+
+        val MIGRATION_15_16: Migration = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `favorite_playlist` " +
+                        "ADD COLUMN `album_count` INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }

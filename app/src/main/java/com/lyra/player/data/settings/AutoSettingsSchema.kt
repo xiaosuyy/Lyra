@@ -1717,7 +1717,7 @@ object AutoSettingsSchema {
         @AutoSetting(
             key = "netease_auto_source_switch",
             type = SettingValueType.Boolean,
-            defaultBoolean = false,
+            defaultBoolean = true,
             order = 135,
             ui = SettingUiType.Custom,
             access = SettingAccessMode.KeyOnly
@@ -1725,7 +1725,7 @@ object AutoSettingsSchema {
         val neteaseAutoSourceSwitch = autoSetting(
             titleRes = R.string.settings_netease_auto_source_switch,
             descriptionRes = R.string.settings_netease_auto_source_switch_desc,
-            iconRes = R.drawable.ic_bilibili
+            iconRes = R.drawable.ic_netease_cloud_music
         )
 
         @AutoSetting(

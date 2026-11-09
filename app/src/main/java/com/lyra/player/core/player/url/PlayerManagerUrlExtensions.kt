@@ -55,6 +55,7 @@ import com.lyra.player.core.player.quality.effectiveNeteaseQuality
 import com.lyra.player.core.player.quality.effectiveYouTubeQuality
 import com.lyra.player.core.player.resolver.netease.NeteasePlaybackResponseParser
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseAutoBiliSource
+import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseAutoCrossPlatformSource
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseMatchedLocalSource
 import com.lyra.player.core.customsource.CUSTOM_SOURCE_NETEASE
 import com.lyra.player.core.customsource.CustomSourceManager
@@ -1349,6 +1350,7 @@ internal suspend fun PlayerManager.getCustomSourceAudioUrl(
         val attemptedQualities = qualities.take(maxQualityAttempts.coerceAtLeast(1))
         var resolved: String? = null
         for (quality in attemptedQualities) {
+            val qualityStartedAt = android.os.SystemClock.elapsedRealtime()
             val url = withTimeoutOrNull(CUSTOM_SOURCE_QUALITY_TIMEOUT_MS) {
                 CustomSourceManager.resolveMusicUrl(
                     context = application,
@@ -1366,6 +1368,11 @@ internal suspend fun PlayerManager.getCustomSourceAudioUrl(
                 resolved = url
                 break
             }
+            LyraLogger.w(
+                "LYRA-PlayerManager",
+                "自定义源音质尝试失败: source=$sourceId quality=$quality song=${song.name}, " +
+                    "耗时=${android.os.SystemClock.elapsedRealtime() - qualityStartedAt}ms"
+            )
         }
         resolved
     }
@@ -1433,7 +1440,7 @@ internal suspend fun PlayerManager.getNeteaseSongUrl(
     sideEffects: RefreshResolverSideEffects = RefreshResolverSideEffects(),
     allowLocalFallback: Boolean = true,
     allowPreviewFallback: Boolean = true,
-    allowAutoBiliFallback: Boolean = true,
+    allowAutoSourceFallback: Boolean = true,
     onPermanentFailure: () -> Unit = {}
 ): SongUrlResult = withContext(Dispatchers.IO) {
     try {
@@ -1528,10 +1535,15 @@ internal suspend fun PlayerManager.getNeteaseSongUrl(
                 return@withContext it
             }
         }
-        if (previewFallback != null ||
-            lastFailureReason == NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION
-        ) {
-            if (allowAutoBiliFallback) {
+        // 本地文件优先，其次按歌名 / 歌手 / 时长到其他平台找同一首歌；
+        // 自动换源开关的判定在各自 resolver 内部完成。
+        if (allowAutoSourceFallback) {
+            tryResolveNeteaseAutoCrossPlatformSource(song, sideEffects)?.let {
+                return@withContext it
+            }
+            if (previewFallback != null ||
+                lastFailureReason == NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION
+            ) {
                 tryResolveNeteaseAutoBiliSource(song, sideEffects)?.let {
                     return@withContext it
                 }
@@ -1539,7 +1551,8 @@ internal suspend fun PlayerManager.getNeteaseSongUrl(
         }
 
         if (allowPreviewFallback) {
-            previewFallback?.let { return@withContext it }
+            // 试听片段静默播放，不再弹出“仅试听 / 受限资源”提示
+            previewFallback?.let { return@withContext it.copy(noticeMessage = null) }
         }
 
         if (requiresLogin) {
@@ -1549,16 +1562,6 @@ internal suspend fun PlayerManager.getNeteaseSongUrl(
 
         // 已经拿到明确的平台响应（无权限 / 无直链）时，重复请求不会改变结果
         onPermanentFailure()
-        // 仅平台明确拒绝时提示切换到其他平台；无直链这类播放失败静默跳过
-        if (lastFailureReason == NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION) {
-            sideEffects.emitError {
-                postPlayerEvent(
-                    PlayerEvent.ShowError(
-                        getLocalizedString(R.string.player_netease_no_permission_switch_platform)
-                    )
-                )
-            }
-        }
         SongUrlResult.Failure
     } catch (e: Exception) {
         if (e is CancellationException) throw e

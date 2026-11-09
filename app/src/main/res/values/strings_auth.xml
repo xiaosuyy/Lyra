@@ -75,7 +75,7 @@
     <string name="auth_cookie_invalid">未解析到合法 Cookie 项</string>
     <string name="auth_cookie_empty">Cookie 为空</string>
     <string name="settings_netease_auto_source_switch">网易云自动换源</string>
-    <string name="settings_netease_auto_source_switch_desc">默认关闭；开启后，网易云歌曲无权限或仅返回试听片段时，自动在哔哩哔哩查找音源</string>
+    <string name="settings_netease_auto_source_switch_desc">默认开启；网易云歌曲无权限或仅返回试听片段时，自动按歌名、歌手和时长在其他平台匹配完整音源</string>
     <string name="settings_netease_local_source_fallback">本地音乐兜底</string>
     <string name="settings_netease_local_source_fallback_desc">默认关闭；开启后，在线歌曲仅可试听、需 VIP/无权限或音源加载失败时，自动检索并播放本地已匹配的同一首歌曲</string>
     <string name="settings_youtube_playback_source">YouTube 播放源</string>

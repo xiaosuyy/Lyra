@@ -66,7 +66,8 @@ data class FavoritePlaylist(
     val addedTime: Long = System.currentTimeMillis(),
     val sortOrder: Long = addedTime,
     val modifiedAt: Long = addedTime,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val albumCount: Int = 0
 )
 
 class FavoritePlaylistRepository private constructor(private val context: Context) {
@@ -244,7 +245,8 @@ class FavoritePlaylistRepository private constructor(private val context: Contex
         browseId: String? = null,
         playlistId: String? = null,
         subtitle: String? = null,
-        songs: List<SongItem>
+        songs: List<SongItem>,
+        albumCount: Int = 0
     ) {
         withContext(Dispatchers.IO) {
             mutex.withLock {
@@ -271,7 +273,8 @@ class FavoritePlaylistRepository private constructor(private val context: Contex
                 addedTime = existing?.takeUnless { it.isDeleted }?.addedTime ?: now,
                 sortOrder = existing?.takeUnless { it.isDeleted }?.normalizeSortOrder()?.sortOrder ?: now,
                 modifiedAt = now,
-                isDeleted = false
+                isDeleted = false,
+                albumCount = maxOf(albumCount, existing?.albumCount ?: 0)
             )
 
             if (existingIndex >= 0) {
@@ -281,6 +284,23 @@ class FavoritePlaylistRepository private constructor(private val context: Contex
             }
 
             publish(list)
+            }
+        }
+    }
+
+    suspend fun updateFavoriteAlbumCount(id: Long, source: String, albumCount: Int) {
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val list = _snapshots.value.toMutableList()
+                val index = list.indexOfFirst { it.id == id && it.source == source }
+                if (index == -1) return@withLock
+                val existing = list[index]
+                if (existing.isDeleted || existing.albumCount == albumCount) return@withLock
+                list[index] = existing.copy(
+                    albumCount = albumCount,
+                    modifiedAt = System.currentTimeMillis()
+                )
+                publish(list)
             }
         }
     }

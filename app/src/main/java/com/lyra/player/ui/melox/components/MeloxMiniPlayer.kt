@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,8 +54,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.ui.melox.glass.MeloxGlassSpec
 import com.lyra.player.ui.melox.glass.meloxGlassSurface
+import com.lyra.player.util.media.offlineCachedImageRequest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -67,6 +71,9 @@ data class MeloxMiniTrack(
 
 private const val MiniSwipeCommitScreenFraction = 0.28f
 private const val MiniSwipeMaxScreenFraction = 0.86f
+private const val MINI_ARTWORK_REQUEST_SIZE_PX = 144
+private const val MINI_ARTWORK_MAX_RETRIES = 2
+private const val MINI_ARTWORK_RETRY_DELAY_MS = 700L
 
 private fun miniSwipeSmoothStep(value: Float): Float {
     val t = value.coerceIn(0f, 1f)
@@ -384,6 +391,12 @@ private fun MiniPlayerArtwork(
     coverUrl: String?,
     coverShape: RoundedCornerShape,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var loadAttempt by remember(coverUrl) { mutableIntStateOf(0) }
+    var loadFailed by remember(coverUrl) { mutableStateOf(false) }
+    val showPlaceholder = coverUrl.isNullOrBlank() || loadFailed
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -391,19 +404,40 @@ private fun MiniPlayerArtwork(
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        if (coverUrl.isNullOrBlank()) {
+        if (showPlaceholder) {
             Icon(
                 imageVector = Icons.Outlined.MusicNote,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        } else {
+        }
+        if (!coverUrl.isNullOrBlank()) {
             AsyncImage(
-                model = coverUrl,
+                model = remember(context, coverUrl, loadAttempt) {
+                    offlineCachedImageRequest(
+                        context = context,
+                        data = coverUrl,
+                        sizePx = MINI_ARTWORK_REQUEST_SIZE_PX,
+                        allowHardware = false,
+                    )
+                },
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
+                onSuccess = { loadFailed = false },
+                onError = {
+                    // 缩略图偶尔一次请求失败会一直空着；重试几次，仍失败才显示占位。
+                    if (loadAttempt < MINI_ARTWORK_MAX_RETRIES) {
+                        scope.launch {
+                            delay(MINI_ARTWORK_RETRY_DELAY_MS)
+                            loadAttempt += 1
+                        }
+                    } else {
+                        LyraLogger.w("LYRA-MiniPlayer", "迷你播放器封面重试后仍失败: url=$coverUrl")
+                        loadFailed = true
+                    }
+                },
             )
         }
     }

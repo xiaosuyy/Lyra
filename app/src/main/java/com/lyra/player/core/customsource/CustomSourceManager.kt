@@ -308,12 +308,22 @@ internal object CustomSourceManager {
                 runtime.isReady && sourceId in runtime.sourceIds
             }
             .sortedBy { (id, _) -> orderById[id] ?: Int.MAX_VALUE }
+        if (candidates.isEmpty()) {
+            LyraLogger.w(TAG, "没有可用的音源脚本运行环境: source=$sourceId")
+            return null
+        }
         for ((id, runtime) in candidates) {
+            val startedAt = android.os.SystemClock.elapsedRealtime()
             val url = runtime.resolveMusicUrl(sourceId, quality, musicInfo)
             if (!url.isNullOrBlank()) {
                 LyraLogger.d(TAG, "自定义源 $id 解析成功: source=$sourceId quality=$quality")
                 return url
             }
+            LyraLogger.i(
+                TAG,
+                "自定义源 $id 未解析出直链: source=$sourceId quality=$quality, " +
+                    "耗时=${android.os.SystemClock.elapsedRealtime() - startedAt}ms"
+            )
         }
         return null
     }

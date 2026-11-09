@@ -320,15 +320,11 @@ internal fun buildNeteaseSuccessResult(
     } else {
         parsed.url
     }
-    val noticeMessage = when (parsed.notice) {
-        NeteasePlaybackResponseParser.Notice.PREVIEW_CLIP ->
-            getLocalizedString(R.string.player_netease_preview_only)
-        null -> null
-    }
     return SongUrlResult.Success(
         url = finalUrl,
         mimeType = normalizeNeteaseMimeType(parsed.type),
-        noticeMessage = noticeMessage,
+        // 试听片段直接播放，不再弹提示打断听歌
+        noticeMessage = null,
         expectedContentLength = parsed.contentLength,
         audioInfo = buildNeteasePlaybackAudioInfo(
             parsed = parsed,

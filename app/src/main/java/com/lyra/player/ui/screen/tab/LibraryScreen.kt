@@ -122,6 +122,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -166,7 +167,6 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import com.lyra.player.R
 import com.lyra.player.core.di.AppContainer
-import com.lyra.player.core.download.DownloadedSong
 import com.lyra.player.data.history.toSongItem
 import com.lyra.player.data.stats.PlaybackStatsPeriod
 import com.lyra.player.data.stats.PlaybackStatsHotPlaylist
@@ -199,7 +199,6 @@ import com.lyra.player.data.model.NeteaseArtistSummary
 import com.lyra.player.ui.viewmodel.tab.AlbumSummary
 import com.lyra.player.ui.viewmodel.tab.BiliPlaylist
 import com.lyra.player.ui.viewmodel.tab.BiliPlaylistKind
-import com.lyra.player.ui.viewmodel.DownloadManagerViewModel
 import com.lyra.player.ui.viewmodel.tab.LibraryViewModel
 import com.lyra.player.ui.viewmodel.tab.PlaylistSummary
 import com.lyra.player.ui.viewmodel.tab.YouTubeMusicPlaylist
@@ -208,6 +207,7 @@ import com.lyra.player.ui.util.rememberPlaylistDisplayCoverUrl
 import com.lyra.player.util.media.fastScrollableImageRequest
 import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.ui.haptic.HapticTextButton
+import com.lyra.player.ui.haptic.performHapticFeedback
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsButton
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsDialog
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsDialogContent
@@ -406,18 +406,27 @@ fun LibraryScreen(
     val localPlaylistRepo = remember(context) {
         LocalPlaylistRepository.getInstance(context)
     }
-    var librarySection by rememberSaveable { mutableStateOf(LibrarySection.SONGS) }
+    // 旧版本用枚举序列化保存页签，移除「下载」后按名称恢复可避免反序列化失败。
+    var librarySection by rememberSaveable(
+        stateSaver = Saver(
+            save = { it.name },
+            restore = { savedName ->
+                LibrarySection.entries.firstOrNull { it.name == savedName }
+                    ?: LibrarySection.SONGS
+            }
+        )
+    ) { mutableStateOf(LibrarySection.SONGS) }
     var libraryQuery by rememberSaveable { mutableStateOf("") }
     val songsListState = rememberLazyListState()
+    val artistsListState = rememberLazyListState()
     val recentListState = rememberLazyListState()
-    val downloadListState = rememberLazyListState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         state = topAppBarState,
         canScroll = {
             val activeListState = when (librarySection) {
                 LibrarySection.SONGS -> songsListState
+                LibrarySection.ARTISTS -> artistsListState
                 LibrarySection.RECENT -> recentListState
-                LibrarySection.DOWNLOAD -> downloadListState
                 else -> localListState
             }
             shouldAllowCollapsingTopAppBar(
@@ -479,19 +488,14 @@ fun LibraryScreen(
             Column(Modifier.fillMaxSize()) {
                 LibrarySectionChips(
                     selected = librarySection,
-                    onSelect = { section ->
-                        librarySection = section
-                        if (section == LibrarySection.DOWNLOAD) libraryQuery = ""
-                    }
+                    onSelect = { section -> librarySection = section }
                 )
 
-                if (librarySection != LibrarySection.DOWNLOAD) {
-                    LibraryInlineSearchField(
-                        query = libraryQuery,
-                        onQueryChange = { libraryQuery = it },
-                        placeholderResId = R.string.library_search_hint
-                    )
-                }
+                LibraryInlineSearchField(
+                    query = libraryQuery,
+                    onQueryChange = { libraryQuery = it },
+                    placeholderResId = R.string.library_search_hint
+                )
 
                 val localFilesSongs = remember(ui.localPlaylists, context) {
                     ui.localPlaylists
@@ -525,6 +529,13 @@ fun LibraryScreen(
                             listState = songsListState,
                             onSongClick = onSongClick,
                             onDeleteSong = { song -> vm.deleteLocalSong(song) }
+                        )
+
+                        LibrarySection.ARTISTS -> LibraryArtistsContent(
+                            query = libraryQuery,
+                            listState = artistsListState,
+                            onArtistClick = onNeteaseArtistClick,
+                            offlineMode = offlineMode
                         )
 
                         LibrarySection.PLAYLISTS -> LocalPlaylistList(
@@ -562,10 +573,6 @@ fun LibraryScreen(
                             onSongClick = onSongClick,
                             offlineMode = offlineMode
                         )
-
-                        LibrarySection.DOWNLOAD -> LibraryDownloadsContent(
-                            listState = downloadListState
-                        )
                     }
                     }
                 }
@@ -576,9 +583,9 @@ fun LibraryScreen(
 
 private enum class LibrarySection(val labelResId: Int) {
     SONGS(R.string.library_section_songs),
+    ARTISTS(R.string.library_section_artists),
     PLAYLISTS(R.string.library_section_playlists),
-    RECENT(R.string.library_recent_played),
-    DOWNLOAD(R.string.library_section_download)
+    RECENT(R.string.library_recent_played)
 }
 
 @Composable
@@ -937,31 +944,51 @@ private fun LibraryInlinePlaylistRow(
 }
 
 @Composable
-private fun LibraryDownloadsContent(
-    listState: LazyListState
+private fun LibraryArtistsContent(
+    query: String,
+    listState: LazyListState,
+    onArtistClick: (NeteaseArtistSummary) -> Unit,
+    offlineMode: Boolean = false
 ) {
-    val viewModel: DownloadManagerViewModel = viewModel()
-    val downloadedSongs by viewModel.downloadedSongs.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) {
-        if (viewModel.downloadedSongs.value.isEmpty() && !viewModel.isRefreshing.value) {
-            viewModel.refreshDownloadedSongs()
+    val context = LocalContext.current
+    val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
+    val favorites by favoriteRepo.favorites.collectAsStateWithLifecycle()
+    val artists = remember(favorites) {
+        favorites.filter { it.source == FAVORITE_SOURCE_NETEASE_ARTIST }
+    }
+    val filteredArtists = remember(artists, query) {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) {
+            artists
+        } else {
+            artists.filter { it.name.contains(normalizedQuery, ignoreCase = true) }
         }
     }
-
     val miniPlayerHeight = LocalMiniPlayerHeight.current
 
-    if (downloadedSongs.isEmpty()) {
+    if (filteredArtists.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    stringResource(R.string.download_no_songs),
+                    stringResource(
+                        if (query.isBlank()) {
+                            R.string.library_no_favorite_artist
+                        } else {
+                            R.string.library_favorite_search_empty
+                        }
+                    ),
                     fontSize = 19.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    stringResource(R.string.download_songs_hint),
+                    stringResource(
+                        if (query.isBlank()) {
+                            R.string.library_favorite_artist_hint
+                        } else {
+                            R.string.library_favorite_search_empty_hint
+                        }
+                    ),
                     modifier = Modifier.padding(top = 7.dp),
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f),
                     fontSize = 13.sp
@@ -976,41 +1003,111 @@ private fun LibraryDownloadsContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = miniPlayerHeight + LyraSpacing.MD)
     ) {
-        item(key = "library_downloads_header") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 18.dp, top = 6.dp, bottom = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    stringResource(R.string.downloaded),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+        items(
+            items = filteredArtists,
+            key = { "${it.source}:${it.id}" }
+        ) { artist ->
+            Column {
+                LibraryArtistRow(
+                    artist = artist,
+                    offlineMode = offlineMode,
+                    onClick = {
+                        onArtistClick(NeteaseArtistSummary(id = artist.id, name = artist.name))
+                    }
                 )
-                Text(
-                    stringResource(R.string.player_play_all),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
+                LibraryInsetDivider(leading = 68.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryArtistRow(
+    artist: FavoritePlaylist,
+    offlineMode: Boolean,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(66.dp)
+            .clickable {
+                context.performHapticFeedback()
+                onClick()
+            }
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!artist.coverUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = fastScrollableImageRequest(
+                        context = context,
+                        data = artist.coverUrl,
+                        sizePx = 160,
+                        offlineMode = offlineMode
+                    ),
+                    contentDescription = artist.name,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .clip(MeloxShapes.capsule)
-                        .clickable {
-                            downloadedSongs.firstOrNull()?.let(viewModel::playDownloadedSong)
-                        }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.AccountCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(30.dp)
                 )
             }
         }
-        items(downloadedSongs, key = { it.deletionIdentity() }) { song ->
-            LibraryDownloadedSongRow(
-                song = song,
-                onPlay = { viewModel.playDownloadedSong(song) },
-                onDelete = { viewModel.deleteDownloadedSong(song) }
+        Spacer(Modifier.width(12.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = artist.name,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 17.sp,
+                lineHeight = 21.sp,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = libraryArtistSubtitle(artist),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 13.sp,
+                lineHeight = 16.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
             )
         }
     }
+}
+
+@Composable
+private fun libraryArtistSubtitle(artist: FavoritePlaylist): String {
+    val songCount = pluralStringResource(
+        R.plurals.artist_song_count,
+        artist.trackCount,
+        artist.trackCount
+    )
+    if (artist.albumCount <= 0) return songCount
+    val albumCount = pluralStringResource(
+        R.plurals.artist_album_count,
+        artist.albumCount,
+        artist.albumCount
+    )
+    return "$songCount · $albumCount"
 }
 
 @Composable
@@ -1249,64 +1346,6 @@ private fun LibrarySwipeToDeleteRow(
                 }
         ) {
             content()
-        }
-    }
-}
-
-@Composable
-private fun LibraryDownloadedSongRow(
-    song: DownloadedSong,
-    onPlay: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val context = LocalContext.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(62.dp)
-            .clickable(onClick = onPlay)
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        AsyncImage(
-            model = offlineCachedImageRequest(
-                context = context,
-                data = song.coverPath ?: song.coverUrl,
-                sizePx = 192,
-                allowHardware = false
-            ),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
-        )
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = song.name,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = song.artist,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f)
-            )
-        }
-        IconButton(onClick = onDelete) {
-            Icon(
-                imageVector = Icons.Outlined.Delete,
-                contentDescription = stringResource(R.string.download_delete),
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
-            )
         }
     }
 }

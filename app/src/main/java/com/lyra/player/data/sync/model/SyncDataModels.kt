@@ -442,7 +442,8 @@ data class SyncFavoritePlaylist(
     @ProtoNumber(10) val sortOrder: Long = addedTime,
     @ProtoNumber(11) val browseId: String? = null,
     @ProtoNumber(12) val playlistId: String? = null,
-    @ProtoNumber(13) val subtitle: String? = null
+    @ProtoNumber(13) val subtitle: String? = null,
+    @ProtoNumber(14) val albumCount: Int = 0
 ) {
     companion object {
         fun fromFavoritePlaylist(playlist: FavoritePlaylist, context: Context? = null): SyncFavoritePlaylist {
@@ -461,7 +462,8 @@ data class SyncFavoritePlaylist(
                     sortOrder = playlist.sortOrder,
                     browseId = playlist.browseId,
                     playlistId = playlist.playlistId,
-                    subtitle = playlist.subtitle
+                    subtitle = playlist.subtitle,
+                    albumCount = playlist.albumCount
                 )
             }
             val syncedSongs = playlist.songs.mapNotNull { SyncSong.fromSongItemOrNull(it, context) }
@@ -485,7 +487,8 @@ data class SyncFavoritePlaylist(
                 sortOrder = playlist.sortOrder,
                 browseId = playlist.browseId,
                 playlistId = playlist.playlistId,
-                subtitle = playlist.subtitle
+                subtitle = playlist.subtitle,
+                albumCount = playlist.albumCount
             )
         }
     }
@@ -504,7 +507,8 @@ data class SyncFavoritePlaylist(
             addedTime = addedTime,
             sortOrder = sortOrder,
             modifiedAt = modifiedAt,
-            isDeleted = isDeleted
+            isDeleted = isDeleted,
+            albumCount = albumCount
         )
     }
 }
