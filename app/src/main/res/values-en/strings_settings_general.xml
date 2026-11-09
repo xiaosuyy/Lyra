@@ -81,6 +81,7 @@
     <string name="settings_lyrics_appearance_section_desc">Adjust lyric translation and font sizes.</string>
     <string name="settings_personalization_background_section">Background Image</string>
     <string name="settings_personalization_background_section_desc">Choose a custom background and display strength.</string>
+    <string name="settings_personalization_library_section">Library</string>
     <string name="settings_display">Display Settings</string>
     <string name="settings_display_desc">Control cover, lyrics, and background display.</string>
     <string name="settings_home_hidden_notice">All home cards are hidden, so Home will disappear from the bottom bar.</string>

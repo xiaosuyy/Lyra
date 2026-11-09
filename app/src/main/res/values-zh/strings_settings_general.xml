@@ -81,6 +81,7 @@
     <string name="settings_lyrics_appearance_section_desc">调整歌词翻译和字号</string>
     <string name="settings_personalization_background_section">背景图</string>
     <string name="settings_personalization_background_section_desc">选择自定义背景和显示强度</string>
+    <string name="settings_personalization_library_section">曲库</string>
     <string name="settings_display">显示设置</string>
     <string name="settings_display_desc">控制封面、歌词与背景的显示方式</string>
     <string name="settings_home_hidden_notice">当前已关闭全部首页卡片，首页会从底部栏隐藏。</string>

@@ -227,6 +227,13 @@ class SettingsPageTest {
             4,
             settingsSearchScrollAnchor(
                 page = SettingsPage.Personalization,
+                targetId = "manual:library_sort"
+            ).itemIndex
+        )
+        assertEquals(
+            5,
+            settingsSearchScrollAnchor(
+                page = SettingsPage.Personalization,
                 targetId = "setting:background_image_uri"
             ).itemIndex
         )

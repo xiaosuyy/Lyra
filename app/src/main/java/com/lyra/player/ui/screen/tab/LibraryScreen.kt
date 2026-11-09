@@ -2033,6 +2033,29 @@ private fun LocalPlaylistList(
             }
         }
 
+        displayedLocalFilesPlaylist?.let { system ->
+            item(key = "local_playlist_local_files") {
+                val displayName = SystemLocalPlaylists.resolve(system.id, system.name, context)?.currentName ?: system.name
+                Column(modifier = Modifier.animateItem()) {
+                    LibraryInlinePlaylistRow(
+                        playlist = system,
+                        title = displayName,
+                        subtitle = pluralStringResource(
+                            R.plurals.library_song_count,
+                            system.songs.size,
+                            system.songs.size
+                        ),
+                        offlineMode = offlineMode,
+                        onClick = if (selectionMode) null else ({ onClick(system) }),
+                        selectionControl = if (selectionMode) {
+                            { Spacer(modifier = Modifier.size(24.dp)) }
+                        } else null
+                    )
+                    LibraryInsetDivider(leading = 68.dp)
+                }
+            }
+        }
+
             items(
                 items = displayedPlaylists,
                 key = { it.id }
@@ -2201,28 +2224,6 @@ private fun LocalPlaylistList(
             }
         }
 
-        displayedLocalFilesPlaylist?.let { system ->
-            item(key = "local_playlist_local_files") {
-                val displayName = SystemLocalPlaylists.resolve(system.id, system.name, context)?.currentName ?: system.name
-                Column(modifier = Modifier.animateItem()) {
-                    LibraryInlinePlaylistRow(
-                        playlist = system,
-                        title = displayName,
-                        subtitle = pluralStringResource(
-                            R.plurals.library_song_count,
-                            system.songs.size,
-                            system.songs.size
-                        ),
-                        offlineMode = offlineMode,
-                        onClick = if (selectionMode) null else ({ onClick(system) }),
-                        selectionControl = if (selectionMode) {
-                            { Spacer(modifier = Modifier.size(24.dp)) }
-                        } else null
-                    )
-                    LibraryInsetDivider(leading = 68.dp)
-                }
-            }
-        }
     }
     }
 }

@@ -332,7 +332,8 @@ private fun personalizationCardIndex(targetId: String): Int {
         in PersonalizationStartTargets -> 0
         in PersonalizationPlaybackInfoTargets -> 1
         in PersonalizationPlaybackControlTargets -> 2
-        in PersonalizationBackgroundTargets -> 3
+        in PersonalizationLibraryTargets -> 3
+        in PersonalizationBackgroundTargets -> 4
         else -> 0
     }
 }
@@ -367,6 +368,10 @@ private val LyricAppearanceSearchTargets = setOf(
     "setting:lyrics_page_translation_font_scale",
     "setting:show_lyric_translation",
     "setting:lyric_translation_use_phonetic"
+)
+
+private val PersonalizationLibraryTargets = setOf(
+    "manual:library_sort"
 )
 
 private val PersonalizationBackgroundTargets = setOf(
@@ -475,6 +480,28 @@ internal fun manualSettingsSearchEntries(context: Context): List<SettingsSearchE
                 "zhutise",
                 "yanse"
             )
+        ),
+        entry(
+            page = SettingsPage.Personalization,
+            titleRes = R.string.settings_library_sort,
+            descriptionRes = R.string.settings_library_sort_dialog_title,
+            id = "library_sort",
+            aliases = listOf(
+                "曲库排序",
+                "歌曲排序",
+                "艺人排序",
+                "字母排序",
+                "按字母",
+                "library sorting",
+                "sort library",
+                "alphabetical",
+                "sort",
+                "pinyin",
+                "qukupaixu",
+                "pai xu",
+                "zimusu"
+            ),
+            order = SettingsPage.Personalization.ordinal * 100 + 34
         ),
         entry(
             page = SettingsPage.Personalization,

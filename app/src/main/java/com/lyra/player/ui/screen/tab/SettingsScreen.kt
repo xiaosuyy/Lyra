@@ -1269,14 +1269,6 @@ fun SettingsScreen(
                             ),
                             onLanguageChanged = onLanguageChanged
                         )
-                        LibrarySortSettingItem(
-                            modifier = Modifier.settingsHighlightTarget(
-                                targetId = "manual:library_sort",
-                                highlightTargetId = settingsHighlightTargetId,
-                                highlightPulse = settingsHighlightPulse,
-                                onHighlightFinished = onSettingsHighlightFinished
-                            )
-                        )
                         MiuixSettingsSectionIntro(
                             title = stringResource(R.string.settings_ui_scale),
                         )
@@ -1370,7 +1362,7 @@ fun SettingsScreen(
                 }
 
                 SettingsPage.Personalization -> {
-                    for (cardIndex in 0..3) {
+                    for (cardIndex in 0..4) {
                         item(key = "${selectedPage.name}:card:$cardIndex") {
                             SettingsPersonalizationPageContent(
                                 autoSettingsRepository = autoSettingsRepository,
@@ -2479,6 +2471,20 @@ private fun SettingsPersonalizationPageContent(
         }
 
         if (shouldShowCard(3)) PersonalizationDetailCard {
+            MiuixSettingsSectionIntro(
+                title = stringResource(R.string.settings_personalization_library_section),
+            )
+            LibrarySortSettingItem(
+                modifier = Modifier.settingsHighlightTarget(
+                    targetId = "manual:library_sort",
+                    highlightTargetId = highlightTargetId,
+                    highlightPulse = highlightPulse,
+                    onHighlightFinished = onHighlightFinished
+                )
+            )
+        }
+
+        if (shouldShowCard(4)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_background_section),
             )
