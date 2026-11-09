@@ -28,12 +28,15 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +49,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,6 +61,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -71,10 +76,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
-import com.lyra.player.ui.component.overlay.DensityScaledAlertDialog as AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -97,6 +102,9 @@ import com.lyra.player.ui.theme.designsystem.LyraSpacing
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.PrimaryTabRow
@@ -107,6 +115,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -118,21 +127,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
@@ -140,9 +158,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 import com.lyra.player.R
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.DownloadedSong
@@ -172,7 +193,6 @@ import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.ui.LocalMiniPlayerHeight
-import com.lyra.player.ui.feedback.AppFeedback
 import com.lyra.player.ui.component.playlist.showPlaylistDeleteResultGlobally
 import com.lyra.player.ui.util.shouldAllowCollapsingTopAppBar
 import com.lyra.player.data.model.NeteaseArtistSummary
@@ -410,6 +430,15 @@ fun LibraryScreen(
     val windowWidthDp = currentWindowWidthDp()
     val isTabletLayout = windowWidthDp >= 720.dp
     val pageHorizontalPadding = if (isTabletLayout) LyraSpacing.XL else 0.dp
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    LaunchedEffect(isRefreshing) {
+        if (!isRefreshing) return@LaunchedEffect
+        vm.refreshLocalLibrary(context)
+        delay(700)
+        isRefreshing = false
+    }
 
     Column(
         Modifier
@@ -472,12 +501,30 @@ fun LibraryScreen(
                 }
 
                 Box(Modifier.weight(1f)) {
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = {
+                            if (!isRefreshing) isRefreshing = true
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        state = pullToRefreshState,
+                        indicator = {
+                            PullToRefreshDefaults.Indicator(
+                                state = pullToRefreshState,
+                                isRefreshing = isRefreshing,
+                                modifier = Modifier.align(Alignment.TopCenter),
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    ) {
                     when (librarySection) {
                         LibrarySection.SONGS -> LibrarySongsContent(
                             songs = localFilesSongs,
                             query = libraryQuery,
                             listState = songsListState,
-                            onSongClick = onSongClick
+                            onSongClick = onSongClick,
+                            onDeleteSong = { song -> vm.deleteLocalSong(song) }
                         )
 
                         LibrarySection.PLAYLISTS -> LocalPlaylistList(
@@ -519,6 +566,7 @@ fun LibraryScreen(
                         LibrarySection.DOWNLOAD -> LibraryDownloadsContent(
                             listState = downloadListState
                         )
+                    }
                     }
                 }
             }
@@ -592,7 +640,8 @@ private fun LibrarySongsContent(
     songs: List<SongItem>,
     query: String,
     listState: LazyListState,
-    onSongClick: (List<SongItem>, Int) -> Unit
+    onSongClick: (List<SongItem>, Int) -> Unit,
+    onDeleteSong: (SongItem) -> Unit
 ) {
     val filteredSongs = remember(songs, query) {
         if (query.isBlank()) {
@@ -606,6 +655,13 @@ private fun LibrarySongsContent(
         }
     }
     val miniPlayerHeight = LocalMiniPlayerHeight.current
+    var expandedKey by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteSong by remember { mutableStateOf<SongItem?>(null) }
+
+    BackHandler(enabled = expandedKey != null) { expandedKey = null }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) expandedKey = null
+    }
 
     if (filteredSongs.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -631,7 +687,12 @@ private fun LibrarySongsContent(
     ) {
         item(key = "library_songs_play_all") {
             Column {
-                LibraryPlayAllRow(onClick = { onSongClick(filteredSongs, 0) })
+                LibraryPlayAllRow(
+                    onClick = {
+                        if (expandedKey != null) expandedKey = null
+                        else onSongClick(filteredSongs, 0)
+                    }
+                )
                 LibraryInsetDivider(leading = 68.dp)
             }
         }
@@ -639,14 +700,48 @@ private fun LibrarySongsContent(
             items = filteredSongs,
             key = { index, song -> "${song.id}-$index" }
         ) { index, song ->
+            val itemKey = "${song.id}-$index"
             Column {
                 LibraryInlineSongRow(
                     song = song,
-                    onClick = { onSongClick(filteredSongs, index) }
+                    onClick = {
+                        if (expandedKey != null) expandedKey = null
+                        else onSongClick(filteredSongs, index)
+                    },
+                    swipeKey = itemKey,
+                    expandedKey = expandedKey,
+                    onExpandedChange = { expandedKey = it },
+                    onDeleteClick = {
+                        expandedKey = null
+                        pendingDeleteSong = song
+                    }
                 )
                 LibraryInsetDivider(leading = 68.dp)
             }
         }
+    }
+
+    pendingDeleteSong?.let { song ->
+        MiuixSettingsDialog(
+            onDismissRequest = { pendingDeleteSong = null },
+            title = { Text(stringResource(R.string.dialog_confirm_delete)) },
+            text = { Text(stringResource(R.string.download_delete_confirm, song.displayName())) },
+            confirmButton = {
+                MiuixSettingsButton(
+                    onClick = {
+                        pendingDeleteSong = null
+                        onDeleteSong(song)
+                    }
+                ) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                MiuixSettingsTextButton(onClick = { pendingDeleteSong = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 }
 
@@ -680,6 +775,12 @@ private fun LibraryRecentContent(
         }
     }
     val miniPlayerHeight = LocalMiniPlayerHeight.current
+    var expandedKey by remember { mutableStateOf<String?>(null) }
+
+    BackHandler(enabled = expandedKey != null) { expandedKey = null }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) expandedKey = null
+    }
 
     if (filteredSongs.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -699,7 +800,12 @@ private fun LibraryRecentContent(
     ) {
         item(key = "library_recent_play_all") {
             Column {
-                LibraryPlayAllRow(onClick = { onSongClick(filteredSongs, 0) })
+                LibraryPlayAllRow(
+                    onClick = {
+                        if (expandedKey != null) expandedKey = null
+                        else onSongClick(filteredSongs, 0)
+                    }
+                )
                 LibraryInsetDivider(leading = 68.dp)
             }
         }
@@ -707,11 +813,22 @@ private fun LibraryRecentContent(
             items = filteredSongs,
             key = { index, song -> "${song.stableKey()}-$index" }
         ) { index, song ->
+            val itemKey = "${song.stableKey()}-$index"
             Column {
                 LibraryInlineSongRow(
                     song = song,
-                    onClick = { onSongClick(filteredSongs, index) },
-                    offlineMode = offlineMode
+                    onClick = {
+                        if (expandedKey != null) expandedKey = null
+                        else onSongClick(filteredSongs, index)
+                    },
+                    offlineMode = offlineMode,
+                    swipeKey = itemKey,
+                    expandedKey = expandedKey,
+                    onExpandedChange = { expandedKey = it },
+                    onDeleteClick = {
+                        expandedKey = null
+                        historyRepo.removeSongs(listOf(song))
+                    }
                 )
                 LibraryInsetDivider(leading = 68.dp)
             }
@@ -726,6 +843,97 @@ private fun LibraryInsetDivider(leading: Dp) {
         thickness = 0.6.dp,
         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
     )
+}
+
+@Composable
+private fun LibraryInlinePlaylistRow(
+    playlist: LocalPlaylist,
+    title: String,
+    subtitle: String,
+    offlineMode: Boolean,
+    modifier: Modifier = Modifier,
+    containerColor: Color = Color.Transparent,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    selectionControl: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    val context = LocalContext.current
+    val cover = rememberPlaylistDisplayCoverUrl(
+        playlist = playlist,
+        resolveLocalFallback = true
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(66.dp)
+            .background(containerColor)
+            .then(
+                when {
+                    onClick == null -> Modifier
+                    onLongClick == null -> Modifier.clickable(onClick = onClick)
+                    else -> Modifier.combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    )
+                }
+            )
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        selectionControl?.invoke()
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!cover.isNullOrBlank()) {
+                AsyncImage(
+                    model = fastScrollableImageRequest(
+                        context = context,
+                        data = cover,
+                        sizePx = 160,
+                        offlineMode = offlineMode
+                    ),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 17.sp,
+                lineHeight = 21.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = subtitle,
+                fontSize = 13.sp,
+                lineHeight = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+            )
+        }
+        trailing?.invoke()
+    }
 }
 
 @Composable
@@ -838,15 +1046,42 @@ private fun LibraryPlayAllRow(onClick: () -> Unit) {
 private fun LibraryInlineSongRow(
     song: SongItem,
     onClick: () -> Unit,
-    offlineMode: Boolean = false
+    offlineMode: Boolean = false,
+    swipeKey: String? = null,
+    expandedKey: String? = null,
+    onExpandedChange: ((String?) -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null
+) {
+    if (swipeKey != null && onExpandedChange != null && onDeleteClick != null) {
+        LibrarySwipeToDeleteRow(
+            isExpanded = expandedKey == swipeKey,
+            onExpandedChange = { expanded -> onExpandedChange(if (expanded) swipeKey else null) },
+            onDeleteClick = onDeleteClick,
+            onClick = onClick
+        ) {
+            LibrarySongRowContent(song = song, offlineMode = offlineMode)
+        }
+    } else {
+        LibrarySongRowContent(
+            song = song,
+            offlineMode = offlineMode,
+            modifier = Modifier.clickable(onClick = onClick)
+        )
+    }
+}
+
+@Composable
+private fun LibrarySongRowContent(
+    song: SongItem,
+    offlineMode: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coverUrl = rememberSongDisplayCoverUrl(song)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(66.dp)
-            .clickable(onClick = onClick)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -893,6 +1128,127 @@ private fun LibraryInlineSongRow(
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
             )
+        }
+    }
+}
+
+/**
+ * 右滑露出删除按钮：整行右移后，在原来封面的位置滑入一个与封面等大的红色圆形按钮
+ * （44dp，白色垃圾桶图标）；时长等尾部内容随行移出裁切区。左滑/返回/点其他位置回弹归位。
+ */
+@Composable
+private fun LibrarySwipeToDeleteRow(
+    isExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onDeleteClick: () -> Unit,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val density = LocalDensity.current
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    // 右移量让封面左缘落在 74dp（18dp 页边距 + 44dp 封面 + 12dp 间距），
+    // 与下一行歌词首个字的起始位置对齐。
+    val revealPx = with(density) { 56.dp.toPx() }
+    var offsetPx by remember { mutableFloatStateOf(0f) }
+    var settleJob by remember { mutableStateOf<Job?>(null) }
+    var crossedThreshold by remember { mutableStateOf(false) }
+    val deleteLabel = stringResource(R.string.download_delete)
+
+    fun animateTo(target: Float) {
+        settleJob?.cancel()
+        settleJob = scope.launch {
+            animate(
+                initialValue = offsetPx,
+                targetValue = target,
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = 260f)
+            ) { value, _ -> offsetPx = value }
+        }
+    }
+
+    LaunchedEffect(isExpanded) {
+        animateTo(if (isExpanded) revealPx else 0f)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(66.dp)
+            .clipToBounds()
+    ) {
+        if (offsetPx > 0.5f) {
+            val progress = (offsetPx / revealPx).coerceIn(0f, 1f)
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 18.dp)
+                        .size(44.dp)
+                        .graphicsLayer {
+                            alpha = progress
+                            val buttonScale = 0.72f + 0.28f * progress
+                            scaleX = buttonScale
+                            scaleY = buttonScale
+                        }
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.error)
+                        .clickable(onClick = {
+                            onExpandedChange(false)
+                            onDeleteClick()
+                        })
+                        .semantics { contentDescription = deleteLabel },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.White
+                    )
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .offset { IntOffset(offsetPx.roundToInt(), 0) }
+                .pointerInput(revealPx) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            settleJob?.cancel()
+                            crossedThreshold = false
+                        },
+                        onHorizontalDrag = { change, amount ->
+                            change.consume()
+                            val proposed = (offsetPx + amount).coerceAtLeast(0f)
+                            offsetPx = if (proposed <= revealPx) {
+                                proposed
+                            } else {
+                                revealPx + (proposed - revealPx) * 0.18f
+                            }
+                            val crossed = offsetPx >= revealPx * 0.45f
+                            if (crossed != crossedThreshold) {
+                                crossedThreshold = crossed
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        },
+                        onDragCancel = { onExpandedChange(false) },
+                        onDragEnd = {
+                            val expanded = offsetPx >= revealPx * 0.45f
+                            animateTo(if (expanded) revealPx else 0f)
+                            onExpandedChange(expanded)
+                        }
+                    )
+                }
+                .clickable {
+                    if (offsetPx > 1f) {
+                        onExpandedChange(false)
+                        animateTo(0f)
+                    } else {
+                        onClick()
+                    }
+                }
+        ) {
+            content()
         }
     }
 }
@@ -1372,24 +1728,30 @@ private fun LocalPlaylistList(
         }
         if (activeSearchQuery.isBlank()) {
             item(key = "local_playlist_create") {
-            Card(
-                shape = cardShape,
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.Transparent
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                modifier = Modifier
-                    .padding(horizontal = LyraSpacing.SM, vertical = LyraSpacing.XS)
-                    .animateItem()
-                    .clip(cardShape)
-                    .clickable(enabled = !selectionMode) { showDialog = true }
-            ) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.library_create_new)) },
-                    colors = ListItemDefaults.colors(
-                        containerColor = Color.Transparent
+            Column(Modifier.animateItem()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(58.dp)
+                        .clickable(enabled = !selectionMode) { showDialog = true }
+                        .padding(horizontal = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = null,
+                        tint = MeloxSystemColors.HomeAccent,
+                        modifier = Modifier.size(24.dp)
                     )
-                )
+                    Text(
+                        text = stringResource(R.string.library_create_new),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                LibraryInsetDivider(leading = 68.dp)
             }
 
             if (showDialog) {
@@ -1444,7 +1806,7 @@ private fun LocalPlaylistList(
             }
 
             if (showDeleteSelectedConfirm) {
-                AlertDialog(
+                MiuixSettingsDialog(
                     onDismissRequest = { showDeleteSelectedConfirm = false },
                     title = { Text(stringResource(R.string.dialog_confirm_delete)) },
                     text = {
@@ -1457,7 +1819,7 @@ private fun LocalPlaylistList(
                         )
                     },
                     confirmButton = {
-                        HapticTextButton(
+                        MiuixSettingsButton(
                             onClick = {
                                 val idsToDelete = selectedIds.toList()
                                 exitSelection()
@@ -1466,7 +1828,7 @@ private fun LocalPlaylistList(
                         ) { Text(stringResource(R.string.action_delete)) }
                     },
                     dismissButton = {
-                        HapticTextButton(
+                        MiuixSettingsTextButton(
                             onClick = { showDeleteSelectedConfirm = false }
                         ) { Text(stringResource(R.string.action_cancel)) }
                     }
@@ -1488,73 +1850,22 @@ private fun LocalPlaylistList(
         displayedFavoritesPlaylist?.let { system ->
             item(key = "local_playlist_favorites") {
                 val displayName = SystemLocalPlaylists.resolve(system.id, system.name, context)?.currentName ?: system.name
-                Card(
-                    shape = cardShape,
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.Transparent
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    modifier = Modifier
-                        .padding(horizontal = LyraSpacing.SM, vertical = LyraSpacing.XS)
-                        .clip(cardShape)
-                        .combinedClickable(
-                            onClick = {
-                                if (!selectionMode) onClick(system)
-                            }
-                        )
-                ) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                displayName,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        supportingContent = {
-                            Text(
-                                pluralStringResource(R.plurals.library_song_count, system.songs.size, system.songs.size),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        colors = ListItemDefaults.colors(
-                            containerColor = Color.Transparent
+                Column(modifier = Modifier.animateItem()) {
+                    LibraryInlinePlaylistRow(
+                        playlist = system,
+                        title = displayName,
+                        subtitle = pluralStringResource(
+                            R.plurals.library_song_count,
+                            system.songs.size,
+                            system.songs.size
                         ),
-                        leadingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (selectionMode) {
-                                    Spacer(modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-                                val cover = rememberPlaylistDisplayCoverUrl(
-                                    playlist = system,
-                                    resolveLocalFallback = true
-                                )
-                                if (!cover.isNullOrEmpty()) {
-                                    AsyncImage(
-                                        model = fastScrollableImageRequest(
-                                            context = context,
-                                            data = cover,
-                                            sizePx = 160,
-                                            offlineMode = offlineMode
-                                        ),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(56.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(56.dp)
-                                    )
-                                }
-                            }
-                        }
+                        offlineMode = offlineMode,
+                        onClick = if (selectionMode) null else ({ onClick(system) }),
+                        selectionControl = if (selectionMode) {
+                            { Spacer(modifier = Modifier.size(24.dp)) }
+                        } else null
                     )
+                    LibraryInsetDivider(leading = 68.dp)
                 }
             }
         }
@@ -1581,141 +1892,90 @@ private fun LocalPlaylistList(
 
                 if (selectionMode && showMenu) showMenu = false
 
-                Card(
-                    shape = cardShape,
-                    colors = CardDefaults.cardColors(
-                        containerColor = rowContainerColor
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    modifier = Modifier
-                        .padding(horizontal = LyraSpacing.SM, vertical = LyraSpacing.XS)
-                        .animateItem()
-                        .clip(cardShape)
-                        .combinedClickable(
-                            onClick = {
-                                if (selectionMode) {
-                                    toggleSelection(pl.id)
-                                } else {
-                                    onClick(pl)
-                                }
-                            },
-                            onLongClick = {
-                                if (!selectionMode && !isSystemPlaylist) {
-                                    selectionMode = true
-                                    selectedIds = setOf(pl.id)
-                                }
+                Column(modifier = Modifier.animateItem()) {
+                    LibraryInlinePlaylistRow(
+                        playlist = pl,
+                        title = displayName,
+                        subtitle = pluralStringResource(
+                            R.plurals.library_song_count,
+                            pl.songs.size,
+                            pl.songs.size
+                        ),
+                        offlineMode = offlineMode,
+                        containerColor = rowContainerColor,
+                        onClick = {
+                            if (selectionMode) {
+                                if (!isSystemPlaylist) toggleSelection(pl.id)
+                            } else {
+                                onClick(pl)
                             }
-                        )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = LyraSpacing.SM,
-                                vertical = LyraSpacing.SM
-                            ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (selectionMode) {
-                            Checkbox(
-                                checked = isSelected,
-                                onCheckedChange = {
-                                    if (!isSystemPlaylist) toggleSelection(pl.id)
-                                },
-                                enabled = !isSystemPlaylist
-                            )
-                            Spacer(modifier = Modifier.width(LyraSpacing.XS))
-                        }
-                        val cover = rememberPlaylistDisplayCoverUrl(
-                            playlist = pl,
-                            resolveLocalFallback = true
-                        )
-                        if (!cover.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = fastScrollableImageRequest(
-                                    context = context,
-                                    data = cover,
-                                    sizePx = 160,
-                                    offlineMode = offlineMode
-                                ),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(LyraRadius.Medium))
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                                contentDescription = null,
-                                tint = LocalNeriColors.current.tertiaryText,
-                                modifier = Modifier.size(56.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(LyraSpacing.MD))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = displayName,
-                                style = LocalNeriTextStyles.current.body,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = pluralStringResource(
-                                    R.plurals.library_song_count,
-                                    pl.songs.size,
-                                    pl.songs.size
-                                ),
-                                style = LocalNeriTextStyles.current.captionSecondary,
-                                color = LocalNeriColors.current.secondaryText
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(LyraSpacing.SM))
-                        if (selectionMode && !isSystemPlaylist) {
-                            Box(
-                                modifier = Modifier
-                                    .detectReorder(reorderState)
-                                    .padding(LyraSpacing.SM)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.DragHandle,
-                                    contentDescription = stringResource(R.string.common_drag_handle),
-                                    modifier = Modifier.size(LyraIconSize.Large)
+                        },
+                        onLongClick = {
+                            if (!selectionMode && !isSystemPlaylist) {
+                                selectionMode = true
+                                selectedIds = setOf(pl.id)
+                            }
+                        },
+                        selectionControl = if (selectionMode) {
+                            {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = {
+                                        if (!isSystemPlaylist) toggleSelection(pl.id)
+                                    },
+                                    enabled = !isSystemPlaylist
                                 )
                             }
-                        } else if (!selectionMode && !isSystemPlaylist) {
-                            Box {
-                                HapticIconButton(onClick = { showMenu = true }) {
+                        } else null,
+                        trailing = {
+                            if (selectionMode && !isSystemPlaylist) {
+                                Box(
+                                    modifier = Modifier
+                                        .detectReorder(reorderState)
+                                        .padding(4.dp)
+                                ) {
                                     Icon(
-                                        imageVector = Icons.Filled.MoreVert,
-                                        contentDescription = stringResource(R.string.common_more_options),
-                                        tint = LocalNeriColors.current.secondaryText,
+                                        imageVector = Icons.Filled.DragHandle,
+                                        contentDescription = stringResource(R.string.common_drag_handle),
+                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f),
                                         modifier = Modifier.size(LyraIconSize.Large)
                                     )
                                 }
-                                DropdownMenu(
-                                    expanded = showMenu,
-                                    onDismissRequest = { showMenu = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.action_rename)) },
-                                        onClick = {
-                                            showMenu = false
-                                            renameText = pl.name.take(maxNameLength)
-                                            showRenameDialog = true
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.action_delete)) },
-                                        onClick = {
-                                            showMenu = false
-                                            showDeleteDialog = true
-                                        }
-                                    )
+                            } else if (!selectionMode && !isSystemPlaylist) {
+                                Box {
+                                    HapticIconButton(onClick = { showMenu = true }) {
+                                        Icon(
+                                            imageVector = Icons.Filled.MoreVert,
+                                            contentDescription = stringResource(R.string.common_more_options),
+                                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f),
+                                            modifier = Modifier.size(LyraIconSize.Large)
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = showMenu,
+                                        onDismissRequest = { showMenu = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.action_rename)) },
+                                            onClick = {
+                                                showMenu = false
+                                                renameText = pl.name.take(maxNameLength)
+                                                showRenameDialog = true
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.action_delete)) },
+                                            onClick = {
+                                                showMenu = false
+                                                showDeleteDialog = true
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
+                    )
+                    LibraryInsetDivider(leading = 68.dp)
                 }
 
                 if (showRenameDialog) {
@@ -1753,14 +2013,14 @@ private fun LocalPlaylistList(
                 }
 
                 if (showDeleteDialog) {
-                    AlertDialog(
+                    MiuixSettingsDialog(
                         onDismissRequest = { showDeleteDialog = false },
                         title = { Text(stringResource(R.string.action_delete)) },
                         text = {
                             Text(stringResource(R.string.library_delete_playlist_confirm, displayName))
                         },
                         confirmButton = {
-                            HapticTextButton(
+                            MiuixSettingsButton(
                                 onClick = {
                                     val playlistId = pl.id
                                     showDeleteDialog = false
@@ -1769,7 +2029,7 @@ private fun LocalPlaylistList(
                             ) { Text(stringResource(R.string.action_delete)) }
                         },
                         dismissButton = {
-                            HapticTextButton(
+                            MiuixSettingsTextButton(
                                 onClick = { showDeleteDialog = false }
                             ) { Text(stringResource(R.string.action_cancel)) }
                         }
@@ -1781,73 +2041,22 @@ private fun LocalPlaylistList(
         displayedLocalFilesPlaylist?.let { system ->
             item(key = "local_playlist_local_files") {
                 val displayName = SystemLocalPlaylists.resolve(system.id, system.name, context)?.currentName ?: system.name
-                Card(
-                    shape = cardShape,
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.Transparent
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    modifier = Modifier
-                        .padding(horizontal = LyraSpacing.SM, vertical = LyraSpacing.XS)
-                        .clip(cardShape)
-                        .combinedClickable(
-                            onClick = {
-                                if (!selectionMode) onClick(system)
-                            }
-                        )
-                ) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                displayName,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        supportingContent = {
-                            Text(
-                                pluralStringResource(R.plurals.library_song_count, system.songs.size, system.songs.size),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        colors = ListItemDefaults.colors(
-                            containerColor = Color.Transparent
+                Column(modifier = Modifier.animateItem()) {
+                    LibraryInlinePlaylistRow(
+                        playlist = system,
+                        title = displayName,
+                        subtitle = pluralStringResource(
+                            R.plurals.library_song_count,
+                            system.songs.size,
+                            system.songs.size
                         ),
-                        leadingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (selectionMode) {
-                                    Spacer(modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-                                val cover = rememberPlaylistDisplayCoverUrl(
-                                    playlist = system,
-                                    resolveLocalFallback = true
-                                )
-                                if (!cover.isNullOrEmpty()) {
-                                    AsyncImage(
-                                        model = fastScrollableImageRequest(
-                                            context = context,
-                                            data = cover,
-                                            sizePx = 160,
-                                            offlineMode = offlineMode
-                                        ),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(56.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(56.dp)
-                                    )
-                                }
-                            }
-                        }
+                        offlineMode = offlineMode,
+                        onClick = if (selectionMode) null else ({ onClick(system) }),
+                        selectionControl = if (selectionMode) {
+                            { Spacer(modifier = Modifier.size(24.dp)) }
+                        } else null
                     )
+                    LibraryInsetDivider(leading = 68.dp)
                 }
             }
         }
@@ -2849,7 +3058,7 @@ private fun FavoritePlaylistList(
     }
 
     if (showDeleteSelectedConfirm) {
-        AlertDialog(
+        MiuixSettingsDialog(
             onDismissRequest = { showDeleteSelectedConfirm = false },
             title = { Text(stringResource(R.string.dialog_confirm_delete)) },
             text = {
@@ -2862,7 +3071,7 @@ private fun FavoritePlaylistList(
                 )
             },
             confirmButton = {
-                HapticTextButton(
+                MiuixSettingsButton(
                     onClick = {
                         val targets = reorderableFavorites.filter { favoriteKey(it) in selectedKeys }
                         scope.launch {
@@ -2875,7 +3084,7 @@ private fun FavoritePlaylistList(
                 }
             },
             dismissButton = {
-                HapticTextButton(onClick = { showDeleteSelectedConfirm = false }) {
+                MiuixSettingsTextButton(onClick = { showDeleteSelectedConfirm = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             }

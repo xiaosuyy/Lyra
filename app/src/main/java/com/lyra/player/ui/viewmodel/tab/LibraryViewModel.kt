@@ -24,6 +24,7 @@ package com.lyra.player.ui.viewmodel.tab
  */
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -44,6 +45,7 @@ import com.lyra.player.R
 import com.lyra.player.core.api.bili.BiliClient
 import com.lyra.player.core.api.youtube.YouTubeMusicLibraryPlaylist
 import com.lyra.player.core.di.AppContainer
+import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.data.auth.youtube.buildRefreshObserverFingerprint
 import com.lyra.player.data.platform.youtube.YouTubeFeatureGate
 import com.lyra.player.ui.viewmodel.tab.library.LibrarySection
@@ -55,6 +57,7 @@ import com.lyra.player.data.local.playlist.model.LocalPlaylist
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.LocalPlaylistDeleteResult
 import com.lyra.player.data.local.playlist.runLocalPlaylistMutationSafely
+import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.core.logging.LyraLogger
 import org.json.JSONObject
@@ -219,6 +222,31 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun refreshLibrarySource(sourceId: String) {
         viewModelScope.launch {
             LibrarySourceRegistry.providerFor(sourceId)?.refresh()
+        }
+    }
+
+    /**
+     * 曲库下拉刷新：只重扫本地内容（已下载文件），本地歌单与最近播放走数据库流自动更新，
+     * 不触发云端同步，也不会因为网络问题报错。
+     */
+    fun refreshLocalLibrary(context: Context) {
+        GlobalDownloadManager.scanLocalFiles(context.applicationContext, forceRefresh = true)
+    }
+
+    /**
+     * 曲库「歌曲」页滑动删除：先移出「本地文件」歌单（扫描进来的本地条目只存在于歌单里），
+     * 已下载的再删除下载文件；两者都做，避免删了文件后歌单条目残留。
+     */
+    fun deleteLocalSong(song: SongItem) {
+        val app = getApplication<Application>()
+        val downloaded = GlobalDownloadManager.findDownloadedSongCached(song)
+        viewModelScope.launch {
+            localRepo.playlists.value
+                .filter { LocalFilesPlaylist.isSystemPlaylist(it, app) }
+                .forEach { playlist ->
+                    localRepo.removeSongsFromPlaylistByIdentity(playlist.id, listOf(song))
+                }
+            downloaded?.let { GlobalDownloadManager.deleteDownloadedSong(app, it) }
         }
     }
 

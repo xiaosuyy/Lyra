@@ -5,27 +5,27 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import com.lyra.player.ui.component.overlay.DensityScaledAlertDialog as AlertDialog
 import com.lyra.player.ui.component.overlay.DensityScaledModalBottomSheet as ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -40,22 +40,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import com.lyra.player.R
 import com.lyra.player.data.local.playlist.model.LocalPlaylist
 import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
-import com.lyra.player.ui.haptic.HapticTextButton
 import com.lyra.player.ui.haptic.performHapticFeedback
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsButton
+import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsDialog
+import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsTextButton
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsTextField
+import com.lyra.player.ui.util.rememberPlaylistDisplayCoverUrl
+import com.lyra.player.util.media.fastScrollableImageRequest
 import java.util.concurrent.atomic.AtomicBoolean
 
 private class PendingPlaylistExport(
@@ -109,24 +114,17 @@ internal fun PlaylistExportSheet(
 
     ModalBottomSheet(
         onDismissRequest = { dismissAnimated() },
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp,
-        scrimColor = Color.Black.copy(alpha = 0.46f),
-        dragHandle = {
-            BottomSheetDefaults.DragHandle(
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f)
-            )
-        }
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
                 .bottomSheetScrollGuard()
-                .padding(horizontal = 20.dp)
                 .padding(bottom = 16.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge
@@ -167,12 +165,12 @@ internal fun PlaylistExportSheet(
                 }
 
                 HorizontalDivider(
-                    thickness = DividerDefaults.Thickness,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+                    thickness = 0.6.dp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
             LazyColumn(
                 state = playlistListState,
@@ -195,7 +193,7 @@ internal fun PlaylistExportSheet(
     }
 
     pendingExport?.let { export ->
-        AlertDialog(
+        MiuixSettingsDialog(
             onDismissRequest = {
                 clearPendingExport()
             },
@@ -211,7 +209,7 @@ internal fun PlaylistExportSheet(
                 )
             },
             confirmButton = {
-                HapticTextButton(
+                MiuixSettingsButton(
                     onClick = {
                         val action = export.onConfirm
                         clearPendingExport()
@@ -222,7 +220,7 @@ internal fun PlaylistExportSheet(
                 }
             },
             dismissButton = {
-                HapticTextButton(
+                MiuixSettingsTextButton(
                     onClick = {
                         clearPendingExport()
                     }
@@ -240,38 +238,77 @@ private fun PlaylistExportRow(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.62f))
-            .playlistExportRowClick(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = playlist.name,
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = pluralStringResource(
-                R.plurals.explore_song_count,
-                playlist.songs.size,
-                playlist.songs.size
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    val context = LocalContext.current
+    val cover = rememberPlaylistDisplayCoverUrl(
+        playlist = playlist,
+        resolveLocalFallback = true
+    )
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(66.dp)
+                .playlistExportRowClick(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!cover.isNullOrBlank()) {
+                    AsyncImage(
+                        model = fastScrollableImageRequest(
+                            context = context,
+                            data = cover,
+                            sizePx = 160,
+                            offlineMode = false
+                        ),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = playlist.name,
+                    fontSize = 17.sp,
+                    lineHeight = 21.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.explore_song_count,
+                        playlist.songs.size,
+                        playlist.songs.size
+                    ),
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                )
+            }
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 68.dp, end = 18.dp),
+            thickness = 0.6.dp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
         )
     }
 }
