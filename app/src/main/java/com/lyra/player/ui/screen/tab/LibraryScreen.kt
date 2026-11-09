@@ -93,7 +93,6 @@ import com.lyra.player.ui.theme.designsystem.LocalNeriColors
 import com.lyra.player.ui.theme.designsystem.LocalNeriTextStyles
 import com.lyra.player.ui.theme.designsystem.LyraIconSize
 import com.lyra.player.ui.theme.designsystem.LyraRadius
-import com.lyra.player.ui.theme.designsystem.LyraSongRow
 import com.lyra.player.ui.theme.designsystem.LyraSpacing
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -608,39 +607,44 @@ private fun LibrarySongsContent(
     }
     val miniPlayerHeight = LocalMiniPlayerHeight.current
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            top = LyraSpacing.XS,
-            bottom = miniPlayerHeight + LyraSpacing.MD
-        )
-    ) {
-        if (filteredSongs.isEmpty()) {
-            item(key = "library_songs_empty") {
-                LibrarySearchEmptyCard(
-                    titleResId = if (query.isBlank()) {
+    if (filteredSongs.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(
+                    if (query.isBlank()) {
                         R.string.library_songs_empty
                     } else {
                         R.string.library_local_search_empty
-                    },
-                    hintResId = if (query.isBlank()) {
-                        R.string.library_songs_empty_hint
-                    } else {
-                        R.string.library_local_search_empty_hint
-                    },
-                    iconIsArtist = false
-                )
+                    }
+                ),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f),
+                fontSize = 17.sp
+            )
+        }
+        return
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = miniPlayerHeight + LyraSpacing.MD)
+    ) {
+        item(key = "library_songs_play_all") {
+            Column {
+                LibraryPlayAllRow(onClick = { onSongClick(filteredSongs, 0) })
+                LibraryInsetDivider(leading = 68.dp)
             }
-        } else {
-            itemsIndexed(
-                items = filteredSongs,
-                key = { index, song -> "${song.id}-$index" }
-            ) { index, song ->
-                LyraSongRow(
+        }
+        itemsIndexed(
+            items = filteredSongs,
+            key = { index, song -> "${song.id}-$index" }
+        ) { index, song ->
+            Column {
+                LibraryInlineSongRow(
                     song = song,
                     onClick = { onSongClick(filteredSongs, index) }
                 )
+                LibraryInsetDivider(leading = 68.dp)
             }
         }
     }
