@@ -222,6 +222,7 @@ import com.lyra.player.ui.viewmodel.tab.PlaylistSummary
 import com.lyra.player.ui.viewmodel.tab.SearchSource
 import com.lyra.player.ui.viewmodel.tab.ChannelSearchType
 import com.lyra.player.core.source.SourceSearchType
+import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.ui.viewmodel.tab.EXPLORE_SEARCH_TYPE_ORDER
 import com.lyra.player.ui.viewmodel.tab.musicSourceId
 import com.lyra.player.ui.viewmodel.tab.searchTypesFor
@@ -494,6 +495,7 @@ fun ExploreScreen(
     onYouTubeMusicPlaylistClick: (YouTubeMusicPlaylist) -> Unit = {},
     onYouTubeCreatorClick: (YouTubeMusicCreatorSummary) -> Unit = {},
     onNeteaseArtistClick: (NeteaseArtistSummary) -> Unit = {},
+    onTencentArtistClick: (CustomChannelArtist) -> Unit = {},
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
     onSongPlayPreservingQueue: (SongItem) -> Unit = {},
     onSongPlayNext: (SongItem) -> Unit = {},
@@ -1372,9 +1374,14 @@ fun ExploreScreen(
                                                     artist = item.artist,
                                                     offlineMode = offlineMode,
                                                     onClick = {
-                                                        vm.setChannelSearchType(ChannelSearchType.SONG)
-                                                        onSearchQueryChange(item.artist.name)
-                                                        vm.search(item.artist.name)
+                                                        if (item.sourceId == MusicSourceIds.TENCENT) {
+                                                            onTencentArtistClick(item.artist)
+                                                        } else {
+                                                            // 其他渠道没有歌手详情，退化为按歌手名搜歌
+                                                            vm.setChannelSearchType(ChannelSearchType.SONG)
+                                                            onSearchQueryChange(item.artist.name)
+                                                            vm.search(item.artist.name)
+                                                        }
                                                     }
                                                 )
                                             }

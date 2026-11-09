@@ -42,6 +42,8 @@ private const val TENCENT_SEARCH_MIN_RESULTS = 20
 private const val TENCENT_SINGER_SONGS_LIMIT = 30
 /** 补足搜索结果时参考的榜单 */
 private val TENCENT_MATCH_TOP_IDS = listOf(26, 27, 4, 62)
+private const val TENCENT_ARTIST_SONG_PAGE_SIZE = 50
+private const val TENCENT_ARTIST_ALBUM_PAGE_SIZE = 30
 
 /** 详情接口逐首补齐，用信号量限制并发，避免一次打太多请求 */
 private val detailSemaphore = Semaphore(DETAIL_PARALLELISM)
@@ -68,6 +70,34 @@ data class CustomChannelArtist(
     val id: String,
     val name: String,
     val coverUrl: String? = null
+)
+
+/** 渠道歌手详情（目前仅 QQ 音乐提供）。 */
+internal data class CustomChannelArtistDetail(
+    val id: String,
+    val name: String,
+    val avatarUrl: String?,
+    val brief: String,
+    val fanCount: Int,
+    val songCount: Int,
+    val albumCount: Int,
+    val songs: List<CustomChannelSong>,
+    val albums: List<CustomChannelArtistAlbum>
+)
+
+/** 渠道歌手专辑条目。 */
+internal data class CustomChannelArtistAlbum(
+    val mid: String,
+    val name: String,
+    val coverUrl: String?,
+    val songCount: Int,
+    val publishDate: String?
+)
+
+/** 歌手详情分页结果。 */
+internal data class CustomChannelArtistPage<T>(
+    val items: List<T>,
+    val hasMore: Boolean
 )
 
 /** 渠道歌单搜索结果 */
@@ -438,43 +468,6 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
         return result.distinctBy { it.platformId }
     }
 
-    private fun tencentSongFromJson(obj: JSONObject): CustomChannelSong? {
-        val songMid = obj.optString("mid").takeIf { it.isNotBlank() }
-            ?: obj.optString("songmid").takeIf { it.isNotBlank() }
-            ?: return null
-        val name = obj.optString("name").takeIf { it.isNotBlank() }
-            ?: obj.optString("songname").takeIf { it.isNotBlank() }
-            ?: return null
-        val album = obj.optJSONObject("album")
-        val singers = obj.optJSONArray("singer")
-            ?.let { array ->
-                (0 until array.length()).mapNotNull { singerIndex ->
-                    array.optJSONObject(singerIndex)
-                        ?.optString("name")
-                        ?.takeIf { it.isNotBlank() }
-                }
-            }
-            .orEmpty()
-            .joinToString(" / ")
-        val albumMid = album?.optString("mid")?.takeIf { it.isNotBlank() }
-            ?: obj.optString("albummid").takeIf { it.isNotBlank() }
-        val albumIdValue = album?.optLong("id", 0L) ?: 0L
-        return CustomChannelSong(
-            platformId = songMid,
-            name = name,
-            artist = singers,
-            album = album?.optString("name")?.takeIf { it.isNotBlank() }
-                ?: obj.optString("albumname"),
-            durationMs = (obj.optLong("interval", 0L) * 1000L).coerceAtLeast(0L),
-            coverUrl = albumMid?.let { tencentAlbumCover(it) },
-            albumId = albumIdValue.takeIf { it > 0L }
-                ?: obj.optString("albumid").toLongOrNull()
-                ?: 0L,
-            albumAudioId = obj.optString("songid").takeIf { it.isNotBlank() }
-                ?: obj.optString("id").takeIf { it.isNotBlank() }
-        )
-    }
-
     /**
      * 音源脚本（K×H 等）内置的 QQ 接口：按“歌名+歌手”关键词返回一首歌的
      * 直链、封面和详情页地址，这里只取歌曲信息，播放仍然交给自定义源脚本。
@@ -556,7 +549,7 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
                     artist = detail?.singer?.takeIf { it.isNotBlank() } ?: suggestion.singer,
                     album = detail?.albumName.orEmpty(),
                     durationMs = detail?.durationMs ?: 0L,
-                    coverUrl = detail?.albumMid?.let { tencentAlbumCover(it) },
+                    coverUrl = detail?.albumMid?.let { tencentAlbumCoverUrl(it) },
                     albumId = detail?.albumId ?: 0L,
                     albumAudioId = suggestion.songId
                 )
@@ -656,7 +649,7 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
                                 ?.takeIf { it.isNotBlank() }
                                 ?: item.optString("albumname"),
                             durationMs = (intervalSeconds * 1000L).coerceAtLeast(0L),
-                            coverUrl = albumMid?.let { tencentAlbumCover(it) },
+                            coverUrl = albumMid?.let { tencentAlbumCoverUrl(it) },
                             albumId = album?.optLong("id", 0L)?.takeIf { it > 0L }
                                 ?: item.optString("albumid").toLongOrNull()
                                 ?: 0L,
@@ -772,6 +765,132 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
                 coverUrl = singer.picUrl
             )
         }
+    }
+
+    /** QQ 歌手详情：表头信息 + 首批歌曲 / 专辑（并发请求）。 */
+    suspend fun fetchTencentArtist(singerMid: String): CustomChannelArtistDetail {
+        val mid = singerMid.trim()
+        require(mid.isNotBlank()) { "singerMid is blank" }
+        return coroutineScope {
+            val songsDeferred = async(Dispatchers.IO) {
+                tencentArtistSongs(mid, offset = 0, limit = TENCENT_ARTIST_SONG_PAGE_SIZE)
+            }
+            val albumsDeferred = async(Dispatchers.IO) {
+                tencentArtistAlbums(mid, offset = 0, limit = TENCENT_ARTIST_ALBUM_PAGE_SIZE)
+            }
+            val songsPage = songsDeferred.await()
+            val albumsPage = albumsDeferred.await()
+            CustomChannelArtistDetail(
+                id = mid,
+                name = songsPage?.name.orEmpty(),
+                avatarUrl = tencentArtistAvatarUrl(mid),
+                brief = songsPage?.brief.orEmpty(),
+                fanCount = songsPage?.fans ?: 0,
+                songCount = songsPage?.total ?: 0,
+                albumCount = albumsPage?.total ?: 0,
+                songs = songsPage?.items.orEmpty(),
+                albums = albumsPage?.items.orEmpty()
+            )
+        }
+    }
+
+    /** QQ 歌手热门歌曲分页。 */
+    suspend fun fetchTencentArtistSongs(
+        singerMid: String,
+        offset: Int,
+        limit: Int
+    ): CustomChannelArtistPage<CustomChannelSong> {
+        val page = tencentArtistSongs(singerMid.trim(), offset, limit)
+            ?: return CustomChannelArtistPage(emptyList(), false)
+        return CustomChannelArtistPage(page.items, page.hasMore)
+    }
+
+    /** QQ 歌手专辑分页。 */
+    suspend fun fetchTencentArtistAlbums(
+        singerMid: String,
+        offset: Int,
+        limit: Int
+    ): CustomChannelArtistPage<CustomChannelArtistAlbum> {
+        val page = tencentArtistAlbums(singerMid.trim(), offset, limit)
+            ?: return CustomChannelArtistPage(emptyList(), false)
+        return CustomChannelArtistPage(page.items, page.hasMore)
+    }
+
+    /** QQ 专辑内歌曲。 */
+    suspend fun fetchTencentAlbumSongs(albumMid: String): List<CustomChannelSong> {
+        val mid = albumMid.trim()
+        if (mid.isBlank()) return emptyList()
+        val url = "https://c.y.qq.com/v8/fcg-bin/fcg_v8_album_info_cp.fcg?albummid=" + encode(mid) +
+            "&format=json&outCharset=utf-8&platform=yqq.json&needNewCode=0"
+        val raw = get(
+            url,
+            referer = "https://y.qq.com/",
+            userAgent = CustomChannelSearchConfig.DESKTOP_USER_AGENT
+        ) ?: return emptyList()
+        return runCatching {
+            parseTencentAlbumSongs(raw, mid)
+        }.onFailure {
+            LyraLogger.w(TAG, "QQ 专辑歌曲解析失败: ${it.message}")
+        }.getOrDefault(emptyList())
+    }
+
+    private suspend fun tencentArtistSongs(
+        singerMid: String,
+        offset: Int,
+        limit: Int
+    ): TencentArtistSongsPage? {
+        if (singerMid.isBlank()) return null
+        val payload = JSONObject()
+            .put("comm", JSONObject().put("ct", "24").put("cv", "0"))
+            .put(
+                "req",
+                JSONObject()
+                    .put("module", "music.web_singer_info_svr")
+                    .put("method", "get_singer_detail_info")
+                    .put(
+                        "param",
+                        JSONObject()
+                            .put("sort", 5)
+                            .put("singermid", singerMid)
+                            .put("sin", offset)
+                            .put("num", limit)
+                    )
+            )
+            .toString()
+        val url = "https://u.y.qq.com/cgi-bin/musicu.fcg?format=json&data=" + encode(payload)
+        val raw = get(
+            url,
+            referer = "https://y.qq.com/",
+            userAgent = CustomChannelSearchConfig.DESKTOP_USER_AGENT
+        ) ?: return null
+        return runCatching {
+            parseTencentArtistSongs(raw, offset)
+        }.onFailure {
+            LyraLogger.w(TAG, "QQ 歌手详情解析失败: ${it.message}")
+        }.getOrNull()
+    }
+
+    private suspend fun tencentArtistAlbums(
+        singerMid: String,
+        offset: Int,
+        limit: Int
+    ): TencentArtistAlbumsPage? {
+        if (singerMid.isBlank()) return null
+        val url = "https://c.y.qq.com/v8/fcg-bin/fcg_v8_singer_album.fcg?ct=24&qqmusic_ver=1298" +
+            "&new_json=1&remoteplace=txt.yqq.center&searchid=0&t=0&aggr=1&cr=1&catZhida=1&g_tk=5381" +
+            "&loginUin=0&hostUin=0&format=json&inCharset=utf8&outCharset=utf-8&notice=0" +
+            "&platform=yqq.json&needNewCode=0&singermid=" + encode(singerMid) +
+            "&begin=$offset&num=$limit&order=time&songstatus=1"
+        val raw = get(
+            url,
+            referer = "https://y.qq.com/",
+            userAgent = CustomChannelSearchConfig.DESKTOP_USER_AGENT
+        ) ?: return null
+        return runCatching {
+            parseTencentArtistAlbums(raw, offset)
+        }.onFailure {
+            LyraLogger.w(TAG, "QQ 歌手专辑解析失败: ${it.message}")
+        }.getOrNull()
     }
 
     // ==================== 歌单 ====================
@@ -967,9 +1086,6 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
             "&searchSwitch=" + encode(switch)
     }
 
-    private fun tencentAlbumCover(albumMid: String): String =
-        "https://y.gtimg.cn/music/photo_new/T002R300x300M000$albumMid.jpg"
-
     private data class TencentSuggestion(
         val songMid: String,
         val songId: String?,
@@ -1031,3 +1147,154 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
         }
     }
 }
+
+// ==================== QQ 歌手详情解析 ====================
+
+internal data class TencentArtistSongsPage(
+    val name: String,
+    val fans: Int,
+    val brief: String,
+    val total: Int,
+    val items: List<CustomChannelSong>,
+    val hasMore: Boolean
+)
+
+internal data class TencentArtistAlbumsPage(
+    val total: Int,
+    val items: List<CustomChannelArtistAlbum>,
+    val hasMore: Boolean
+)
+
+internal fun parseTencentArtistSongs(raw: String, offset: Int = 0): TencentArtistSongsPage? {
+    val data = JSONObject(raw).optJSONObject("req")?.optJSONObject("data") ?: return null
+    val info = data.optJSONObject("singer_info")
+    val list = data.optJSONArray("songlist") ?: JSONArray()
+    val songs = buildList(list.length()) {
+        for (index in 0 until list.length()) {
+            list.optJSONObject(index)?.let(::tencentSongFromJson)?.let(::add)
+        }
+    }
+    val total = data.optInt("total_song", 0).coerceAtLeast(offset + songs.size)
+    return TencentArtistSongsPage(
+        name = info?.optString("name").orEmpty().trim(),
+        fans = info?.optInt("fans", 0) ?: 0,
+        brief = data.optString("singer_brief").trim(),
+        total = total,
+        items = songs,
+        hasMore = offset + songs.size < total
+    )
+}
+
+internal fun parseTencentArtistAlbums(raw: String, offset: Int = 0): TencentArtistAlbumsPage? {
+    val data = JSONObject(raw).optJSONObject("data") ?: return null
+    val list = data.optJSONArray("list") ?: JSONArray()
+    val albums = buildList(list.length()) {
+        for (index in 0 until list.length()) {
+            val item = list.optJSONObject(index) ?: continue
+            val mid = item.optString("albumMID").trim().takeIf { it.isNotBlank() } ?: continue
+            val name = item.optString("albumName").trim().takeIf { it.isNotBlank() } ?: continue
+            add(
+                CustomChannelArtistAlbum(
+                    mid = mid,
+                    name = name,
+                    coverUrl = tencentAlbumCoverUrl(mid),
+                    songCount = item.optJSONObject("latest_song")?.optInt("song_count", 0) ?: 0,
+                    publishDate = item.optString("pubTime").trim().takeIf { it.isNotBlank() }
+                )
+            )
+        }
+    }
+    val total = data.optInt("total", 0).coerceAtLeast(offset + albums.size)
+    return TencentArtistAlbumsPage(
+        total = total,
+        items = albums,
+        hasMore = offset + albums.size < total
+    )
+}
+
+internal fun parseTencentAlbumSongs(raw: String, fallbackAlbumMid: String): List<CustomChannelSong> {
+    val data = JSONObject(raw).optJSONObject("data") ?: return emptyList()
+    val albumName = data.optString("name").trim()
+    val albumMid = data.optString("mid").trim().ifBlank { fallbackAlbumMid }
+    val list = data.optJSONArray("list") ?: JSONArray()
+    return buildList(list.length()) {
+        for (index in 0 until list.length()) {
+            list.optJSONObject(index)
+                ?.let { tencentAlbumSongFromJson(it, albumMid, albumName) }
+                ?.let(::add)
+        }
+    }
+}
+
+internal fun tencentSongFromJson(obj: JSONObject): CustomChannelSong? {
+    val songMid = obj.optString("mid").takeIf { it.isNotBlank() }
+        ?: obj.optString("songmid").takeIf { it.isNotBlank() }
+        ?: return null
+    val name = obj.optString("name").takeIf { it.isNotBlank() }
+        ?: obj.optString("songname").takeIf { it.isNotBlank() }
+        ?: return null
+    val album = obj.optJSONObject("album")
+    val singers = obj.optJSONArray("singer")
+        ?.let { array ->
+            (0 until array.length()).mapNotNull { singerIndex ->
+                array.optJSONObject(singerIndex)
+                    ?.optString("name")
+                    ?.takeIf { it.isNotBlank() }
+            }
+        }
+        .orEmpty()
+        .joinToString(" / ")
+    val albumMid = album?.optString("mid")?.takeIf { it.isNotBlank() }
+        ?: obj.optString("albummid").takeIf { it.isNotBlank() }
+    val albumIdValue = album?.optLong("id", 0L) ?: 0L
+    return CustomChannelSong(
+        platformId = songMid,
+        name = name,
+        artist = singers,
+        album = album?.optString("name")?.takeIf { it.isNotBlank() }
+            ?: obj.optString("albumname"),
+        durationMs = (obj.optLong("interval", 0L) * 1000L).coerceAtLeast(0L),
+        coverUrl = albumMid?.let { tencentAlbumCoverUrl(it) },
+        albumId = albumIdValue.takeIf { it > 0L }
+            ?: obj.optString("albumid").toLongOrNull()
+            ?: 0L,
+        albumAudioId = obj.optString("songid").takeIf { it.isNotBlank() }
+            ?: obj.optString("id").takeIf { it.isNotBlank() }
+    )
+}
+
+private fun tencentAlbumSongFromJson(
+    obj: JSONObject,
+    fallbackAlbumMid: String,
+    fallbackAlbumName: String
+): CustomChannelSong? {
+    val songMid = obj.optString("songmid").takeIf { it.isNotBlank() } ?: return null
+    val name = obj.optString("songname").takeIf { it.isNotBlank() } ?: return null
+    val albumMid = obj.optString("albummid").takeIf { it.isNotBlank() } ?: fallbackAlbumMid
+    val singers = obj.optJSONArray("singer")
+        ?.let { array ->
+            (0 until array.length()).mapNotNull { singerIndex ->
+                array.optJSONObject(singerIndex)
+                    ?.optString("name")
+                    ?.takeIf { it.isNotBlank() }
+            }
+        }
+        .orEmpty()
+        .joinToString(" / ")
+    return CustomChannelSong(
+        platformId = songMid,
+        name = name,
+        artist = singers,
+        album = obj.optString("albumname").takeIf { it.isNotBlank() } ?: fallbackAlbumName,
+        durationMs = (obj.optLong("interval", 0L) * 1000L).coerceAtLeast(0L),
+        coverUrl = tencentAlbumCoverUrl(albumMid),
+        albumId = obj.optLong("albumid", 0L),
+        albumAudioId = obj.optString("songid").takeIf { it.isNotBlank() }
+    )
+}
+
+internal fun tencentAlbumCoverUrl(albumMid: String): String =
+    "https://y.gtimg.cn/music/photo_new/T002R300x300M000$albumMid.jpg"
+
+internal fun tencentArtistAvatarUrl(singerMid: String): String =
+    "https://y.gtimg.cn/music/photo_new/T001R500x500M000$singerMid.jpg"

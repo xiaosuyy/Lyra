@@ -634,7 +634,7 @@ private fun ArtistHero(
 }
 
 @Composable
-private fun ArtistTabChips(
+internal fun ArtistTabChips(
     selectedTab: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier

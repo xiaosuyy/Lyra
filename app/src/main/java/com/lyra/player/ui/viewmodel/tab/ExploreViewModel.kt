@@ -292,8 +292,11 @@ sealed class ExploreSearchResult {
     }
 
     /** 渠道（QQ / 酷狗 / 咪咕）歌手结果 */
-    data class ChannelArtist(val artist: CustomChannelArtist) : ExploreSearchResult() {
-        override val stableKey: String = "channel|artist|${artist.name}"
+    data class ChannelArtist(
+        val artist: CustomChannelArtist,
+        val sourceId: String
+    ) : ExploreSearchResult() {
+        override val stableKey: String = "channel|artist|$sourceId|${artist.id}|${artist.name}"
     }
 
     /** 渠道（QQ / 酷狗 / 咪咕）歌单结果 */

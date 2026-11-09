@@ -77,7 +77,7 @@ internal class CustomChannelSearchProvider private constructor(
                         else -> emptyList()
                     }
                 }
-                SourceSearchPage(items = artists.map { ExploreSearchResult.ChannelArtist(it) })
+                SourceSearchPage(items = artists.map { ExploreSearchResult.ChannelArtist(it, sourceId) })
             }
 
             SourceSearchType.PLAYLIST -> {

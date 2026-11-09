@@ -87,6 +87,7 @@
     <string name="artist_songs_empty">No songs</string>
     <string name="artist_songs_search_empty">No matching songs</string>
     <string name="artist_search_hint">Search songs by this artist</string>
+    <string name="artist_fans">%1$s fans</string>
     <string name="artist_albums_empty">No albums</string>
     <string name="artist_load_more">Load More</string>
     <string name="bili_uploader_detail">Uploader profile</string>

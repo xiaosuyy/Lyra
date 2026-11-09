@@ -59,6 +59,7 @@ import com.lyra.player.core.api.bili.BiliClient
 import com.lyra.player.core.api.bili.buildBiliSongAlbum
 import com.lyra.player.core.api.youtube.YouTubeMusicCreatorSection
 import com.lyra.player.core.api.youtube.YouTubeMusicCreatorSummary
+import com.lyra.player.core.api.search.CustomChannelArtist
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.data.model.NeteaseArtistSummary
 import com.lyra.player.data.model.SongItem
@@ -70,6 +71,7 @@ import com.lyra.player.ui.effect.glass.advancedGlassHostNavigationTransition
 import com.lyra.player.ui.effect.glass.animateAdvancedGlassSceneMotion
 import com.lyra.player.ui.rememberMainTabSceneRestoredEntry
 import com.lyra.player.ui.screen.artist.NeteaseArtistDetailScreen
+import com.lyra.player.ui.screen.artist.TencentArtistDetailScreen
 import com.lyra.player.ui.screen.artist.YouTubeMusicCreatorDetailScreen
 import com.lyra.player.ui.screen.artist.YouTubeMusicCreatorItemsScreen
 import com.lyra.player.ui.screen.playlist.BiliPlaylistDetailScreen
@@ -89,6 +91,7 @@ import com.lyra.player.util.media.CoverArtColorCache
 internal sealed class ExploreSelectedItem {
     data class Netease(val playlist: PlaylistSummary) : ExploreSelectedItem()
     data class NeteaseArtist(val artist: NeteaseArtistSummary) : ExploreSelectedItem()
+    data class TencentArtist(val artist: CustomChannelArtist) : ExploreSelectedItem()
     data class NeteaseArtistAlbum(
         val artist: NeteaseArtistSummary,
         val album: AlbumSummary
@@ -411,6 +414,10 @@ fun ExploreHostScreen(
                                     captureExploreScrollPosition()
                                     openExploreSelectedItem(ExploreSelectedItem.NeteaseArtist(artist))
                                 },
+                                onTencentArtistClick = { artist ->
+                                    captureExploreScrollPosition()
+                                    openExploreSelectedItem(ExploreSelectedItem.TencentArtist(artist))
+                                },
                                 onSongClick = onSongClick,
                                 onSongPlayPreservingQueue = onSongPlayPreservingQueue,
                                 onSongPlayNext = onSongPlayNext,
@@ -448,6 +455,15 @@ fun ExploreHostScreen(
                                             )
                                         )
                                     },
+                                    offlineMode = offlineMode
+                                )
+                            }
+
+                            is ExploreSelectedItem.TencentArtist -> {
+                                TencentArtistDetailScreen(
+                                    artist = current.artist,
+                                    onBack = ::closeSelectedDetail,
+                                    onSongClick = onSongClick,
                                     offlineMode = offlineMode
                                 )
                             }
