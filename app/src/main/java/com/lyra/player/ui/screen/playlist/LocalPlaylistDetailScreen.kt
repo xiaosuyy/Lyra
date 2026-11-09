@@ -85,6 +85,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LibraryMusic
@@ -104,11 +105,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -152,6 +151,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
@@ -203,7 +203,6 @@ import com.lyra.player.ui.component.playlist.showPlaylistDeleteResultGlobally
 import com.lyra.player.ui.component.playlist.showPlaylistSongDeleteResult
 import com.lyra.player.ui.component.local.LocalSongDetailsDialog
 import com.lyra.player.ui.component.local.LocalSongSyncConfirmDialog
-import com.lyra.player.ui.component.download.SongDownloadSubtitle
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.util.rememberPlaylistDisplayCoverUrl
@@ -237,20 +236,13 @@ import org.burnoutcrew.reorderable.reorderable
 import java.io.File
 import kotlin.random.Random
 
-internal enum class LocalFilesSongTab {
-    MANUALLY_ADDED,
-    DOWNLOADED
-}
-
-internal fun localFilesSongsForTab(
-    manuallyAddedSongs: List<SongItem>,
-    downloadedSongs: List<SongItem>,
-    tab: LocalFilesSongTab
+internal fun mergedLocalFilesSongs(
+    playlistSongs: List<SongItem>,
+    downloadedSongs: List<SongItem>
 ): List<SongItem> {
-    return when (tab) {
-        LocalFilesSongTab.MANUALLY_ADDED -> manuallyAddedSongs
-        LocalFilesSongTab.DOWNLOADED -> downloadedSongs
-    }
+    if (downloadedSongs.isEmpty()) return playlistSongs
+    val existingKeys = playlistSongs.mapTo(mutableSetOf()) { it.stableKey() }
+    return playlistSongs + downloadedSongs.filter { existingKeys.add(it.stableKey()) }
 }
 
 private const val BLANK_COVER_MODEL = "about:blank"
@@ -1059,18 +1051,7 @@ fun LocalPlaylistDetailScreen(
 
             val headerKey = LOCAL_PLAYLIST_HEADER_KEY
             val metadataProcessingVisible = visibleMetadataProcessingState.isProcessing
-            var selectedLocalFilesTabIndex by rememberSaveable(playlistId) {
-                mutableIntStateOf(0)
-            }
-            val selectedLocalFilesTab = if (
-                selectedLocalFilesTabIndex == LocalFilesSongTab.DOWNLOADED.ordinal
-            ) {
-                LocalFilesSongTab.DOWNLOADED
-            } else {
-                LocalFilesSongTab.MANUALLY_ADDED
-            }
-            val canReorderCurrentSongs = !isLocalFilesPlaylist ||
-                selectedLocalFilesTab == LocalFilesSongTab.MANUALLY_ADDED
+            val canReorderCurrentSongs = !isLocalFilesPlaylist
             val canReorderCurrentSongsState = rememberUpdatedState(canReorderCurrentSongs)
 
             val reorderState = rememberReorderableLazyListState(
@@ -1133,10 +1114,9 @@ fun LocalPlaylistDetailScreen(
                 }
             }
             val tabSongs = if (isLocalFilesPlaylist) {
-                localFilesSongsForTab(
-                    manuallyAddedSongs = baseQueue,
-                    downloadedSongs = downloadedPlaybackSongs,
-                    tab = selectedLocalFilesTab
+                mergedLocalFilesSongs(
+                    playlistSongs = baseQueue,
+                    downloadedSongs = downloadedPlaybackSongs
                 )
             } else {
                 baseQueue
@@ -1676,10 +1656,7 @@ fun LocalPlaylistDetailScreen(
                                     }
                                 }
                                 
-                                if (
-                                    isLocalFilesPlaylist &&
-                                    selectedLocalFilesTab == LocalFilesSongTab.MANUALLY_ADDED
-                                ) {
+                                if (isLocalFilesPlaylist) {
                                     HapticIconButton(onClick = {
                                         showLocalScanModeDialog = true
                                     }, enabled = !scanPreviewState.isScanning) {
@@ -1939,66 +1916,22 @@ fun LocalPlaylistDetailScreen(
                                         offlineMode = offlineMode,
                                         hasCustomBackground = hasCustomBackground
                                     ) {
-                                        Column {
-                                            if (isLocalFilesPlaylist) {
-                                                PrimaryTabRow(
-                                                    selectedTabIndex = selectedLocalFilesTabIndex,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(horizontal = 16.dp),
-                                                    containerColor = Color.Transparent,
-                                                    contentColor = MaterialTheme.colorScheme.primary
-                                                ) {
-                                                    Tab(
-                                                        selected = selectedLocalFilesTab == LocalFilesSongTab.MANUALLY_ADDED,
-                                                        onClick = {
-                                                            selectedLocalFilesTabIndex =
-                                                                LocalFilesSongTab.MANUALLY_ADDED.ordinal
-                                                            if (selectionMode) exitSelectionMode()
-                                                        },
-                                                        text = {
-                                                            Text(
-                                                                stringResource(R.string.local_files_manual_added)
-                                                            )
-                                                        }
-                                                    )
-                                                    Tab(
-                                                        selected = selectedLocalFilesTab == LocalFilesSongTab.DOWNLOADED,
-                                                        onClick = {
-                                                            selectedLocalFilesTabIndex =
-                                                                LocalFilesSongTab.DOWNLOADED.ordinal
-                                                            if (selectionMode) exitSelectionMode()
-                                                        },
-                                                        text = {
-                                                            Text(
-                                                                stringResource(R.string.local_files_downloaded)
-                                                            )
-                                                        }
-                                                    )
-                                                }
-                                                HorizontalDivider(
-                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(
-                                                        alpha = 0.5f
-                                                    )
-                                                )
+                                        LocalPlaylistPlaybackActions(
+                                            songCount = tabSongs.size,
+                                            shuffleEnabled = shuffleEnabled,
+                                            repeatMode = repeatMode,
+                                            onPlayInOrder = { playPlaylist(shuffle = false) },
+                                            onShufflePlay = { playPlaylist(shuffle = true) },
+                                            onToggleShuffle = {
+                                                PlayerManager.setShuffle(!shuffleEnabled)
+                                            },
+                                            onCycleRepeatMode = {
+                                                PlayerManager.cycleRepeatMode()
+                                            },
+                                            onExportToLocalPlaylist = {
+                                                showExportAllSheet = true
                                             }
-                                            LocalPlaylistPlaybackActions(
-                                                songCount = tabSongs.size,
-                                                shuffleEnabled = shuffleEnabled,
-                                                repeatMode = repeatMode,
-                                                onPlayInOrder = { playPlaylist(shuffle = false) },
-                                                onShufflePlay = { playPlaylist(shuffle = true) },
-                                                onToggleShuffle = {
-                                                    PlayerManager.setShuffle(!shuffleEnabled)
-                                                },
-                                                onCycleRepeatMode = {
-                                                    PlayerManager.cycleRepeatMode()
-                                                },
-                                                onExportToLocalPlaylist = {
-                                                    showExportAllSheet = true
-                                                }
-                                            )
-                                        }
+                                        )
                                     }
                                 }
 
@@ -2021,7 +1954,7 @@ fun LocalPlaylistDetailScreen(
                                     items = displayedSongs,
                                     key = { _, song -> song.stableKey() },
                                     contentType = { _, _ -> "local_playlist_song" }
-                                ) { revIndex, song ->
+                                ) { index, song ->
                                 ReorderableItem(state = reorderState, key = song.stableKey()) { isDragging ->
                                     val rowScale by animateFloatAsState(
                                         targetValue = if (isDragging) 1.02f else 1f,
@@ -2045,6 +1978,7 @@ fun LocalPlaylistDetailScreen(
                                         modifier = Modifier
                                             .graphicsLayer { scaleX = rowScale; scaleY = rowScale }
                                     ) {
+                                        Column {
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -2068,72 +2002,76 @@ fun LocalPlaylistDetailScreen(
                                                         }
                                                     }
                                                 )
-                                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                                .padding(
+                                                    start = 20.dp,
+                                                    top = 11.dp,
+                                                    end = 10.dp,
+                                                    bottom = 11.dp
+                                                ),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                        Row(
-                                            modifier = Modifier.weight(1f),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            // 序号/复选框
-                                            Box(
-                                                Modifier.width(48.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                if (selectionMode) {
-                                                    Checkbox(
-                                                        checked = selectedKeysState.value.contains(song.stableKey()),
-                                                        onCheckedChange = { toggleSelect(song) }
-                                                    )
-                                                } else {
-                                                    Text(
-                                                        text = (revIndex + 1).toString(),
-                                                        style = MaterialTheme.typography.titleSmall,
-                                                        color = playlistModernListTertiaryContentColor(),
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Clip
-                                                    )
-                                                }
-                                            }
+                                        if (selectionMode) {
+                                            Checkbox(
+                                                checked = selectedKeysState.value.contains(song.stableKey()),
+                                                onCheckedChange = { toggleSelect(song) },
+                                                modifier = Modifier.padding(end = 10.dp)
+                                            )
+                                        }
 
-                                            // 封面
-                                            val itemContext = LocalContext.current
-                                            val displayCoverUrl = rememberSongDisplayCoverUrl(song)
-                                            if (!displayCoverUrl.isNullOrBlank()) {
-                                                AsyncImage(
-                                                    model = fastScrollableImageRequest(
-                                                        context = itemContext,
-                                                        data = displayCoverUrl,
-                                                        sizePx = 128,
-                                                        crossfade = false,
-                                                        offlineMode = offlineMode
-                                                    ),
-                                                    contentDescription = null,
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier
-                                                        .size(48.dp)
-                                                        .clip(RoundedCornerShape(10.dp))
-                                                )
-                                            } else {
-                                                Spacer(Modifier.size(48.dp))
-                                            }
-                                            Spacer(Modifier.width(12.dp))
+                                        // 封面
+                                        val itemContext = LocalContext.current
+                                        val displayCoverUrl = rememberSongDisplayCoverUrl(song)
+                                        if (!displayCoverUrl.isNullOrBlank()) {
+                                            AsyncImage(
+                                                model = fastScrollableImageRequest(
+                                                    context = itemContext,
+                                                    data = displayCoverUrl,
+                                                    sizePx = 128,
+                                                    crossfade = false,
+                                                    offlineMode = offlineMode
+                                                ),
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .size(44.dp)
+                                                    .clip(RoundedCornerShape(6.dp))
+                                            )
+                                        } else {
+                                            Spacer(Modifier.size(44.dp))
+                                        }
+                                        Spacer(Modifier.width(12.dp))
 
-                                            // 标题/歌手
-                                            Column(Modifier.weight(1f)) {
-                                                val downloaded = song.stableKey() in downloadedSongKeys
+                                        // 标题/歌手
+                                        Column(Modifier.weight(1f)) {
+                                            val downloaded = song.stableKey() in downloadedSongKeys
+                                            Text(
+                                                text = song.displayName(),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                fontSize = 17.sp,
+                                                lineHeight = 22.sp,
+                                                color = playlistModernListPrimaryContentColor()
+                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    text = song.displayName(),
+                                                    text = song.displayArtist(),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    color = playlistModernListPrimaryContentColor()
+                                                    fontSize = 13.sp,
+                                                    lineHeight = 16.sp,
+                                                    color = playlistModernListSecondaryContentColor(),
+                                                    modifier = Modifier.weight(1f, fill = false)
                                                 )
-                                                SongDownloadSubtitle(
-                                                    text = song.displayArtist(),
-                                                    downloaded = downloaded,
-                                                    color = playlistModernListSecondaryContentColor()
-                                                )
+                                                if (downloaded) {
+                                                    Spacer(Modifier.width(5.dp))
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.DownloadDone,
+                                                        contentDescription = stringResource(R.string.downloaded),
+                                                        modifier = Modifier.size(13.dp),
+                                                        tint = playlistModernListSecondaryContentColor()
+                                                            .copy(alpha = 0.75f)
+                                                    )
+                                                }
                                             }
                                         }
 
@@ -2149,7 +2087,7 @@ fun LocalPlaylistDetailScreen(
                                             ) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                                                 ) {
                                                     if (isPlayingSong) {
                                                         PlayingIndicator(
@@ -2159,8 +2097,10 @@ fun LocalPlaylistDetailScreen(
                                                     } else {
                                                         Text(
                                                             text = formatDuration(song.durationMs),
-                                                            color = playlistModernListSecondaryContentColor(),
-                                                            style = MaterialTheme.typography.bodySmall
+                                                            color = playlistModernListSecondaryContentColor()
+                                                                .copy(alpha = 0.46f),
+                                                            fontSize = 13.sp,
+                                                            maxLines = 1
                                                         )
                                                     }
 
@@ -2168,12 +2108,15 @@ fun LocalPlaylistDetailScreen(
                                                     var showMoreMenu by remember { mutableStateOf(false) }
                                                     Box {
                                                         IconButton(
-                                                            onClick = { showMoreMenu = true }
+                                                            onClick = { showMoreMenu = true },
+                                                            modifier = Modifier.size(30.dp)
                                                         ) {
                                                             Icon(
                                                                 Icons.Filled.MoreVert,
                                                                 contentDescription = stringResource(R.string.cd_more_actions),
+                                                                modifier = Modifier.size(18.dp),
                                                                 tint = playlistModernListSecondaryContentColor()
+                                                                    .copy(alpha = 0.40f)
                                                             )
                                                         }
 
@@ -2311,11 +2254,23 @@ fun LocalPlaylistDetailScreen(
                                         } else {
                                             Spacer(Modifier.size(40.dp))
                                         }
+                                        }
+                                        if (index != displayedSongs.lastIndex) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(
+                                                    start = 66.dp,
+                                                    end = 20.dp
+                                                ),
+                                                thickness = 0.6.dp,
+                                                color = playlistModernListPrimaryContentColor()
+                                                    .copy(alpha = 0.12f)
+                                            )
+                                        }
+                                        }
                                     }
                                 }
                                 }
                             }
-                        }
                         }
                         }
                         // 定位到正在播放
@@ -2385,8 +2340,13 @@ fun LocalPlaylistDetailScreen(
                 // 多选删除确认
                 if (showDeleteMultiConfirm) {
                     val count = selectedKeysState.value.size
-                    val deletesDownloadedSongs = isLocalFilesPlaylist &&
-                        selectedLocalFilesTab == LocalFilesSongTab.DOWNLOADED
+                    val selectedDownloads = if (isLocalFilesPlaylist) {
+                        selectedDownloadedSongsForAction
+                    } else {
+                        emptyList()
+                    }
+                    val deletesDownloadedSongs = selectedDownloads.isNotEmpty() &&
+                        selectedDownloads.size == count
                     AlertDialog(
                         onDismissRequest = { showDeleteMultiConfirm = false },
                         title = {
@@ -2418,11 +2378,42 @@ fun LocalPlaylistDetailScreen(
                         },
                         confirmButton = {
                             HapticTextButton(onClick = {
-                                if (deletesDownloadedSongs) {
-                                    val songsToDelete = selectedDownloadedSongsForAction
-                                    showDeleteMultiConfirm = false
-                                    exitSelectionMode()
-                                    vm.deleteDownloadedSongs(songsToDelete) { result ->
+                                val previousSongs = localSongs.toList()
+                                val selectedKeys = selectedKeysState.value
+                                val downloadsToDelete = selectedDownloads
+                                val songsToRemove = localSongs.filter {
+                                    it.stableKey() in selectedKeys
+                                }
+                                val removeAll = localSongs.isNotEmpty() &&
+                                    songsToRemove.size == localSongs.size
+                                val expectedSongs = if (songsToRemove.isEmpty()) {
+                                    previousSongs
+                                } else {
+                                    val removeIdentities = songsToRemove.map { it.identity() }.toSet()
+                                    localSongs.filterNot { it.identity() in removeIdentities }
+                                }
+
+                                showDeleteMultiConfirm = false
+                                exitSelectionMode()
+
+                                if (songsToRemove.isNotEmpty()) {
+                                    pendingOrderIdentities = expectedSongs.map { it.identity() }
+                                    blockSync = true
+                                    localSongs.clear()
+                                    localSongs.addAll(expectedSongs)
+                                    if (removeAll) {
+                                        vm.clearSongs { result ->
+                                            handleLocalSongDeleteResult(previousSongs, result)
+                                        }
+                                    } else {
+                                        vm.removeSongs(songsToRemove) { result ->
+                                            handleLocalSongDeleteResult(previousSongs, result)
+                                        }
+                                    }
+                                }
+
+                                if (downloadsToDelete.isNotEmpty()) {
+                                    vm.deleteDownloadedSongs(downloadsToDelete) { result ->
                                         scope.launch {
                                             val message = when {
                                                 result.deletedCount > 0 && result.notDeletedCount == 0 -> {
@@ -2447,39 +2438,6 @@ fun LocalPlaylistDetailScreen(
                                             }
                                             snackbarHostState.showNeriSnackbar(message)
                                         }
-                                    }
-                                    return@HapticTextButton
-                                }
-                                val previousSongs = localSongs.toList()
-                                val selectedKeys = selectedKeysState.value
-                                val removeAll = localSongs.isNotEmpty() &&
-                                    selectedKeys.size == localSongs.size &&
-                                    localSongs.all { it.stableKey() in selectedKeys }
-                                var songsToRemove = emptyList<SongItem>()
-                                val expectedSongs = if (removeAll) {
-                                    emptyList()
-                                } else {
-                                    songsToRemove = localSongs.filter {
-                                        it.stableKey() in selectedKeys
-                                    }
-                                    val removeIdentities = songsToRemove.map { it.identity() }.toSet()
-                                    localSongs.filterNot { it.identity() in removeIdentities }
-                                }
-                                pendingOrderIdentities = expectedSongs.map { it.identity() }
-                                blockSync = true
-
-                                localSongs.clear()
-                                localSongs.addAll(expectedSongs)
-                                showDeleteMultiConfirm = false
-                                exitSelectionMode()
-
-                                if (removeAll) {
-                                    vm.clearSongs { result ->
-                                        handleLocalSongDeleteResult(previousSongs, result)
-                                    }
-                                } else {
-                                    vm.removeSongs(songsToRemove) { result ->
-                                        handleLocalSongDeleteResult(previousSongs, result)
                                     }
                                 }
                             }) { Text(stringResource(R.string.local_playlist_delete_count, count)) }

@@ -98,29 +98,35 @@ class LocalPlaylistDetailSelectionPolicyTest {
     }
 
     @Test
-    fun `local files tabs keep manually added and downloaded sources independent`() {
+    fun `local files merge keeps playlist order then appends unmatched downloads`() {
         val manuallyAddedOnly = song(id = 1, name = "manual")
         val manuallyAddedDownloaded = song(id = 2, name = "manual-downloaded")
         val downloadedOnly = song(id = 3, name = "downloaded")
         val manuallyAddedSongs = listOf(manuallyAddedOnly, manuallyAddedDownloaded)
         val downloadedSongs = listOf(manuallyAddedDownloaded, downloadedOnly)
 
-        assertEquals(
-            manuallyAddedSongs,
-            localFilesSongsForTab(
-                manuallyAddedSongs = manuallyAddedSongs,
-                downloadedSongs = downloadedSongs,
-                tab = LocalFilesSongTab.MANUALLY_ADDED
-            )
+        val merged = mergedLocalFilesSongs(
+            playlistSongs = manuallyAddedSongs,
+            downloadedSongs = downloadedSongs
         )
+
         assertEquals(
-            downloadedSongs,
-            localFilesSongsForTab(
-                manuallyAddedSongs = manuallyAddedSongs,
-                downloadedSongs = downloadedSongs,
-                tab = LocalFilesSongTab.DOWNLOADED
-            )
+            listOf(manuallyAddedOnly, manuallyAddedDownloaded, downloadedOnly),
+            merged
         )
+    }
+
+    @Test
+    fun `local files merge ignores duplicate downloads`() {
+        val first = song(id = 1, name = "first")
+        val second = song(id = 2, name = "second")
+
+        val merged = mergedLocalFilesSongs(
+            playlistSongs = listOf(first),
+            downloadedSongs = listOf(first, second, first)
+        )
+
+        assertEquals(listOf(first, second), merged)
     }
 
     private fun song(id: Long, name: String): SongItem {

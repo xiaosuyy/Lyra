@@ -1006,7 +1006,7 @@ internal fun PlaylistModernHeroHeader(
             .height(height)
             .background(visualColors.background)
     ) {
-        val artworkSize = minOf(maxWidth * 0.64f, 280.dp)
+        val artworkSize = minOf(maxWidth * 0.68f, 300.dp)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1030,7 +1030,7 @@ internal fun PlaylistModernHeroHeader(
                     .size(artworkSize)
                     .shadow(
                         elevation = 18.dp,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                         clip = false,
                         ambientColor = Color.Black.copy(alpha = 0.18f),
                         spotColor = Color.Black.copy(alpha = 0.18f)
@@ -1049,7 +1049,7 @@ internal fun PlaylistModernHeroHeader(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(12.dp))
                 )
             }
             Text(
@@ -1065,10 +1065,10 @@ internal fun PlaylistModernHeroHeader(
             )
             Text(
                 text = subtitle,
-                modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp),
-                color = Color.White.copy(alpha = 0.86f),
-                fontSize = 16.sp,
-                lineHeight = 21.sp,
+                modifier = Modifier.padding(top = 7.dp, start = 24.dp, end = 24.dp),
+                color = Color.White.copy(alpha = 0.62f),
+                fontSize = 15.sp,
+                lineHeight = 19.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -1439,7 +1439,7 @@ internal fun PlaylistModernPlaybackActions(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 18.dp, top = 12.dp, end = 18.dp, bottom = 16.dp),
+            .padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -1460,12 +1460,12 @@ internal fun PlaylistModernPlaybackActions(
             )
         }
 
-        Spacer(Modifier.width(18.dp))
+        Spacer(Modifier.width(14.dp))
 
         Row(
             modifier = Modifier
-                .width(148.dp)
-                .height(52.dp)
+                .width(140.dp)
+                .height(50.dp)
                 .clip(CircleShape)
                 .background(playBackground)
                 .clickable(enabled = canUseSongs, onClick = onPlayInOrder),
@@ -1476,9 +1476,9 @@ internal fun PlaylistModernPlaybackActions(
                 Icons.Filled.PlayArrow,
                 contentDescription = playLabel,
                 tint = playForeground,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
             )
-            Spacer(Modifier.width(7.dp))
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = playLabel,
                 color = playForeground,
@@ -1487,7 +1487,7 @@ internal fun PlaylistModernPlaybackActions(
             )
         }
 
-        Spacer(Modifier.width(18.dp))
+        Spacer(Modifier.width(14.dp))
 
         HapticFilledIconButton(
             onClick = onExportToLocalPlaylist,
