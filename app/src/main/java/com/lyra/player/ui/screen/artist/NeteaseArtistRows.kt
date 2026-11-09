@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +33,9 @@ import com.lyra.player.R
 import com.lyra.player.data.local.media.displayAlbum
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
+import com.lyra.player.ui.screen.playlist.playlistModernListErrorContentColor
+import com.lyra.player.ui.screen.playlist.playlistModernListPrimaryContentColor
+import com.lyra.player.ui.screen.playlist.playlistModernListSecondaryContentColor
 import com.lyra.player.ui.util.rememberSongDisplayCoverUrl
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.ui.viewmodel.tab.AlbumSummary
@@ -49,7 +51,7 @@ private fun ArtistInsetDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 68.dp, end = 18.dp),
         thickness = 0.6.dp,
-        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
+        color = playlistModernListPrimaryContentColor().copy(alpha = 0.12f)
     )
 }
 
@@ -92,7 +94,7 @@ internal fun ArtistSongRow(
                 modifier = Modifier
                     .size(ArtistRowCoverSize)
                     .clip(ArtistRowCoverShape)
-                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
+                    .background(playlistModernListPrimaryContentColor().copy(alpha = 0.10f))
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -104,7 +106,7 @@ internal fun ArtistSongRow(
                     lineHeight = 21.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = playlistModernListPrimaryContentColor()
                 )
                 if (subtitle.isNotBlank()) {
                     Text(
@@ -113,7 +115,7 @@ internal fun ArtistSongRow(
                         lineHeight = 16.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                        color = playlistModernListSecondaryContentColor()
                     )
                 }
             }
@@ -121,7 +123,7 @@ internal fun ArtistSongRow(
                 Text(
                     text = formatDuration(song.durationMs),
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                    color = playlistModernListSecondaryContentColor().copy(alpha = 0.8f)
                 )
             }
         }
@@ -157,7 +159,7 @@ internal fun ArtistAlbumRow(
                 modifier = Modifier
                     .size(ArtistRowCoverSize)
                     .clip(ArtistRowCoverShape)
-                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
+                    .background(playlistModernListPrimaryContentColor().copy(alpha = 0.10f))
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -169,7 +171,7 @@ internal fun ArtistAlbumRow(
                     lineHeight = 21.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = playlistModernListPrimaryContentColor()
                 )
                 Text(
                     text = pluralStringResource(R.plurals.count_songs_format, album.size, album.size),
@@ -177,7 +179,7 @@ internal fun ArtistAlbumRow(
                     lineHeight = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+                    color = playlistModernListSecondaryContentColor()
                 )
             }
         }
@@ -194,9 +196,12 @@ internal fun LoadingBlock() {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CircularProgressIndicator()
+        CircularProgressIndicator(color = playlistModernListPrimaryContentColor())
         Spacer(Modifier.width(12.dp))
-        Text(stringResource(R.string.playlist_loading_content))
+        Text(
+            stringResource(R.string.playlist_loading_content),
+            color = playlistModernListPrimaryContentColor()
+        )
     }
 }
 
@@ -208,10 +213,13 @@ internal fun ErrorBlock(error: String, onRetry: () -> Unit) {
             .padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(error, color = MaterialTheme.colorScheme.error)
+        Text(error, color = playlistModernListErrorContentColor())
         Spacer(Modifier.height(8.dp))
         TextButton(onClick = onRetry) {
-            Text(stringResource(R.string.action_retry))
+            Text(
+                stringResource(R.string.action_retry),
+                color = playlistModernListPrimaryContentColor()
+            )
         }
     }
 }
@@ -224,7 +232,7 @@ internal fun EmptyBlock(text: String) {
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, color = playlistModernListSecondaryContentColor())
     }
 }
 
@@ -238,10 +246,17 @@ internal fun LoadMoreButton(loading: Boolean, onClick: () -> Unit) {
     ) {
         TextButton(onClick = onClick, enabled = !loading) {
             if (loading) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = playlistModernListPrimaryContentColor()
+                )
                 Spacer(Modifier.width(8.dp))
             }
-            Text(stringResource(R.string.artist_load_more))
+            Text(
+                stringResource(R.string.artist_load_more),
+                color = playlistModernListPrimaryContentColor()
+            )
         }
     }
 }

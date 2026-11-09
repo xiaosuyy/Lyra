@@ -317,163 +317,176 @@ fun LocalArtistDetailScreen(
         }
     }
 
-    Surface(Modifier.fillMaxSize(), color = androidx.compose.ui.graphics.Color.Transparent) {
-        Scaffold(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-            snackbarHost = {
-                LyraSnackbarHost(
-                    hostState = snackbarHostState,
-                    bottomPadding = LocalMiniPlayerHeight.current
-                )
-            },
-            topBar = {
-                if (!selectionMode) {
-                    TopAppBar(
-                        title = {
-                            Text(
-                                text = title,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        navigationIcon = {
-                            HapticIconButton(onClick = onBack) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.action_back)
+    PlaylistModernVisualColorsProvider(
+        coverUrl = headerCover,
+        offlineMode = offlineMode
+    ) {
+        val playlistChromeColor = rememberPlaylistModernHeroBackgroundColor(
+            coverUrl = headerCover,
+            offlineMode = offlineMode
+        )
+        val topBarContentColor = resolvePlaylistSolidTopBarContentColor(playlistChromeColor)
+        Surface(Modifier.fillMaxSize(), color = playlistChromeColor) {
+            Scaffold(
+                containerColor = playlistChromeColor,
+                snackbarHost = {
+                    LyraSnackbarHost(
+                        hostState = snackbarHostState,
+                        bottomPadding = LocalMiniPlayerHeight.current
+                    )
+                },
+                topBar = {
+                    if (!selectionMode) {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    text = title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            }
-                        },
-                        actions = {
-                            HapticIconButton(
-                                enabled = songs.isNotEmpty(),
-                                onClick = {
-                                    if (showSearch) {
-                                        closeSearch()
-                                    } else {
-                                        showSearch = true
+                            },
+                            navigationIcon = {
+                                HapticIconButton(onClick = onBack) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = stringResource(R.string.action_back)
+                                    )
+                                }
+                            },
+                            actions = {
+                                HapticIconButton(
+                                    enabled = songs.isNotEmpty(),
+                                    onClick = {
+                                        if (showSearch) {
+                                            closeSearch()
+                                        } else {
+                                            showSearch = true
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Search,
+                                        contentDescription = stringResource(R.string.cd_search_songs)
+                                    )
+                                }
+                                if (hasDownloadManagerEntry) {
+                                    HapticIconButton(onClick = { showDownloadManager = true }) {
+                                        Icon(
+                                            Icons.Outlined.Download,
+                                            contentDescription = stringResource(R.string.cd_download_manager),
+                                            tint = topBarContentColor
+                                        )
                                     }
                                 }
-                            ) {
-                                Icon(
-                                    Icons.Filled.Search,
-                                    contentDescription = stringResource(R.string.cd_search_songs)
+                                HapticIconButton(
+                                    enabled = displayedSongs.isNotEmpty(),
+                                    onClick = {
+                                        if (displayedSongs.isNotEmpty()) {
+                                            onSongClick(displayedSongs, 0)
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Outlined.PlaylistPlay,
+                                        contentDescription = stringResource(R.string.cd_play_all)
+                                    )
+                                }
+                            },
+                            windowInsets = WindowInsets.statusBars,
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = playlistChromeColor,
+                                titleContentColor = topBarContentColor,
+                                navigationIconContentColor = topBarContentColor,
+                                actionIconContentColor = topBarContentColor
+                            )
+                        )
+                    } else {
+                        val displayedSongKeys = displayedSongs.map { it.stableKey() }.toSet()
+                        val allSelected = areDisplayedSongKeysSelected(
+                            selectedKeys = selectedKeys,
+                            displayedKeys = displayedSongKeys
+                        )
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    pluralStringResource(
+                                        R.plurals.common_selected_count,
+                                        selectedKeys.size,
+                                        selectedKeys.size
+                                    )
                                 )
-                            }
-                            if (hasDownloadManagerEntry) {
-                                HapticIconButton(onClick = { showDownloadManager = true }) {
+                            },
+                            navigationIcon = {
+                                HapticIconButton(onClick = { exitSelectionMode() }) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = stringResource(R.string.cd_exit_select)
+                                    )
+                                }
+                            },
+                            actions = {
+                                HapticIconButton(
+                                    onClick = {
+                                        selectedKeys = toggleDisplayedSongSelection(
+                                            selectedKeys = selectedKeys,
+                                            displayedKeys = displayedSongKeys
+                                        )
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (allSelected) {
+                                            Icons.Filled.CheckBox
+                                        } else {
+                                            Icons.Filled.CheckBoxOutlineBlank
+                                        },
+                                        contentDescription = if (allSelected) {
+                                            stringResource(R.string.action_deselect_all)
+                                        } else {
+                                            stringResource(R.string.action_select_all)
+                                        }
+                                    )
+                                }
+                                HapticIconButton(
+                                    onClick = {
+                                        if (selectedKeys.isNotEmpty()) {
+                                            showExportSheet = true
+                                        }
+                                    },
+                                    enabled = selectedKeys.isNotEmpty()
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Outlined.PlaylistAdd,
+                                        contentDescription = stringResource(R.string.cd_export_playlist)
+                                    )
+                                }
+                                HapticIconButton(
+                                    onClick = {
+                                        val onlineSongs = selectedSongsForAction.filterNot { it.isLocalSong() }
+                                        if (onlineSongs.isNotEmpty()) {
+                                            showDownloadManager = true
+                                            exitSelectionMode()
+                                            GlobalDownloadManager.startBatchDownload(context, onlineSongs)
+                                        }
+                                    },
+                                    enabled = selectedSongsForAction.isNotEmpty() && hasSelectedOnlineSongs
+                                ) {
                                     Icon(
                                         Icons.Outlined.Download,
-                                        contentDescription = stringResource(R.string.cd_download_manager),
-                                        tint = MaterialTheme.colorScheme.primary
+                                        contentDescription = stringResource(R.string.cd_download_selected)
                                     )
                                 }
-                            }
-                            HapticIconButton(
-                                enabled = displayedSongs.isNotEmpty(),
-                                onClick = {
-                                    if (displayedSongs.isNotEmpty()) {
-                                        onSongClick(displayedSongs, 0)
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Outlined.PlaylistPlay,
-                                    contentDescription = stringResource(R.string.cd_play_all)
-                                )
-                            }
-                        },
-                        windowInsets = WindowInsets.statusBars,
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surface
-                        )
-                    )
-                } else {
-                    val displayedSongKeys = displayedSongs.map { it.stableKey() }.toSet()
-                    val allSelected = areDisplayedSongKeysSelected(
-                        selectedKeys = selectedKeys,
-                        displayedKeys = displayedSongKeys
-                    )
-                    TopAppBar(
-                        title = {
-                            Text(
-                                pluralStringResource(
-                                    R.plurals.common_selected_count,
-                                    selectedKeys.size,
-                                    selectedKeys.size
-                                )
+                            },
+                            windowInsets = WindowInsets.statusBars,
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = playlistChromeColor,
+                                titleContentColor = topBarContentColor,
+                                navigationIconContentColor = topBarContentColor,
+                                actionIconContentColor = topBarContentColor
                             )
-                        },
-                        navigationIcon = {
-                            HapticIconButton(onClick = { exitSelectionMode() }) {
-                                Icon(
-                                    Icons.Filled.Close,
-                                    contentDescription = stringResource(R.string.cd_exit_select)
-                                )
-                            }
-                        },
-                        actions = {
-                            HapticIconButton(
-                                onClick = {
-                                    selectedKeys = toggleDisplayedSongSelection(
-                                        selectedKeys = selectedKeys,
-                                        displayedKeys = displayedSongKeys
-                                    )
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = if (allSelected) {
-                                        Icons.Filled.CheckBox
-                                    } else {
-                                        Icons.Filled.CheckBoxOutlineBlank
-                                    },
-                                    contentDescription = if (allSelected) {
-                                        stringResource(R.string.action_deselect_all)
-                                    } else {
-                                        stringResource(R.string.action_select_all)
-                                    }
-                                )
-                            }
-                            HapticIconButton(
-                                onClick = {
-                                    if (selectedKeys.isNotEmpty()) {
-                                        showExportSheet = true
-                                    }
-                                },
-                                enabled = selectedKeys.isNotEmpty()
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Outlined.PlaylistAdd,
-                                    contentDescription = stringResource(R.string.cd_export_playlist)
-                                )
-                            }
-                            HapticIconButton(
-                                onClick = {
-                                    val onlineSongs = selectedSongsForAction.filterNot { it.isLocalSong() }
-                                    if (onlineSongs.isNotEmpty()) {
-                                        showDownloadManager = true
-                                        exitSelectionMode()
-                                        GlobalDownloadManager.startBatchDownload(context, onlineSongs)
-                                    }
-                                },
-                                enabled = selectedSongsForAction.isNotEmpty() && hasSelectedOnlineSongs
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Download,
-                                    contentDescription = stringResource(R.string.cd_download_selected)
-                                )
-                            }
-                        },
-                        windowInsets = WindowInsets.statusBars,
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surface
                         )
-                    )
+                    }
                 }
-            }
-        ) { padding ->
+            ) { padding ->
             if (songs.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -483,7 +496,7 @@ fun LocalArtistDetailScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.local_artist_detail_empty),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = playlistModernListSecondaryContentColor()
                     )
                 }
                 return@Scaffold
@@ -538,7 +551,7 @@ fun LocalArtistDetailScreen(
                             ) {
                                 Text(
                                     text = stringResource(R.string.search_no_match),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = playlistModernListSecondaryContentColor()
                                 )
                             }
                         }
@@ -654,6 +667,7 @@ fun LocalArtistDetailScreen(
 
         BackHandler(enabled = selectionMode) { exitSelectionMode() }
         BackHandler(enabled = showSearch && !selectionMode) { closeSearch() }
+        }
     }
 }
 
@@ -669,7 +683,7 @@ private fun LocalArtistDetailHeader(
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
+            containerColor = playlistModernListPrimaryContentColor().copy(alpha = 0.10f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
@@ -699,12 +713,12 @@ private fun LocalArtistDetailHeader(
                     modifier = Modifier
                         .size(96.dp)
                         .clip(RoundedCornerShape(18.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .background(playlistModernListPrimaryContentColor().copy(alpha = 0.12f))
                 ) {
                     Icon(
                         imageVector = Icons.Filled.AccountCircle,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = playlistModernListSecondaryContentColor(),
                         modifier = Modifier.size(52.dp)
                     )
                 }
@@ -716,7 +730,8 @@ private fun LocalArtistDetailHeader(
                     text = title,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.headlineSmall
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = playlistModernListPrimaryContentColor()
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -725,7 +740,7 @@ private fun LocalArtistDetailHeader(
                         formatTotalDuration(context, durationMs),
                         songCount
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = playlistModernListSecondaryContentColor(),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -751,7 +766,7 @@ private fun LocalArtistSongRow(
         resolveLocalFallback = false
     )
     val rowContainerColor = if (selected) {
-        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
+        playlistModernListPrimaryContentColor().copy(alpha = 0.10f)
     } else {
         androidx.compose.ui.graphics.Color.Transparent
     }
@@ -808,11 +823,13 @@ private fun LocalArtistSongRow(
                 text = song.displayName(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
+                color = playlistModernListPrimaryContentColor()
             )
             SongDownloadSubtitle(
                 text = song.displayArtist(),
-                downloaded = downloaded
+                downloaded = downloaded,
+                color = playlistModernListSecondaryContentColor()
             )
         }
     }
