@@ -27,6 +27,9 @@ import com.lyra.player.core.player.lyrics.isExternalBluetoothLyricCadenceActive
 import com.lyra.player.core.player.lyrics.updateExternalBluetoothLyricLine
 import com.lyra.player.core.player.model.PlayerEvent
 import com.lyra.player.core.player.model.SongUrlResult
+import com.lyra.player.core.player.model.insertIntoShuffleRestorePlaylist
+import com.lyra.player.core.player.model.removeFromShuffleRestorePlaylist
+import com.lyra.player.core.player.model.replaceInShuffleRestorePlaylist
 import com.lyra.player.core.player.model.resolvePlayerQueueRestoreOrder
 import com.lyra.player.core.player.model.resolvePlayerRepeatAllShuffleOrder
 import com.lyra.player.core.player.model.resolvePlayerSequentialShuffleOrder
@@ -641,6 +644,62 @@ private fun PlayerManager.rememberShuffleRestoreQueueSnapshot() {
 private fun PlayerManager.clearShuffleRestoreQueueSnapshot() {
     shuffleRestorePlaylistReference = null
     shuffleRestoreCurrentIndex = -1
+}
+
+internal fun PlayerManager.syncShuffleRestoreQueueSnapshotAfterAdd(
+    song: SongItem,
+    afterCurrent: Boolean
+) {
+    val restorePlaylist = shuffleRestorePlaylistReference ?: return
+    shuffleRestorePlaylistReference = insertIntoShuffleRestorePlaylist(
+        restorePlaylist = restorePlaylist,
+        song = song,
+        currentSong = _currentSongFlow.value,
+        afterCurrent = afterCurrent
+    )
+    refreshShuffleRestoreCurrentIndex()
+}
+
+internal fun PlayerManager.syncShuffleRestoreQueueSnapshotAfterRemove(song: SongItem) {
+    val restorePlaylist = shuffleRestorePlaylistReference ?: return
+    val updated = removeFromShuffleRestorePlaylist(restorePlaylist, song)
+    if (updated.isEmpty()) {
+        clearShuffleRestoreQueueSnapshot()
+        return
+    }
+    shuffleRestorePlaylistReference = updated
+    refreshShuffleRestoreCurrentIndex()
+}
+
+internal fun PlayerManager.syncShuffleRestoreQueueSnapshotAfterReplace(
+    replacedSong: SongItem?,
+    song: SongItem
+) {
+    val restorePlaylist = shuffleRestorePlaylistReference ?: return
+    shuffleRestorePlaylistReference = replaceInShuffleRestorePlaylist(
+        restorePlaylist = restorePlaylist,
+        replacedSong = replacedSong,
+        song = song
+    )
+    refreshShuffleRestoreCurrentIndex()
+}
+
+internal fun PlayerManager.invalidateShuffleRestoreQueueSnapshot(reason: String) {
+    if (shuffleRestorePlaylistReference == null) return
+    LyraLogger.d(
+        "LYRA-PlayerManager",
+        "invalidateShuffleRestoreQueueSnapshot: reason=$reason, restoreSize=${shuffleRestorePlaylistReference?.size}"
+    )
+    clearShuffleRestoreQueueSnapshot()
+}
+
+private fun PlayerManager.refreshShuffleRestoreCurrentIndex() {
+    val restorePlaylist = shuffleRestorePlaylistReference ?: return
+    val currentSong = _currentSongFlow.value
+    shuffleRestoreCurrentIndex = currentSong
+        ?.let { song -> restorePlaylist.indexOfFirst { it.sameIdentityAs(song) } }
+        ?.takeIf { it >= 0 }
+        ?: shuffleRestoreCurrentIndex.coerceIn(0, restorePlaylist.lastIndex)
 }
 
 private fun PlayerManager.restoreShuffleRestoreQueueSnapshot(): Boolean {

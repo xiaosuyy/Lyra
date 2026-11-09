@@ -2,6 +2,9 @@ package com.lyra.player.core.player.persistence
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.lyra.player.core.player.model.insertIntoShuffleRestorePlaylist
+import com.lyra.player.core.player.model.removeFromShuffleRestorePlaylist
+import com.lyra.player.core.player.model.replaceInShuffleRestorePlaylist
 import com.lyra.player.core.player.model.resolvePlayerQueueDisplayIndices
 import com.lyra.player.core.player.model.resolvePlayerQueueRestoreOrder
 import com.lyra.player.core.player.model.resolvePlayerRepeatAllShuffleOrder
@@ -289,6 +292,145 @@ class PlayerManagerQueueOrderTest {
         )
 
         assertEquals(1, index)
+    }
+
+    @Test
+    fun `shuffle restore inserts a queued-next song after the current song`() {
+        val first = testSong(1L, "First")
+        val second = testSong(2L, "Second")
+        val third = testSong(3L, "Third")
+        val added = testSong(4L, "Added")
+
+        val updated = insertIntoShuffleRestorePlaylist(
+            restorePlaylist = listOf(first, second, third),
+            song = added,
+            currentSong = second,
+            afterCurrent = true
+        )
+
+        assertEquals(listOf(first, second, added, third), updated)
+    }
+
+    @Test
+    fun `shuffle restore appends a queued song at the end`() {
+        val first = testSong(1L, "First")
+        val second = testSong(2L, "Second")
+        val added = testSong(3L, "Added")
+
+        val updated = insertIntoShuffleRestorePlaylist(
+            restorePlaylist = listOf(first, second),
+            song = added,
+            currentSong = first,
+            afterCurrent = false
+        )
+
+        assertEquals(listOf(first, second, added), updated)
+    }
+
+    @Test
+    fun `shuffle restore moves an existing song when it is queued again`() {
+        val first = testSong(1L, "First")
+        val second = testSong(2L, "Second")
+        val third = testSong(3L, "Third")
+
+        val updated = insertIntoShuffleRestorePlaylist(
+            restorePlaylist = listOf(first, second, third),
+            song = first,
+            currentSong = third,
+            afterCurrent = true
+        )
+
+        assertEquals(listOf(second, third, first), updated)
+    }
+
+    @Test
+    fun `shuffle restore appends the song when the current song is missing`() {
+        val first = testSong(1L, "First")
+        val added = testSong(2L, "Added")
+
+        val updated = insertIntoShuffleRestorePlaylist(
+            restorePlaylist = listOf(first),
+            song = added,
+            currentSong = testSong(99L, "Missing"),
+            afterCurrent = true
+        )
+
+        assertEquals(listOf(first, added), updated)
+    }
+
+    @Test
+    fun `shuffle restore removes the dequeued song`() {
+        val first = testSong(1L, "First")
+        val second = testSong(2L, "Second")
+        val third = testSong(3L, "Third")
+
+        val updated = removeFromShuffleRestorePlaylist(
+            restorePlaylist = listOf(first, second, third),
+            song = second
+        )
+
+        assertEquals(listOf(first, third), updated)
+    }
+
+    @Test
+    fun `shuffle restore keeps the order when removing a missing song`() {
+        val first = testSong(1L, "First")
+        val second = testSong(2L, "Second")
+        val restorePlaylist = listOf(first, second)
+
+        val updated = removeFromShuffleRestorePlaylist(
+            restorePlaylist = restorePlaylist,
+            song = testSong(99L, "Missing")
+        )
+
+        assertEquals(restorePlaylist, updated)
+    }
+
+    @Test
+    fun `shuffle restore replaces the current song in place`() {
+        val first = testSong(1L, "First")
+        val second = testSong(2L, "Second")
+        val third = testSong(3L, "Third")
+        val replacement = testSong(4L, "Replacement")
+
+        val updated = replaceInShuffleRestorePlaylist(
+            restorePlaylist = listOf(first, second, third),
+            replacedSong = second,
+            song = replacement
+        )
+
+        assertEquals(listOf(first, replacement, third), updated)
+    }
+
+    @Test
+    fun `shuffle restore keeps the position for an identity-only metadata update`() {
+        val first = testSong(1L, "First")
+        val second = testSong(2L, "Second")
+        val third = testSong(3L, "Third")
+        val renamedSecond = second.copy(name = "Second Renamed")
+
+        val updated = replaceInShuffleRestorePlaylist(
+            restorePlaylist = listOf(first, second, third),
+            replacedSong = second,
+            song = renamedSecond
+        )
+
+        assertEquals(listOf(first, renamedSecond, third), updated)
+    }
+
+    @Test
+    fun `shuffle restore drops the replaced song when the replacement already exists`() {
+        val first = testSong(1L, "First")
+        val second = testSong(2L, "Second")
+        val third = testSong(3L, "Third")
+
+        val updated = replaceInShuffleRestorePlaylist(
+            restorePlaylist = listOf(first, second, third),
+            replacedSong = second,
+            song = third
+        )
+
+        assertEquals(listOf(first, third), updated)
     }
 
     private fun testSong(id: Long, name: String): SongItem {

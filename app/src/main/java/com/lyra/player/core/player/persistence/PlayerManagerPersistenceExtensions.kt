@@ -44,7 +44,11 @@ import com.lyra.player.core.player.model.toPersistedSongItem
 import com.lyra.player.core.player.model.toPlaybackState
 import com.lyra.player.core.player.model.withPlaybackState
 import com.lyra.player.core.player.playback.BiliVideoSkipPlaybackController
+import com.lyra.player.core.player.playback.invalidateShuffleRestoreQueueSnapshot
 import com.lyra.player.core.player.playback.playAtIndex
+import com.lyra.player.core.player.playback.syncShuffleRestoreQueueSnapshotAfterAdd
+import com.lyra.player.core.player.playback.syncShuffleRestoreQueueSnapshotAfterRemove
+import com.lyra.player.core.player.playback.syncShuffleRestoreQueueSnapshotAfterReplace
 import com.lyra.player.core.player.playlist.PlayerFavoritesController
 import com.lyra.player.core.player.policy.command.PlaybackCommandSource
 import com.lyra.player.core.player.source.toSongItem
@@ -1054,6 +1058,7 @@ internal fun PlayerManager.replaceCurrentInQueueAndPlayImpl(
     }
 
     val oldIndex = currentIndex.coerceIn(currentPlaylist.indices)
+    val replacedSong = currentPlaylist.getOrNull(oldIndex)
     val newPlaylist = currentPlaylist.toMutableList()
     val existingIndex = newPlaylist.indexOfFirst { it.sameIdentityAs(song) }
     val targetIndex = if (existingIndex != -1 && existingIndex != oldIndex) {
@@ -1076,6 +1081,10 @@ internal fun PlayerManager.replaceCurrentInQueueAndPlayImpl(
         "replaceCurrentInQueueAndPlay(): song=${song.name}/${song.id}, existingIndex=$existingIndex, targetIndex=$targetIndex, queueSize=${currentPlaylist.size}, source=$commandSource, stack=[${debugStackHint()}]"
     )
     playAtIndex(currentIndex, commandSource = commandSource)
+    syncShuffleRestoreQueueSnapshotAfterReplace(
+        replacedSong = replacedSong,
+        song = song
+    )
     emitPlaybackCommand(
         type = "PLAY_FROM_QUEUE",
         source = commandSource,
@@ -1146,6 +1155,7 @@ internal fun PlayerManager.moveQueueItemImpl(fromIndex: Int, toIndex: Int) {
         "LYRA-PlayerManager",
         "moveQueueItem(): from=$fromIndex, to=$toIndex, queueSize=$queueSize, oldIndex=$oldIndex, currentIndex=$currentIndex, shuffle=${player.shuffleModeEnabled}, stack=[${debugStackHint()}]"
     )
+    invalidateShuffleRestoreQueueSnapshot(reason = "move_queue_item")
     emitQueueUpdateCommand()
 
     ioScope.launch {
@@ -1191,15 +1201,18 @@ internal fun PlayerManager.removeQueueItemImpl(index: Int) {
     if (removingCurrent) {
         if (shouldContinuePlayback && currentIndex in currentPlaylist.indices) {
             playAtIndex(currentIndex, commandSource = PlaybackCommandSource.LOCAL)
+            syncShuffleRestoreQueueSnapshotAfterRemove(removedSong)
             emitQueueUpdateCommand(shouldPlay = true)
         } else {
             stopPlaybackPreservingQueue(clearMediaUrl = true)
+            syncShuffleRestoreQueueSnapshotAfterRemove(removedSong)
             emitQueueUpdateCommand(shouldPlay = false)
         }
         return
     }
 
     setCurrentSongForPlayback(currentPlaylist.getOrNull(currentIndex))
+    syncShuffleRestoreQueueSnapshotAfterRemove(removedSong)
     emitQueueUpdateCommand()
     ioScope.launch {
         persistState()
@@ -1267,7 +1280,7 @@ internal fun PlayerManager.reorderQueueImpl(
         "LYRA-PlayerManager",
         "reorderQueue(): queueSize=${currentPlaylist.size}, oldIndex=$oldIndex, currentIndex=$currentIndex, shuffle=${player.shuffleModeEnabled}, stack=[${debugStackHint()}]"
     )
-
+    invalidateShuffleRestoreQueueSnapshot(reason = "reorder_queue")
     emitPlaybackCommand(
         type = "SET_QUEUE",
         source = commandSource,
@@ -1328,6 +1341,7 @@ internal fun PlayerManager.addToQueueNextImpl(song: SongItem) {
         "LYRA-PlayerManager",
         "addToQueueNext(): song=${song.name}/${song.id}, existingIndex=$existingIndex, insertIndex=$insertIndex, queueSize=${currentPlaylist.size}, currentIndex=$currentIndex, shuffle=${player.shuffleModeEnabled}, stack=[${debugStackHint()}]"
     )
+    syncShuffleRestoreQueueSnapshotAfterAdd(song = song, afterCurrent = true)
     emitQueueUpdateCommand()
 
     ioScope.launch {
@@ -1377,6 +1391,7 @@ internal fun PlayerManager.addToQueueEndImpl(song: SongItem) {
         "LYRA-PlayerManager",
         "addToQueueEnd(): song=${song.name}/${song.id}, existingIndex=$existingIndex, queueSize=${currentPlaylist.size}, currentIndex=$currentIndex, shuffle=${player.shuffleModeEnabled}, stack=[${debugStackHint()}]"
     )
+    syncShuffleRestoreQueueSnapshotAfterAdd(song = song, afterCurrent = false)
     emitQueueUpdateCommand()
 
     ioScope.launch {
@@ -1415,6 +1430,7 @@ internal fun PlayerManager.applyRemoteQueueUpdateImpl(
         _currentQueueFlow.value = currentPlaylist
         currentIndex = currentIndexInQueue.coerceIn(currentPlaylist.indices)
         bumpCurrentQueueDisplayRevision()
+        invalidateShuffleRestoreQueueSnapshot(reason = "remote_queue_update")
     }
 
     ioScope.launch {

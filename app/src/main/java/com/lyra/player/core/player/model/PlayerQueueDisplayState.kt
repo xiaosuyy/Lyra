@@ -110,6 +110,64 @@ internal fun resolvePlayerRepeatAllShuffleOrder(
     )
 }
 
+internal fun insertIntoShuffleRestorePlaylist(
+    restorePlaylist: List<SongItem>,
+    song: SongItem,
+    currentSong: SongItem?,
+    afterCurrent: Boolean
+): List<SongItem> {
+    val updated = restorePlaylist.toMutableList()
+    val existingIndex = updated.indexOfFirst { it.sameIdentityAs(song) }
+    if (existingIndex >= 0) {
+        updated.removeAt(existingIndex)
+    }
+    val insertIndex = if (afterCurrent) {
+        val anchorIndex = currentSong
+            ?.let { current -> updated.indexOfFirst { it.sameIdentityAs(current) } }
+            ?: -1
+        if (anchorIndex >= 0) anchorIndex + 1 else updated.size
+    } else {
+        updated.size
+    }
+    updated.add(insertIndex.coerceIn(0, updated.size), song)
+    return updated
+}
+
+internal fun removeFromShuffleRestorePlaylist(
+    restorePlaylist: List<SongItem>,
+    song: SongItem
+): List<SongItem> {
+    val removedIndex = restorePlaylist.indexOfFirst { it.sameIdentityAs(song) }
+    if (removedIndex < 0) return restorePlaylist
+    return restorePlaylist.toMutableList().apply { removeAt(removedIndex) }
+}
+
+internal fun replaceInShuffleRestorePlaylist(
+    restorePlaylist: List<SongItem>,
+    replacedSong: SongItem?,
+    song: SongItem
+): List<SongItem> {
+    if (replacedSong != null && replacedSong.sameIdentityAs(song)) {
+        val index = restorePlaylist.indexOfFirst { it.sameIdentityAs(song) }
+        if (index < 0) return restorePlaylist
+        return restorePlaylist.toMutableList().apply { set(index, song) }
+    }
+    val updated = restorePlaylist.toMutableList()
+    val existingIndex = updated.indexOfFirst { it.sameIdentityAs(song) }
+    if (existingIndex >= 0) {
+        updated.removeAt(existingIndex)
+    }
+    val replacedIndex = replacedSong
+        ?.let { replaced -> updated.indexOfFirst { it.sameIdentityAs(replaced) } }
+        ?: -1
+    if (replacedIndex >= 0) {
+        updated[replacedIndex] = song
+    } else {
+        updated.add(song)
+    }
+    return updated
+}
+
 internal fun resolvePlayerQueueRestoreOrder(
     restorePlaylist: List<SongItem>?,
     currentSong: SongItem?,
