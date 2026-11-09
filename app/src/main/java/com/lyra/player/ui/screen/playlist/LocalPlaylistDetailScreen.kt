@@ -212,7 +212,6 @@ import com.lyra.player.ui.viewmodel.playlist.LocalPlaylistDetailUiState
 import com.lyra.player.ui.viewmodel.playlist.LocalMetadataProcessingState
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.util.media.fastScrollableImageRequest
-import com.lyra.player.ui.haptic.HapticFloatingActionButton
 import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.ui.haptic.HapticOutlinedButton
 import com.lyra.player.ui.haptic.HapticTextButton
@@ -1215,11 +1214,8 @@ fun LocalPlaylistDetailScreen(
                 onSongClick(tabSongs, startIndex)
             }
 
-            // 当前播放 & FAB
+            // 当前播放
             val currentSong by PlayerManager.currentSongFlow.collectAsState()
-            val currentIndexInSource = remember(tabSongs, currentSong) {
-                tabSongs.indexOfFirst { it.sameIdentityAs(currentSong) }
-            }
             val selectedSongsForAction by remember(tabSongs, selectedKeysState.value) {
                 derivedStateOf {
                     tabSongs.filter { it.stableKey() in selectedKeysState.value }
@@ -1613,20 +1609,9 @@ fun LocalPlaylistDetailScreen(
                 topBar = {
                     if (!selectionMode) {
                         TopAppBar(
-                            title = {
-                                val displayName = when {
-                                    isFavorites -> stringResource(R.string.favorite_my_music)
-                                    isLocalFilesPlaylist -> stringResource(R.string.local_files)
-                                    else -> playlist.name
-                                }
-                                Text(
-                                    displayName,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
+                            title = {},
                             navigationIcon = {
-                                HapticIconButton(onClick = onBack) {
+                                PlaylistModernTopBarCircleButton(onClick = onBack) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = stringResource(R.string.action_back)
@@ -1634,7 +1619,7 @@ fun LocalPlaylistDetailScreen(
                                 }
                             },
                             actions = {
-                                HapticIconButton(onClick = {
+                                PlaylistModernTopBarCircleButton(onClick = {
                                     val openingSearch = !showSearch
                                     if (!openingSearch) {
                                         searchQuery = ""
@@ -1645,19 +1630,20 @@ fun LocalPlaylistDetailScreen(
                                 }) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search_songs)) }
                                 
                                 if (hasDownloadManagerEntry) {
-                                    HapticIconButton(
+                                    Spacer(Modifier.width(8.dp))
+                                    PlaylistModernTopBarCircleButton(
                                         onClick = { showDownloadManager = true }
                                     ) {
                                         Icon(
                                             Icons.Outlined.Download,
-                                            contentDescription = stringResource(R.string.cd_download_manager),
-                                            tint = playlistTopBarContentColor
+                                            contentDescription = stringResource(R.string.cd_download_manager)
                                         )
                                     }
                                 }
                                 
                                 if (isLocalFilesPlaylist) {
-                                    HapticIconButton(onClick = {
+                                    Spacer(Modifier.width(8.dp))
+                                    PlaylistModernTopBarCircleButton(onClick = {
                                         showLocalScanModeDialog = true
                                     }, enabled = !scanPreviewState.isScanning) {
                                         Icon(
@@ -1667,7 +1653,8 @@ fun LocalPlaylistDetailScreen(
                                     }
                                 }
                                 if (isFavorites) {
-                                    HapticIconButton(
+                                    Spacer(Modifier.width(8.dp))
+                                    PlaylistModernTopBarCircleButton(
                                         onClick = { requestNeteaseSync() },
                                         enabled = !syncInProgress
                                     ) {
@@ -1686,14 +1673,16 @@ fun LocalPlaylistDetailScreen(
                                 }
                                 
                                 if (!isSystemPlaylist) {
-                                    HapticIconButton(onClick = {
+                                    Spacer(Modifier.width(8.dp))
+                                    PlaylistModernTopBarCircleButton(onClick = {
                                         renameText = playlistNameFieldValue(playlist.name, maxNameLength)
                                         renameError = null
                                         showRename = true
                                     }) {
                                         Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.local_playlist_rename))
                                     }
-                                    HapticIconButton(onClick = {
+                                    Spacer(Modifier.width(8.dp))
+                                    PlaylistModernTopBarCircleButton(onClick = {
                                         showDeletePlaylistConfirm = true
                                     }) {
                                         Icon(
@@ -2273,37 +2262,6 @@ fun LocalPlaylistDetailScreen(
                             }
                         }
                         }
-                        // 定位到正在播放
-                        val currentIndexInDisplay = if (currentIndexInSource >= 0) {
-                            displayedSongs.indexOfFirst { it.sameIdentityAs(currentSong) }
-                        } else -1
-
-                        if (currentIndexInDisplay >= 0) {
-                            HapticFloatingActionButton(
-                                onClick = {
-                                    scope.launch {
-                                        reorderState.listState.animateScrollToItem(
-                                            resolveLocalPlaylistPlayingItemIndex(
-                                                songIndex = currentIndexInDisplay,
-                                                metadataProcessingVisible = metadataProcessingVisible
-                                            )
-                                        )
-                                    }
-                                },
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(
-                                        bottom = 16.dp + miniPlayerHeight,
-                                        end = 16.dp
-                                    )
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Outlined.PlaylistPlay,
-                                    contentDescription = stringResource(R.string.cd_locate_playing)
-                                )
-                            }
-                        }
-                        
 
                     }
                 }

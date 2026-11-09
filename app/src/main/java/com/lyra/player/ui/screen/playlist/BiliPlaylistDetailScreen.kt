@@ -111,7 +111,6 @@ import com.lyra.player.ui.viewmodel.playlist.BiliVideoItem
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.ui.haptic.HapticIconButton
-import com.lyra.player.ui.haptic.HapticFloatingActionButton
 import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.util.format.formatDurationSec
 import com.lyra.player.util.media.offlineCachedImageRequest
@@ -446,37 +445,45 @@ fun BiliPlaylistDetailScreen(
             Column {
                 if (!selectionMode) {
                     TopAppBar(
-                        title = {
-                            Text(
-                                text = ui.header?.title ?: playlist.title,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
+                        title = {},
                         navigationIcon = {
-                            HapticIconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                            PlaylistModernTopBarCircleButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.action_back),
+                                    modifier = Modifier.size(19.dp)
+                                )
                             }
                         },
                         actions = {
-                            HapticIconButton(onClick = {
+                            PlaylistModernTopBarCircleButton(onClick = {
                                 showSearch = !showSearch
                                 if (!showSearch) {
                                     searchQuery = ""
                                     focusManager.clearFocus()
                                     keyboardController?.hide()
                                 }
-                            }) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search_video)) }
+                            }) {
+                                Icon(
+                                    Icons.Filled.Search,
+                                    contentDescription = stringResource(R.string.search_video),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
 
-                            HapticIconButton(onClick = { vm.refresh() }) {
+                            Spacer(Modifier.width(8.dp))
+
+                            PlaylistModernTopBarCircleButton(onClick = { vm.refresh() }) {
                                 Icon(
                                     Icons.Filled.Refresh,
-                                    contentDescription = stringResource(R.string.action_refresh)
+                                    contentDescription = stringResource(R.string.action_refresh),
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 
                             // 收藏按钮
-                            HapticIconButton(onClick = {
+                            Spacer(Modifier.width(8.dp))
+                            PlaylistModernTopBarCircleButton(onClick = {
                                 scope.launch {
                                     val header = ui.header ?: playlist
                                     if (isFavorite) {
@@ -502,16 +509,17 @@ fun BiliPlaylistDetailScreen(
                                     } else {
                                         stringResource(R.string.action_favorite_playlist)
                                     },
-                                    tint = playlistTopBarContentColor
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 
                             if (hasDownloadManagerEntry) {
-                                HapticIconButton(onClick = { showDownloadManager = true }) {
+                                Spacer(Modifier.width(8.dp))
+                                PlaylistModernTopBarCircleButton(onClick = { showDownloadManager = true }) {
                                     Icon(
                                         Icons.Outlined.Download,
                                         contentDescription = stringResource(R.string.download_manager),
-                                        tint = playlistTopBarContentColor
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
@@ -605,10 +613,6 @@ fun BiliPlaylistDetailScreen(
                     .windowInsetsPadding(WindowInsets.navigationBars)
                 ) {
                     val activeSong = currentSong
-                    val currentVideoIndex = displayedVideos.indexOfFirst { video ->
-                        activeSong?.album?.startsWith(PlayerManager.BILI_SOURCE_TAG) == true &&
-                            activeSong.id == video.id
-                    }
 
                     PlaylistModernVisualColorsProvider(
                         coverUrl = displayHeaderCoverUrl,
@@ -823,26 +827,6 @@ fun BiliPlaylistDetailScreen(
                             }
                         }
                     }
-                    }
-
-                    if (currentVideoIndex >= 0) {
-                        HapticFloatingActionButton(
-                            onClick = {
-                                scope.launch {
-                                    listState.animateScrollToItem(
-                                        resolvePlaylistSongItemIndex(currentVideoIndex)
-                                    )
-                                }
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(bottom = 16.dp + miniPlayerHeight, end = 16.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                                contentDescription = stringResource(R.string.cd_locate_playing)
-                            )
-                        }
                     }
 
                     LyraOverlaySnackbarHost(

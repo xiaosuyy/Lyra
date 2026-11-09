@@ -158,7 +158,6 @@ import com.lyra.player.data.model.SongItem
 import com.lyra.player.ui.viewmodel.tab.AlbumSummary
 import com.lyra.player.ui.viewmodel.tab.PlaylistSummary
 import com.lyra.player.ui.util.rememberSongDisplayCoverUrl
-import com.lyra.player.ui.haptic.HapticFloatingActionButton
 import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.ui.feedback.LyraOverlaySnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
@@ -354,16 +353,8 @@ private fun PlaylistTopBarCircleButton(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    HapticIconButton(onClick = onClick, modifier = modifier.size(40.dp)) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center
-        ) {
-            content()
-        }
+    PlaylistModernTopBarCircleButton(onClick = onClick, modifier = modifier) {
+        content()
     }
 }
 
@@ -391,7 +382,6 @@ fun DetailScreen(
     val pendingTaskCount = downloadTaskSummary.pendingTaskCount
     val hasDownloadManagerEntry = downloadTaskSummary.hasPendingTasks
 
-    val currentSong by PlayerManager.currentSongFlow.collectAsState()
     val shuffleEnabled by PlayerManager.shuffleModeFlow.collectAsState()
     val repeatMode by PlayerManager.repeatModeFlow.collectAsState()
     val listState = rememberSaveable(playlistId, saver = LazyListState.Saver) {
@@ -624,7 +614,6 @@ fun DetailScreen(
                                     Icon(
                                         Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = stringResource(R.string.cd_back),
-                                        tint = playlistTopBarContentColor,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
@@ -641,7 +630,6 @@ fun DetailScreen(
                                     Icon(
                                         Icons.Filled.Search,
                                         contentDescription = stringResource(R.string.cd_search_songs),
-                                        tint = playlistTopBarContentColor,
                                         modifier = Modifier.size(17.dp)
                                     )
                                 }
@@ -671,7 +659,6 @@ fun DetailScreen(
                                         Icon(
                                             imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
                                             contentDescription = if (isFavorite) stringResource(R.string.action_unfavorite) else stringResource(R.string.action_favorite_playlist),
-                                            tint = playlistTopBarContentColor,
                                             modifier = Modifier.size(17.dp)
                                         )
                                     }
@@ -683,7 +670,6 @@ fun DetailScreen(
                                         Icon(
                                             Icons.Outlined.Download,
                                             contentDescription = stringResource(R.string.cd_download_manager),
-                                            tint = playlistTopBarContentColor,
                                             modifier = Modifier.size(17.dp)
                                         )
                                     }
@@ -818,7 +804,6 @@ fun DetailScreen(
                         PlayerManager.setShuffle(shuffle)
                         onSongClick(ui.tracks, startIndex)
                     }
-                    val currentIndex = displayedTracks.indexOfFirst { it.sameIdentityAs(currentSong) }
 
                     Box(
                         modifier = Modifier
@@ -992,29 +977,6 @@ fun DetailScreen(
                                 }
                             }
                         }
-                        }
-
-                        if (currentIndex >= 0) {
-                            HapticFloatingActionButton(
-                                onClick = {
-                                    scope.launch {
-                                        listState.animateScrollToItem(
-                                            resolvePlaylistSongItemIndex(currentIndex)
-                                        )
-                                    }
-                                },
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(
-                                        bottom = 16.dp + miniPlayerHeight,
-                                        end = 16.dp
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                                    contentDescription = stringResource(R.string.cd_locate_playing)
-                                )
-                            }
                         }
                     }
                 }

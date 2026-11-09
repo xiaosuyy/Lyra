@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -1423,17 +1425,8 @@ internal fun PlaylistModernPlaybackActions(
     onExportToLocalPlaylist: () -> Unit
 ) {
     val canUseSongs = songCount > 0
-    val visualColors = LocalPlaylistHeroVisualColors.current
-    val controlContentColor = visualColors?.controlContent
-        ?: MaterialTheme.colorScheme.onSurface
-    val lightControls = controlContentColor.luminance() > 0.5f
-    val circleColor = if (lightControls) {
-        Color.Black.copy(alpha = 0.26f)
-    } else {
-        Color.White.copy(alpha = 0.42f)
-    }
-    val playBackground = if (lightControls) Color.White else Color.Black
-    val playForeground = if (lightControls) Color.Black else Color.White
+    val maskColor = PlaylistGlassMaskColor
+    val maskContentColor = PlaylistGlassMaskInk
     val playLabel = stringResource(R.string.player_play)
 
     Row(
@@ -1449,8 +1442,10 @@ internal fun PlaylistModernPlaybackActions(
             modifier = Modifier.size(54.dp),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = circleColor,
-                contentColor = controlContentColor
+                containerColor = maskColor,
+                contentColor = maskContentColor,
+                disabledContainerColor = maskColor.copy(alpha = 0.55f),
+                disabledContentColor = maskContentColor.copy(alpha = 0.3f)
             )
         ) {
             Icon(
@@ -1467,7 +1462,7 @@ internal fun PlaylistModernPlaybackActions(
                 .width(140.dp)
                 .height(50.dp)
                 .clip(CircleShape)
-                .background(playBackground)
+                .background(maskColor)
                 .clickable(enabled = canUseSongs, onClick = onPlayInOrder),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
@@ -1475,13 +1470,13 @@ internal fun PlaylistModernPlaybackActions(
             Icon(
                 Icons.Filled.PlayArrow,
                 contentDescription = playLabel,
-                tint = playForeground,
+                tint = maskContentColor,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = playLabel,
-                color = playForeground,
+                color = maskContentColor,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -1495,8 +1490,10 @@ internal fun PlaylistModernPlaybackActions(
             modifier = Modifier.size(54.dp),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = circleColor,
-                contentColor = controlContentColor
+                containerColor = maskColor,
+                contentColor = maskContentColor,
+                disabledContainerColor = maskColor.copy(alpha = 0.55f),
+                disabledContentColor = maskContentColor.copy(alpha = 0.3f)
             )
         ) {
             Icon(
@@ -1504,6 +1501,36 @@ internal fun PlaylistModernPlaybackActions(
                 contentDescription = stringResource(R.string.playlist_export_to_local),
                 modifier = Modifier.size(26.dp)
             )
+        }
+    }
+}
+
+internal val PlaylistGlassMaskColor = Color.White.copy(alpha = 0.92f)
+internal val PlaylistGlassMaskInk = Color(0xFF17171A)
+
+@Composable
+internal fun PlaylistModernTopBarCircleButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    HapticIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(44.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(PlaylistGlassMaskColor)
+                .border(0.75.dp, Color.Black.copy(alpha = 0.08f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            CompositionLocalProvider(LocalContentColor provides PlaylistGlassMaskInk) {
+                content()
+            }
         }
     }
 }

@@ -128,7 +128,6 @@ import com.lyra.player.data.model.SongItem
 import com.lyra.player.ui.viewmodel.playlist.YouTubeMusicPlaylistDetailViewModel
 import com.lyra.player.ui.viewmodel.tab.YouTubeMusicPlaylist
 import com.lyra.player.ui.viewmodel.tab.favoriteId
-import com.lyra.player.ui.haptic.HapticFloatingActionButton
 import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.ui.haptic.HapticTextButton
 import com.lyra.player.util.format.formatDuration
@@ -411,7 +410,6 @@ fun YouTubeMusicPlaylistDetailScreen(
         items = visibleTracks,
         tokens = { song -> song.playlistSearchValues(context) }
     )
-    val currentIndex = displayedTracks.indexOfFirst { it.sameIdentityAs(currentSong) }
     val heroSubtitle = listOfNotNull(
         resolvedPlaylist.creatorName.takeIf { it.isNotBlank() },
         resolvedPlaylist.subtitle.takeIf { it.isNotBlank() },
@@ -459,23 +457,18 @@ fun YouTubeMusicPlaylistDetailScreen(
         topBar = {
             if (!selectionMode) {
                 TopAppBar(
-                    title = {
-                        Text(
-                            text = resolvedPlaylist.title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
+                    title = {},
                     navigationIcon = {
-                        HapticIconButton(onClick = onBack) {
+                        PlaylistModernTopBarCircleButton(onClick = onBack) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.action_back)
+                                contentDescription = stringResource(R.string.action_back),
+                                modifier = Modifier.size(19.dp)
                             )
                         }
                     },
                     actions = {
-                        HapticIconButton(
+                        PlaylistModernTopBarCircleButton(
                             onClick = {
                                 showSearch = !showSearch
                                 if (!showSearch) {
@@ -487,16 +480,20 @@ fun YouTubeMusicPlaylistDetailScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Search,
-                                contentDescription = stringResource(R.string.cd_search_songs)
+                                contentDescription = stringResource(R.string.cd_search_songs),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
-                        HapticIconButton(onClick = viewModel::retry) {
+                        Spacer(Modifier.width(8.dp))
+                        PlaylistModernTopBarCircleButton(onClick = viewModel::retry) {
                             Icon(
                                 imageVector = Icons.Filled.Refresh,
-                                contentDescription = stringResource(R.string.action_refresh)
+                                contentDescription = stringResource(R.string.action_refresh),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
-                        HapticIconButton(
+                        Spacer(Modifier.width(8.dp))
+                        PlaylistModernTopBarCircleButton(
                             onClick = {
                                 scope.launch {
                                     if (isFavorite) {
@@ -532,15 +529,16 @@ fun YouTubeMusicPlaylistDetailScreen(
                                 } else {
                                     stringResource(R.string.action_favorite_playlist)
                                 },
-                                tint = playlistTopBarContentColor
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                         if (hasDownloadManagerEntry) {
-                            HapticIconButton(onClick = { showDownloadManager = true }) {
+                            Spacer(Modifier.width(8.dp))
+                            PlaylistModernTopBarCircleButton(onClick = { showDownloadManager = true }) {
                                 Icon(
                                     Icons.Outlined.Download,
                                     contentDescription = stringResource(R.string.cd_download_manager),
-                                    tint = playlistTopBarContentColor
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
@@ -851,36 +849,6 @@ fun YouTubeMusicPlaylistDetailScreen(
                         }
                     }
                 }
-                }
-
-                if (currentIndex >= 0) {
-                    HapticFloatingActionButton(
-                        onClick = {
-                            scope.launch {
-                                listState.animateScrollToItem(
-                                    resolvePlaylistSongItemIndex(
-                                        songIndex = currentIndex,
-                                        fixedItemCount = if (!requestedAllTracksLoaded && visibleTracks.isNotEmpty()) {
-                                            3
-                                        } else {
-                                            2
-                                        }
-                                    )
-                                )
-                            }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(
-                                bottom = 16.dp + miniPlayerHeight,
-                                end = 16.dp
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                            contentDescription = stringResource(R.string.cd_locate_playing)
-                        )
-                    }
                 }
             }
         }
