@@ -84,6 +84,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -930,36 +931,49 @@ fun DetailScreen(
                                             val isFavoriteSong = favoriteSongs.any {
                                                 it.sameIdentityAs(item)
                                             }
-                                            SongRow(
-                                                song = item,
-                                                isFavorite = isFavoriteSong,
-                                                onFavoriteToggle = ::toggleSongFavorite,
-                                                showCover = false,
-                                                trackNumber = index + 1,
-                                                selectionMode = selectionMode,
-                                                selected = selectedIds.contains(item.id),
-                                                onToggleSelect = { toggleSelect(item.id) },
-                                                onLongPress = {
-                                                    if (!selectionMode) {
-                                                        selectionMode = true
-                                                        selectedIds = setOf(item.id)
-                                                    } else {
-                                                        toggleSelect(item.id)
-                                                    }
-                                                },
-                                                onClick = {
-                                                    LyraLogger.d(
-                                                        "LYRA-UI",
-                                                        "tap song index=$index id=${item.id}"
+                                            Column {
+                                                SongRow(
+                                                    song = item,
+                                                    isFavorite = isFavoriteSong,
+                                                    onFavoriteToggle = ::toggleSongFavorite,
+                                                    showCover = false,
+                                                    trackNumber = index + 1,
+                                                    selectionMode = selectionMode,
+                                                    selected = selectedIds.contains(item.id),
+                                                    onToggleSelect = { toggleSelect(item.id) },
+                                                    onLongPress = {
+                                                        if (!selectionMode) {
+                                                            selectionMode = true
+                                                            selectedIds = setOf(item.id)
+                                                        } else {
+                                                            toggleSelect(item.id)
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        LyraLogger.d(
+                                                            "LYRA-UI",
+                                                            "tap song index=$index id=${item.id}"
+                                                        )
+                                                        val full = ui.tracks
+                                                        val itemKey = item.stableKey()
+                                                        val pos = full.indexOfFirst { it.stableKey() == itemKey }
+                                                        if (pos >= 0) onSongClick(full, pos)
+                                                    },
+                                                    snackbarHostState = snackbarHostState,
+                                                    offlineMode = offlineMode
+                                                )
+                                                if (index != displayedTracks.lastIndex) {
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(
+                                                            start = 56.dp,
+                                                            end = 16.dp
+                                                        ),
+                                                        thickness = 0.6.dp,
+                                                        color = playlistModernListPrimaryContentColor()
+                                                            .copy(alpha = 0.12f)
                                                     )
-                                                    val full = ui.tracks
-                                                    val itemKey = item.stableKey()
-                                                    val pos = full.indexOfFirst { it.stableKey() == itemKey }
-                                                    if (pos >= 0) onSongClick(full, pos)
-                                                },
-                                                snackbarHostState = snackbarHostState,
-                                                offlineMode = offlineMode
-                                            )
+                                                }
+                                            }
                                         }
                                     }
                                 }
