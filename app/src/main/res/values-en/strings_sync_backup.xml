@@ -147,10 +147,11 @@
     <string name="settings_sync_repo_placeholder">username/repo-name</string>
     <string name="account_title">Account</string>
     <string name="account_login_title">Sign in to WebDAV</string>
-    <string name="account_login_desc">Signing in syncs history and playlists automatically. Your avatar and name are stored with the account.</string>
+    <string name="account_login_desc">Signing in syncs history, playlists and followed artists automatically. Your avatar and name are stored with the account.</string>
     <string name="account_name_label">Name</string>
     <string name="account_history">Listening history</string>
     <string name="account_cloud_playlists">Cloud playlists</string>
+    <string name="account_followed_artists">Followed artists</string>
     <string name="account_logout">Sign out</string>
     <string name="account_logout_confirm_title">Sign out of WebDAV?</string>
     <string name="account_logout_confirm_message">You will need to enter the WebDAV address, account and password again to resume syncing.</string>

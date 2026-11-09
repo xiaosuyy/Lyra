@@ -230,6 +230,7 @@ import com.lyra.player.ui.screen.RecentScreen
 import com.lyra.player.ui.screen.PlaybackStatsScreen
 import com.lyra.player.ui.screen.account.AccountScreen
 import com.lyra.player.ui.screen.account.CloudPlaylistsScreen
+import com.lyra.player.ui.screen.account.FollowedArtistsScreen
 import com.lyra.player.ui.screen.debug.BiliApiProbeScreen
 import com.lyra.player.ui.screen.debug.CrashLogListScreen
 import com.lyra.player.ui.screen.debug.DebugCrashTestType
@@ -314,6 +315,7 @@ private val TRANSPARENT_MAIN_TAB_DETAIL_ROUTES = setOf(
     Destinations.PlaybackStats.route,
     Destinations.Account.route,
     Destinations.CloudPlaylists.route,
+    Destinations.FollowedArtists.route,
     Destinations.DownloadManager.route,
     Destinations.DownloadProgress.route
 )
@@ -4098,6 +4100,11 @@ private fun LyraAppContent(
                                                 navController.navigate(
                                                     Destinations.CloudPlaylists.route
                                                 )
+                                            },
+                                            onOpenFollowedArtists = {
+                                                navController.navigate(
+                                                    Destinations.FollowedArtists.route
+                                                )
                                             }
                                         )
                                     }
@@ -4126,6 +4133,29 @@ private fun LyraAppContent(
                                                     localPlaylistSourceRoute(playlistId)
                                                 )
                                             }
+                                        )
+                                    }
+                                }
+
+                                composable(
+                                    route = Destinations.FollowedArtists.route,
+                                    enterTransition = {
+                                        transparentDetailEnterTransition(coherentFeedbackEnabled)
+                                    },
+                                    exitTransition = {
+                                        transparentDetailExitTransition(coherentFeedbackEnabled)
+                                    },
+                                    popEnterTransition = {
+                                        transparentDetailPopEnterTransition(coherentFeedbackEnabled)
+                                    },
+                                    popExitTransition = {
+                                        transparentDetailPopExitTransition(coherentFeedbackEnabled)
+                                    }
+                                ) {
+                                    RenderNavHostScene(Destinations.FollowedArtists.route) {
+                                        FollowedArtistsScreen(
+                                            onBack = { navController.popBackStack() },
+                                            onOpenArtist = ::navigateToNeteaseArtist
                                         )
                                     }
                                 }

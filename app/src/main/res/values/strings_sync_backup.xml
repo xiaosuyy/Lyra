@@ -147,10 +147,11 @@
     <string name="settings_sync_repo_placeholder">username/repo-name</string>
     <string name="account_title">账号</string>
     <string name="account_login_title">登录 WebDAV</string>
-    <string name="account_login_desc">登录后自动同步播放历史与歌单，头像与昵称跟随账号保存。</string>
+    <string name="account_login_desc">登录后自动同步播放历史、歌单与关注艺人，头像与昵称跟随账号保存。</string>
     <string name="account_name_label">昵称</string>
     <string name="account_history">听歌历史</string>
     <string name="account_cloud_playlists">云端歌单</string>
+    <string name="account_followed_artists">关注艺人</string>
     <string name="account_logout">退出登录</string>
     <string name="account_logout_confirm_title">退出 WebDAV？</string>
     <string name="account_logout_confirm_message">退出后需要重新输入 WebDAV 地址与账号密码才能继续同步。</string>

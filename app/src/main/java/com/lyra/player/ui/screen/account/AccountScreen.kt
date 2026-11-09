@@ -83,6 +83,7 @@ fun AccountScreen(
     onBack: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenCloudPlaylists: () -> Unit,
+    onOpenFollowedArtists: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -244,6 +245,7 @@ fun AccountScreen(
                 AccountMenuCard(
                     onOpenHistory = onOpenHistory,
                     onOpenCloudPlaylists = onOpenCloudPlaylists,
+                    onOpenFollowedArtists = onOpenFollowedArtists,
                 )
 
                 Spacer(Modifier.height(18.dp))
@@ -430,6 +432,7 @@ private fun ProfileHeader(
 private fun AccountMenuCard(
     onOpenHistory: () -> Unit,
     onOpenCloudPlaylists: () -> Unit,
+    onOpenFollowedArtists: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -452,6 +455,15 @@ private fun AccountMenuCard(
             icon = Icons.Outlined.Cloud,
             label = stringResource(R.string.account_cloud_playlists),
             onClick = onOpenCloudPlaylists,
+        )
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 52.dp),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
+        )
+        AccountMenuRow(
+            icon = Icons.Outlined.Person,
+            label = stringResource(R.string.account_followed_artists),
+            onClick = onOpenFollowedArtists,
         )
     }
 }
