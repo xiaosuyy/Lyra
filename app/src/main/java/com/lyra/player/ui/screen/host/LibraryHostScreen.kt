@@ -58,6 +58,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import com.lyra.player.ui.screen.artist.NeteaseArtistDetailScreen
+import com.lyra.player.ui.screen.artist.TencentArtistDetailScreen
 import com.lyra.player.ui.screen.playlist.LocalArtistDetailScreen
 import com.lyra.player.ui.screen.playlist.HotPlaylistDetailScreen
 import com.lyra.player.ui.screen.playlist.LocalPlaylistDetailScreen
@@ -76,6 +77,7 @@ import com.lyra.player.ui.viewmodel.playlist.BiliVideoItem
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.stats.PlaybackStatsPeriod
 import com.lyra.player.core.api.bili.BiliClient
+import com.lyra.player.core.api.search.CustomChannelArtist
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.data.model.displayCoverUrl
 import com.lyra.player.data.playlist.usage.PlaylistUsageRepository
@@ -109,6 +111,14 @@ sealed class LibrarySelectedItem : Parcelable {
     data class NeteaseAlbum(val album: AlbumSummary) : LibrarySelectedItem()
     @Parcelize
     data class NeteaseArtist(val artist: NeteaseArtistSummary) : LibrarySelectedItem()
+    @Parcelize
+    data class TencentArtist(
+        val singerMid: String,
+        val name: String,
+        val coverUrl: String? = null
+    ) : LibrarySelectedItem() {
+        fun toArtist() = CustomChannelArtist(id = singerMid, name = name, coverUrl = coverUrl)
+    }
     @Parcelize
     data class NeteaseArtistAlbum(
         val artist: NeteaseArtistSummary,
@@ -251,6 +261,18 @@ fun LibraryHostScreen(
         cancelPendingNeteaseCoverWarmup()
         skipDetailCloseAnimation = false
         selected = LibrarySelectedItem.NeteaseArtist(artist)
+    }
+
+    fun openTencentArtist(artist: CustomChannelArtist) {
+        val currentArtist = (selected as? LibrarySelectedItem.TencentArtist)?.singerMid
+        if (currentArtist == artist.id) return
+        cancelPendingNeteaseCoverWarmup()
+        skipDetailCloseAnimation = false
+        selected = LibrarySelectedItem.TencentArtist(
+            singerMid = artist.id,
+            name = artist.name,
+            coverUrl = artist.coverUrl
+        )
     }
 
     fun closeDeletedLocalPlaylist() {
@@ -511,6 +533,10 @@ fun LibraryHostScreen(
                                 captureLibraryScrollPosition(LibraryScrollSource.Favorite)
                                 openNeteaseArtist(artist)
                             },
+                            onTencentArtistClick = { artist ->
+                                captureLibraryScrollPosition(LibraryScrollSource.Favorite)
+                                openTencentArtist(artist)
+                            },
                             onYouTubeMusicPlaylistClick = { playlist ->
                                 skipDetailCloseAnimation = false
                                 captureLibraryScrollPosition(
@@ -644,6 +670,19 @@ fun LibraryHostScreen(
                             }
                         }
 
+                        is LibrarySelectedItem.TencentArtist -> {
+                            libraryStateHolder.SaveableStateProvider(
+                                "tencent_artist_${current.singerMid}"
+                            ) {
+                                TencentArtistDetailScreen(
+                                    artist = current.toArtist(),
+                                    onBack = { selected = null },
+                                    onSongClick = onSongClick,
+                                    offlineMode = offlineMode
+                                )
+                            }
+                        }
+
                         is LibrarySelectedItem.NeteaseArtistAlbum -> {
                             NeteaseAlbumDetailScreen(
                                 onBack = {
@@ -729,6 +768,12 @@ private val librarySelectedItemSaver = mapSaver<LibrarySelectedItem?>(
                 "artistId" to item.artist.id,
                 "artistName" to item.artist.name
             )
+            is LibrarySelectedItem.TencentArtist -> hashMapOf(
+                "type" to "tencentArtist",
+                "singerMid" to item.singerMid,
+                "artistName" to item.name,
+                "coverUrl" to item.coverUrl
+            )
             is LibrarySelectedItem.NeteaseArtistAlbum -> hashMapOf(
                 "type" to "neteaseArtistAlbum",
                 "artistId" to item.artist.id,
@@ -759,6 +804,15 @@ private val librarySelectedItemSaver = mapSaver<LibrarySelectedItem?>(
                 id = (saved["artistId"] as? Number)?.toLong(),
                 name = saved["artistName"] as? String
             )?.let { LibrarySelectedItem.NeteaseArtist(it) }
+            "tencentArtist" -> (saved["singerMid"] as? String)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { singerMid ->
+                    LibrarySelectedItem.TencentArtist(
+                        singerMid = singerMid,
+                        name = saved["artistName"] as? String ?: "",
+                        coverUrl = saved["coverUrl"] as? String
+                    )
+                }
             "neteaseArtistAlbum" -> {
                 val artist = restoreNeteaseArtistSummary(
                     id = (saved["artistId"] as? Number)?.toLong(),

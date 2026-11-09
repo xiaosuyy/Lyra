@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -131,6 +132,7 @@ fun TencentArtistDetailScreen(
                     onLoadMoreAlbums = viewModel::loadMoreAlbums,
                     onAlbumClick = viewModel::openAlbum,
                     onSongClick = onSongClick,
+                    onToggleFollow = viewModel::toggleFollow,
                     offlineMode = offlineMode,
                     isTabletLayout = isTabletLayout
                 )
@@ -230,6 +232,7 @@ private fun TencentArtistContent(
     onLoadMoreAlbums: () -> Unit,
     onAlbumClick: (CustomChannelArtistAlbum) -> Unit,
     onSongClick: (List<SongItem>, Int) -> Unit,
+    onToggleFollow: () -> Unit,
     offlineMode: Boolean,
     isTabletLayout: Boolean
 ) {
@@ -257,8 +260,10 @@ private fun TencentArtistContent(
                     header = ui.header,
                     fallbackName = artistName,
                     pageColor = pageColor,
+                    followUpdating = ui.followUpdating,
                     offlineMode = offlineMode,
-                    isTabletLayout = isTabletLayout
+                    isTabletLayout = isTabletLayout,
+                    onToggleFollow = onToggleFollow
                 )
             }
 
@@ -359,8 +364,10 @@ private fun TencentArtistHero(
     header: TencentArtistHeader?,
     fallbackName: String,
     pageColor: Color,
+    followUpdating: Boolean,
     offlineMode: Boolean,
-    isTabletLayout: Boolean
+    isTabletLayout: Boolean,
+    onToggleFollow: () -> Unit
 ) {
     val context = LocalContext.current
     val avatarUrl = header?.avatarUrl.orEmpty()
@@ -460,6 +467,15 @@ private fun TencentArtistHero(
                 lineHeight = 18.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1
+            )
+        }
+
+        if (header != null) {
+            Spacer(Modifier.height(16.dp))
+            ArtistFollowButton(
+                followed = header.followed,
+                updating = followUpdating,
+                onToggle = onToggleFollow
             )
         }
     }

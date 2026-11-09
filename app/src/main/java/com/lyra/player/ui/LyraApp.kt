@@ -161,6 +161,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import com.lyra.player.R
 import com.lyra.player.core.api.bili.BiliClient
+import com.lyra.player.core.api.search.CustomChannelArtist
 import com.lyra.player.core.api.search.MusicPlatform
 import com.lyra.player.core.api.youtube.YouTubeMusicCreatorSummary
 import com.lyra.player.core.di.AppContainer
@@ -242,6 +243,7 @@ import com.lyra.player.ui.screen.debug.UsbExclusiveDebugScreen
 import com.lyra.player.ui.screen.debug.YouTubeApiProbeScreen
 import com.lyra.player.ui.screen.artist.BiliUploaderDetailScreen
 import com.lyra.player.ui.screen.artist.NeteaseArtistDetailScreen
+import com.lyra.player.ui.screen.artist.TencentArtistDetailScreen
 import com.lyra.player.ui.screen.artist.YouTubeMusicCreatorNavigationScreen
 import com.lyra.player.ui.screen.host.ExploreHostScreen
 import com.lyra.player.ui.screen.host.HomeHostScreen
@@ -260,6 +262,7 @@ import com.lyra.player.ui.util.rememberSongDisplayCoverUrl
 import com.lyra.player.ui.view.HyperBackground
 import com.lyra.player.ui.viewmodel.debug.LogViewerScreen
 import com.lyra.player.data.model.NeteaseArtistSummary
+import com.lyra.player.data.playlist.favorite.FAVORITE_SOURCE_TENCENT_ARTIST
 import com.lyra.player.data.model.BiliUploaderSummary
 import com.lyra.player.ui.viewmodel.playlist.BiliVideoItem
 import com.lyra.player.data.model.SongItem
@@ -306,6 +309,7 @@ private val TRANSPARENT_MAIN_TAB_DETAIL_ROUTES = setOf(
     Destinations.PlaylistDetail.route,
     Destinations.NeteaseAlbumDetail.route,
     Destinations.NeteaseArtistDetail.route,
+    Destinations.TencentArtistDetail.route,
     Destinations.BiliPlaylistDetail.route,
     Destinations.BiliUploaderDetail.route,
     Destinations.YouTubeMusicCreatorDetail.route,
@@ -2533,6 +2537,31 @@ private fun LyraAppContent(
                     launchSingleTop = true
                 }
             }
+            fun navigateToTencentArtist(artist: CustomChannelArtist) {
+                if (artist.id.isBlank()) return
+                val json = Uri.encode(navigationGson.toJson(artist))
+                val currentEntry = navController.currentBackStackEntry
+                val currentIsArtist =
+                    currentEntry?.destination?.route == Destinations.TencentArtistDetail.route
+                val currentArtist = currentEntry
+                    ?.takeIf { currentIsArtist }
+                    ?.arguments
+                    ?.getString("artistJson")
+                    ?.let {
+                        runCatching {
+                            navigationGson.fromJson(it, CustomChannelArtist::class.java)
+                        }.getOrNull()
+                    }
+                if (currentArtist?.id == artist.id) {
+                    return
+                }
+                if (currentIsArtist) {
+                    navController.popBackStack()
+                }
+                navController.navigate("tencent_artist_detail/$json") {
+                    launchSingleTop = true
+                }
+            }
             fun navigateToBiliUploader(uploader: BiliUploaderSummary) {
                 if (uploader.mid <= 0L) return
                 val currentEntry = navController.currentBackStackEntry
@@ -3798,6 +3827,41 @@ private fun LyraAppContent(
                                 }
 
                                 composable(
+                                    route = Destinations.TencentArtistDetail.route,
+                                    arguments = listOf(navArgument("artistJson") {
+                                        type = NavType.StringType
+                                    }),
+                                    enterTransition = {
+                                        transparentDetailEnterTransition(coherentFeedbackEnabled)
+                                    },
+                                    exitTransition = {
+                                        transparentDetailExitTransition(coherentFeedbackEnabled)
+                                    },
+                                    popEnterTransition = {
+                                        transparentDetailPopEnterTransition(coherentFeedbackEnabled)
+                                    },
+                                    popExitTransition = {
+                                        transparentDetailPopExitTransition(coherentFeedbackEnabled)
+                                    }
+                                ) { backStackEntry ->
+                                    val artistJson = backStackEntry.arguments?.getString("artistJson")
+                                    val artist = navigationGson.fromJson(
+                                        artistJson,
+                                        CustomChannelArtist::class.java
+                                    )
+                                    RenderNavHostScene(
+                                        Destinations.TencentArtistDetail.route
+                                    ) {
+                                        TencentArtistDetailScreen(
+                                            artist = artist,
+                                            onBack = { navController.popBackStack() },
+                                            onSongClick = ::playSongsAndOpenNowPlaying,
+                                            offlineMode = offlineMode
+                                        )
+                                    }
+                                }
+
+                                composable(
                                     route = Destinations.YouTubeMusicCreatorDetail.route,
                                     arguments = listOf(navArgument("creatorJson") {
                                         type = NavType.StringType
@@ -4155,7 +4219,24 @@ private fun LyraAppContent(
                                     RenderNavHostScene(Destinations.FollowedArtists.route) {
                                         FollowedArtistsScreen(
                                             onBack = { navController.popBackStack() },
-                                            onOpenArtist = ::navigateToNeteaseArtist
+                                            onOpenArtist = { artist ->
+                                                if (artist.source == FAVORITE_SOURCE_TENCENT_ARTIST) {
+                                                    navigateToTencentArtist(
+                                                        CustomChannelArtist(
+                                                            id = artist.browseId.orEmpty(),
+                                                            name = artist.name,
+                                                            coverUrl = artist.coverUrl
+                                                        )
+                                                    )
+                                                } else {
+                                                    navigateToNeteaseArtist(
+                                                        NeteaseArtistSummary(
+                                                            id = artist.id,
+                                                            name = artist.name
+                                                        )
+                                                    )
+                                                }
+                                            }
                                         )
                                     }
                                 }

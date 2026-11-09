@@ -14,6 +14,8 @@ import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.data.model.SongItem
+import com.lyra.player.data.playlist.favorite.FAVORITE_SOURCE_TENCENT_ARTIST
+import com.lyra.player.data.playlist.favorite.FavoritePlaylistRepository
 import com.lyra.player.ui.viewmodel.tab.toSongItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.absoluteValue
 
 private const val TAG = "LYRA-TencentArtistVM"
 private const val SONG_PAGE_SIZE = 50
@@ -35,8 +38,13 @@ internal data class TencentArtistHeader(
     val brief: String,
     val fanCount: Int,
     val songCount: Int,
-    val albumCount: Int
+    val albumCount: Int,
+    val followed: Boolean = false
 )
+
+/** QQ 音乐歌手 mid 转稳定的本地收藏 id */
+internal fun tencentArtistFavoriteId(singerMid: String): Long =
+    -1L - singerMid.hashCode().toLong().absoluteValue
 
 internal data class TencentAlbumSongsState(
     val album: CustomChannelArtistAlbum,
@@ -47,6 +55,7 @@ internal data class TencentAlbumSongsState(
 
 internal data class TencentArtistDetailUiState(
     val loading: Boolean = true,
+    val followUpdating: Boolean = false,
     val error: String? = null,
     val header: TencentArtistHeader? = null,
     val songs: List<SongItem> = emptyList(),
@@ -61,6 +70,7 @@ internal data class TencentArtistDetailUiState(
 internal class TencentArtistDetailViewModel(application: Application) : AndroidViewModel(application) {
     private val api = CustomChannelSearchApi(AppContainer.sharedOkHttpClient)
     private val app = getApplication<Application>()
+    private val favoriteRepo = FavoritePlaylistRepository.getInstance(application)
     private val _uiState = MutableStateFlow(TencentArtistDetailUiState())
     val uiState: StateFlow<TencentArtistDetailUiState> = _uiState
 
@@ -71,7 +81,10 @@ internal class TencentArtistDetailViewModel(application: Application) : AndroidV
     private var loadJob: Job? = null
 
     fun start(artist: CustomChannelArtist, forceRefresh: Boolean = false) {
-        if (!forceRefresh && artistId == artist.id && _uiState.value.header != null) return
+        if (!forceRefresh && artistId == artist.id && _uiState.value.header != null) {
+            refreshFollowState()
+            return
+        }
 
         currentArtist = artist
         artistId = artist.id
@@ -87,7 +100,8 @@ internal class TencentArtistDetailViewModel(application: Application) : AndroidV
                 brief = "",
                 fanCount = 0,
                 songCount = 0,
-                albumCount = 0
+                albumCount = 0,
+                followed = favoriteRepo.isArtistFollowed(artist.name)
             )
         )
 
@@ -98,9 +112,10 @@ internal class TencentArtistDetailViewModel(application: Application) : AndroidV
                 val songs = mapSongs(detail.songs)
                 songOffset = detail.songs.size
                 albumOffset = detail.albums.size
+                val header = detail.toHeader(fallback = artist)
                 _uiState.value = TencentArtistDetailUiState(
                     loading = false,
-                    header = detail.toHeader(fallback = artist),
+                    header = header.copy(followed = favoriteRepo.isArtistFollowed(header.name)),
                     songs = songs,
                     albums = detail.albums,
                     songsHasMore = detail.songCount > detail.songs.size,
@@ -125,6 +140,56 @@ internal class TencentArtistDetailViewModel(application: Application) : AndroidV
 
     fun retry() {
         currentArtist?.let { start(it, forceRefresh = true) }
+    }
+
+    private fun refreshFollowState() {
+        _uiState.update { current ->
+            val header = current.header ?: return@update current
+            current.copy(header = header.copy(followed = favoriteRepo.isArtistFollowed(header.name)))
+        }
+    }
+
+    fun toggleFollow() {
+        val header = _uiState.value.header ?: return
+        val targetFollowed = !header.followed
+        viewModelScope.launch {
+            _uiState.update { it.copy(followUpdating = true) }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    if (targetFollowed) {
+                        favoriteRepo.followArtist(
+                            id = tencentArtistFavoriteId(header.id),
+                            name = header.name,
+                            coverUrl = header.avatarUrl.takeIf { it.isNotBlank() },
+                            trackCount = header.songCount,
+                            source = FAVORITE_SOURCE_TENCENT_ARTIST,
+                            browseId = header.id,
+                            albumCount = header.albumCount
+                        )
+                    } else {
+                        favoriteRepo.unfollowArtist(header.name)
+                    }
+                }
+            }.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        followUpdating = false,
+                        header = it.header?.copy(followed = targetFollowed)
+                    )
+                }
+            }.onFailure { error ->
+                LyraLogger.e(TAG, "toggle tencent artist follow failed", error)
+                _uiState.update {
+                    it.copy(
+                        followUpdating = false,
+                        error = app.getString(
+                            R.string.artist_follow_failed,
+                            error.message ?: error.javaClass.simpleName
+                        )
+                    )
+                }
+            }
+        }
     }
 
     fun loadMoreSongs() {

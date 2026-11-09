@@ -86,7 +86,7 @@ class NeteaseArtistDetailViewModel(application: Application) : AndroidViewModel(
                 briefDesc = "",
                 musicSize = 0,
                 albumSize = 0,
-                followed = favoriteRepo.isFavorite(summary.id, FAVORITE_SOURCE_NETEASE_ARTIST)
+                followed = favoriteRepo.isArtistFollowed(summary.name)
             )
         )
 
@@ -129,7 +129,7 @@ class NeteaseArtistDetailViewModel(application: Application) : AndroidViewModel(
             val header = current.header ?: return@update current
             current.copy(
                 header = header.copy(
-                    followed = favoriteRepo.isFavorite(header.id, FAVORITE_SOURCE_NETEASE_ARTIST)
+                    followed = favoriteRepo.isArtistFollowed(header.name)
                 )
             )
         }
@@ -191,18 +191,17 @@ class NeteaseArtistDetailViewModel(application: Application) : AndroidViewModel(
             runCatching {
                 withContext(Dispatchers.IO) {
                     if (targetFollowed) {
-                        favoriteRepo.addFavorite(
+                        favoriteRepo.followArtist(
                             id = header.id,
                             name = header.name,
                             coverUrl = preferredArtistCover(header),
                             trackCount = header.musicSize,
                             source = FAVORITE_SOURCE_NETEASE_ARTIST,
                             subtitle = preferredArtistSubtitle(header),
-                            songs = emptyList(),
                             albumCount = header.albumSize
                         )
                     } else {
-                        favoriteRepo.removeFavorite(header.id, FAVORITE_SOURCE_NETEASE_ARTIST)
+                        favoriteRepo.unfollowArtist(header.name)
                     }
                 }
             }.onSuccess {
@@ -240,9 +239,10 @@ class NeteaseArtistDetailViewModel(application: Application) : AndroidViewModel(
         val songsPage = parseArtistSongs(songsDeferred.await())
         val albumsPage = parseArtistAlbums(albumsDeferred.await())
 
-        if (favoriteRepo.isFavorite(detailHeader.id, FAVORITE_SOURCE_NETEASE_ARTIST)) {
+        val followedArtist = favoriteRepo.findFollowedArtist(detailHeader.name)
+        if (followedArtist?.source == FAVORITE_SOURCE_NETEASE_ARTIST) {
             favoriteRepo.updateFavoriteAlbumCount(
-                id = detailHeader.id,
+                id = followedArtist.id,
                 source = FAVORITE_SOURCE_NETEASE_ARTIST,
                 albumCount = detailHeader.albumSize
             )
@@ -251,7 +251,7 @@ class NeteaseArtistDetailViewModel(application: Application) : AndroidViewModel(
         NeteaseArtistDetailUiState(
             loading = false,
             header = detailHeader.copy(
-                followed = favoriteRepo.isFavorite(detailHeader.id, FAVORITE_SOURCE_NETEASE_ARTIST)
+                followed = followedArtist != null
             ),
             songs = songsPage.items,
             albums = albumsPage.items,

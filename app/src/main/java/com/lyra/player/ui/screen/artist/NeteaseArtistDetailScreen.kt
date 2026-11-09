@@ -36,10 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -481,7 +478,6 @@ private fun ArtistHero(
     val avatarModel = header?.avatarUrl?.takeIf { it.isNotBlank() } ?: coverUrl
     val avatarSize = if (isTabletLayout) 176.dp else 148.dp
     val followed = header?.followed == true
-    val followContentColor = if (followed) Color.White else PlaylistGlassMaskInk
 
     Column(
         modifier = Modifier
@@ -574,61 +570,11 @@ private fun ArtistHero(
                 maxLines = 1
             )
             Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier
-                    .height(44.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (followed) {
-                            Color.White.copy(alpha = 0.18f)
-                        } else {
-                            Color.White.copy(alpha = 0.94f)
-                        },
-                        CircleShape
-                    )
-                    .border(
-                        width = 0.75.dp,
-                        color = if (followed) {
-                            Color.White.copy(alpha = 0.26f)
-                        } else {
-                            Color.Transparent
-                        },
-                        shape = CircleShape
-                    )
-                    .clickable(enabled = !followUpdating, onClick = onToggleFollow)
-                    .padding(horizontal = 22.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (followUpdating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(17.dp),
-                        strokeWidth = 2.dp,
-                        color = followContentColor
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (followed) {
-                            Icons.Filled.Star
-                        } else {
-                            Icons.Outlined.StarOutline
-                        },
-                        contentDescription = null,
-                        tint = followContentColor,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = if (followed) {
-                        stringResource(R.string.artist_followed)
-                    } else {
-                        stringResource(R.string.artist_follow)
-                    },
-                    color = followContentColor,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            ArtistFollowButton(
+                followed = followed,
+                updating = followUpdating,
+                onToggle = onToggleFollow
+            )
         }
     }
 }

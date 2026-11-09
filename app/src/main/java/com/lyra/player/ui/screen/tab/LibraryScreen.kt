@@ -172,7 +172,10 @@ import com.lyra.player.data.stats.PlaybackStatsPeriod
 import com.lyra.player.data.stats.PlaybackStatsHotPlaylist
 import com.lyra.player.data.stats.buildPlaybackStatsHotPlaylist
 import com.lyra.player.core.source.MusicSourceIds
+import com.lyra.player.core.api.search.CustomChannelArtist
+import com.lyra.player.data.playlist.favorite.ARTIST_FAVORITE_SOURCES
 import com.lyra.player.data.playlist.favorite.FAVORITE_SOURCE_NETEASE_ARTIST
+import com.lyra.player.data.playlist.favorite.FAVORITE_SOURCE_TENCENT_ARTIST
 import com.lyra.player.ui.screen.tab.library.LibraryUnifiedContent
 import com.lyra.player.ui.viewmodel.tab.library.LOCAL_SOURCE_ID
 import com.lyra.player.ui.viewmodel.tab.library.LibraryPlaylistRef
@@ -393,6 +396,7 @@ fun LibraryScreen(
     onNeteasePlaylistClick: (PlaylistSummary) -> Unit = {},
     onNeteaseAlbumClick: (AlbumSummary) -> Unit = {},
     onNeteaseArtistClick: (NeteaseArtistSummary) -> Unit = {},
+    onTencentArtistClick: (CustomChannelArtist) -> Unit = {},
     onYouTubeMusicPlaylistClick: (YouTubeMusicPlaylist) -> Unit = {},
     onBiliPlaylistClick: (BiliPlaylist) -> Unit = {},
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
@@ -534,7 +538,28 @@ fun LibraryScreen(
                         LibrarySection.ARTISTS -> LibraryArtistsContent(
                             query = libraryQuery,
                             listState = artistsListState,
-                            onArtistClick = onNeteaseArtistClick,
+                            onArtistClick = { artist ->
+                                if (artist.source == FAVORITE_SOURCE_TENCENT_ARTIST) {
+                                    artist.browseId
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?.let { singerMid ->
+                                            onTencentArtistClick(
+                                                CustomChannelArtist(
+                                                    id = singerMid,
+                                                    name = artist.name,
+                                                    coverUrl = artist.coverUrl
+                                                )
+                                            )
+                                        }
+                                } else {
+                                    onNeteaseArtistClick(
+                                        NeteaseArtistSummary(
+                                            id = artist.id,
+                                            name = artist.name
+                                        )
+                                    )
+                                }
+                            },
                             offlineMode = offlineMode
                         )
 
@@ -947,14 +972,14 @@ private fun LibraryInlinePlaylistRow(
 private fun LibraryArtistsContent(
     query: String,
     listState: LazyListState,
-    onArtistClick: (NeteaseArtistSummary) -> Unit,
+    onArtistClick: (FavoritePlaylist) -> Unit,
     offlineMode: Boolean = false
 ) {
     val context = LocalContext.current
     val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
     val favorites by favoriteRepo.favorites.collectAsStateWithLifecycle()
     val artists = remember(favorites) {
-        favorites.filter { it.source == FAVORITE_SOURCE_NETEASE_ARTIST }
+        favorites.filter { it.source in ARTIST_FAVORITE_SOURCES }
     }
     val filteredArtists = remember(artists, query) {
         val normalizedQuery = query.trim()
@@ -1011,9 +1036,7 @@ private fun LibraryArtistsContent(
                 LibraryArtistRow(
                     artist = artist,
                     offlineMode = offlineMode,
-                    onClick = {
-                        onArtistClick(NeteaseArtistSummary(id = artist.id, name = artist.name))
-                    }
+                    onClick = { onArtistClick(artist) }
                 )
                 LibraryInsetDivider(leading = 68.dp)
             }
@@ -2492,6 +2515,7 @@ private fun favoriteSourceSearchAliases(source: String): List<String> {
         "netease" -> listOf("Netease", "网易云", "歌单")
         "bili" -> listOf("Bilibili", "哔哩哔哩", "B站")
         FAVORITE_SOURCE_NETEASE_ARTIST -> listOf("Artist", "歌手")
+        FAVORITE_SOURCE_TENCENT_ARTIST -> listOf("Artist", "QQ", "QQ音乐", "歌手")
         else -> listOf(source)
     }
 }
@@ -2535,10 +2559,10 @@ private fun FavoritePlaylistList(
     var showDeleteSelectedConfirm by rememberSaveable { mutableStateOf(false) }
     val reorderableFavorites = remember { mutableStateListOf<FavoritePlaylist>() }
     val playlistFavorites = remember(favorites) {
-        favorites.filterNot { it.source == FAVORITE_SOURCE_NETEASE_ARTIST }
+        favorites.filterNot { it.source in ARTIST_FAVORITE_SOURCES }
     }
     val artistFavorites = remember(favorites) {
-        favorites.filter { it.source == FAVORITE_SOURCE_NETEASE_ARTIST }
+        favorites.filter { it.source in ARTIST_FAVORITE_SOURCES }
     }
     val isHotCategory = selectedFavoriteCategory == FAVORITE_CATEGORY_HOT
     val visibleFavorites = remember(playlistFavorites, artistFavorites, selectedFavoriteCategory) {
@@ -3042,7 +3066,8 @@ private fun FavoritePlaylistList(
                             } else {
                                 Icon(
                                     imageVector = when (favorite.source) {
-                                        FAVORITE_SOURCE_NETEASE_ARTIST -> Icons.Filled.AccountCircle
+                                        FAVORITE_SOURCE_NETEASE_ARTIST,
+                                        FAVORITE_SOURCE_TENCENT_ARTIST -> Icons.Filled.AccountCircle
                                         "neteaseAlbum" -> Icons.Filled.Album
                                         else -> Icons.AutoMirrored.Filled.QueueMusic
                                     },
@@ -3138,7 +3163,8 @@ private fun favoriteSourceLabel(source: String): String {
         "neteaseAlbum" -> "Netease Album"
         "netease" -> "Netease"
         "bili" -> "Bilibili"
-        FAVORITE_SOURCE_NETEASE_ARTIST -> stringResource(R.string.library_favorite_source_artist)
+        FAVORITE_SOURCE_NETEASE_ARTIST,
+        FAVORITE_SOURCE_TENCENT_ARTIST -> stringResource(R.string.library_favorite_source_artist)
         else -> source
     }
 }

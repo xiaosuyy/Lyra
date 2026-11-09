@@ -32,6 +32,7 @@ class LyraAppNavigationIsolationPolicyTest {
         val detailRoutes = listOf(
             Destinations.PlaylistDetail.route,
             Destinations.NeteaseArtistDetail.route,
+            Destinations.TencentArtistDetail.route,
             Destinations.BiliPlaylistDetail.route,
             Destinations.LocalPlaylistDetail.route,
             Destinations.Recent.route,

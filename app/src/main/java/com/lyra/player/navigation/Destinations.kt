@@ -81,6 +81,9 @@ sealed class Destinations(val route: String, val labelResId: Int) {
     // 网易云歌手详情路由
     data object NeteaseArtistDetail : Destinations("netease_artist_detail/{artistJson}", com.lyra.player.R.string.artist_detail)
 
+    // QQ 音乐歌手详情路由
+    data object TencentArtistDetail : Destinations("tencent_artist_detail/{artistJson}", com.lyra.player.R.string.artist_detail)
+
     // B 站收藏夹详情路由
     data object BiliPlaylistDetail : Destinations("bili_playlist_detail/{playlistJson}", com.lyra.player.R.string.playlist_detail)
 

@@ -42,8 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.lyra.player.R
-import com.lyra.player.data.model.NeteaseArtistSummary
-import com.lyra.player.data.playlist.favorite.FAVORITE_SOURCE_NETEASE_ARTIST
+import com.lyra.player.data.playlist.favorite.ARTIST_FAVORITE_SOURCES
 import com.lyra.player.data.playlist.favorite.FavoritePlaylist
 import com.lyra.player.data.playlist.favorite.FavoritePlaylistRepository
 import com.lyra.player.ui.haptic.performHapticFeedback
@@ -55,13 +54,13 @@ import com.lyra.player.util.media.fastScrollableImageRequest
 @Composable
 fun FollowedArtistsScreen(
     onBack: () -> Unit,
-    onOpenArtist: (NeteaseArtistSummary) -> Unit,
+    onOpenArtist: (FavoritePlaylist) -> Unit,
 ) {
     val context = LocalContext.current
     val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
     val favorites by favoriteRepo.favorites.collectAsStateWithLifecycle()
     val artists = remember(favorites) {
-        favorites.filter { it.source == FAVORITE_SOURCE_NETEASE_ARTIST }
+        favorites.filter { it.source in ARTIST_FAVORITE_SOURCES }
     }
 
     Box(
@@ -144,11 +143,7 @@ fun FollowedArtistsScreen(
                         Column {
                             FollowedArtistRow(
                                 artist = artist,
-                                onClick = {
-                                    onOpenArtist(
-                                        NeteaseArtistSummary(id = artist.id, name = artist.name)
-                                    )
-                                }
+                                onClick = { onOpenArtist(artist) }
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 68.dp, end = 18.dp),

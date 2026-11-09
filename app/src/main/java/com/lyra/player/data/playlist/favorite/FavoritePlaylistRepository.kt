@@ -51,7 +51,17 @@ import com.lyra.player.util.io.writeTextAtomically
 import java.io.File
 
 const val FAVORITE_SOURCE_NETEASE_ARTIST = "neteaseArtist"
+const val FAVORITE_SOURCE_TENCENT_ARTIST = "tencentArtist"
 private const val TAG = "FavoritePlaylistRepo"
+
+val ARTIST_FAVORITE_SOURCES: Set<String> = setOf(
+    FAVORITE_SOURCE_NETEASE_ARTIST,
+    FAVORITE_SOURCE_TENCENT_ARTIST
+)
+
+/** 跨平台关注去重键：忽略大小写、半角/全角空白 */
+internal fun normalizeArtistFollowName(name: String): String =
+    name.lowercase().replace(Regex("[\\s\\u3000]+"), "")
 
 data class FavoritePlaylist(
     val id: Long,
@@ -439,6 +449,104 @@ class FavoritePlaylistRepository private constructor(private val context: Contex
 
     fun getFavorite(id: Long, source: String): FavoritePlaylist? {
         return _favorites.value.firstOrNull { it.id == id && it.source == source }
+    }
+
+    /** 按艺人名跨平台查找已关注记录（网易云 / QQ 音乐只保留一条） */
+    fun findFollowedArtist(name: String): FavoritePlaylist? {
+        val key = normalizeArtistFollowName(name)
+        if (key.isEmpty()) return null
+        return _favorites.value.firstOrNull {
+            it.source in ARTIST_FAVORITE_SOURCES && normalizeArtistFollowName(it.name) == key
+        }
+    }
+
+    fun isArtistFollowed(name: String): Boolean = findFollowedArtist(name) != null
+
+    /** 关注艺人：同名跨平台记录合并，旧的另一平台记录会被移除 */
+    suspend fun followArtist(
+        id: Long,
+        name: String,
+        coverUrl: String?,
+        trackCount: Int,
+        source: String,
+        browseId: String? = null,
+        subtitle: String? = null,
+        albumCount: Int = 0
+    ) {
+        require(source in ARTIST_FAVORITE_SOURCES) { "not an artist source: $source" }
+        val key = normalizeArtistFollowName(name)
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val list = _snapshots.value.toMutableList()
+                val now = System.currentTimeMillis()
+                val existingIndex = list.indexOfFirst { it.id == id && it.source == source }
+                val existing = list.getOrNull(existingIndex)?.takeUnless { it.isDeleted }
+
+                if (key.isNotEmpty()) {
+                    for (index in list.indices) {
+                        if (index == existingIndex) continue
+                        val item = list[index]
+                        if (item.isDeleted || item.source !in ARTIST_FAVORITE_SOURCES) continue
+                        if (normalizeArtistFollowName(item.name) != key) continue
+                        list[index] = item.copy(
+                            songs = emptyList(),
+                            trackCount = 0,
+                            sortOrder = item.normalizeSortOrder().sortOrder,
+                            modifiedAt = now,
+                            isDeleted = true
+                        )
+                    }
+                }
+
+                val merged = FavoritePlaylist(
+                    id = id,
+                    name = name,
+                    coverUrl = coverUrl ?: existing?.coverUrl,
+                    trackCount = maxOf(trackCount, existing?.trackCount ?: 0),
+                    source = source,
+                    browseId = browseId?.takeIf { it.isNotBlank() } ?: existing?.browseId,
+                    subtitle = subtitle?.takeIf { it.isNotBlank() } ?: existing?.subtitle,
+                    songs = existing?.songs.orEmpty(),
+                    addedTime = existing?.addedTime ?: now,
+                    sortOrder = existing?.normalizeSortOrder()?.sortOrder ?: now,
+                    modifiedAt = now,
+                    albumCount = maxOf(albumCount, existing?.albumCount ?: 0)
+                )
+                if (existingIndex >= 0) {
+                    list[existingIndex] = merged
+                } else {
+                    list += merged
+                }
+                publish(list)
+            }
+        }
+    }
+
+    /** 取消关注：移除所有同名艺人关注记录，忽略平台 */
+    suspend fun unfollowArtist(name: String) {
+        val key = normalizeArtistFollowName(name)
+        if (key.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val list = _snapshots.value.toMutableList()
+                val now = System.currentTimeMillis()
+                var changed = false
+                for (index in list.indices) {
+                    val item = list[index]
+                    if (item.isDeleted || item.source !in ARTIST_FAVORITE_SOURCES) continue
+                    if (normalizeArtistFollowName(item.name) != key) continue
+                    list[index] = item.copy(
+                        songs = emptyList(),
+                        trackCount = 0,
+                        sortOrder = item.normalizeSortOrder().sortOrder,
+                        modifiedAt = now,
+                        isDeleted = true
+                    )
+                    changed = true
+                }
+                if (changed) publish(list)
+            }
+        }
     }
 
     fun getSyncSnapshots(): List<FavoritePlaylist> {
