@@ -243,7 +243,7 @@ class PlaylistSearchFocusPolicyTest {
     }
 
     @Test
-    fun keepsPlaylistTopBarsTranslucentButReadable() {
+    fun keepsPlaylistTopBarContentReadableOnPlaylistColor() {
         assertEquals(
             Color(0xFF17191F).toArgb(),
             resolvePlaylistSolidTopBarContentColor(Color.White).toArgb()
@@ -251,66 +251,6 @@ class PlaylistSearchFocusPolicyTest {
         assertEquals(
             Color.White.copy(alpha = 0.95f).toArgb(),
             resolvePlaylistSolidTopBarContentColor(Color(0xFF102030)).toArgb()
-        )
-        assertEquals(
-            1f,
-            resolvePlaylistTranslucentTopBarColor(
-                playlistColor = Color(0xFF102030),
-                collapseProgress = 0f
-            ).alpha,
-            0.001f
-        )
-        assertEquals(
-            0f,
-            resolvePlaylistTranslucentTopBarColor(
-                playlistColor = Color(0xFF102030),
-                collapseProgress = 1f
-            ).alpha,
-            0.001f
-        )
-    }
-
-    @Test
-    fun keepsSelectionTopBarSolidUntilPlaylistHeaderScrollsAway() {
-        val playlistColor = Color(0xFF70523D)
-        val collapsedContentColor = Color(0xFF191712)
-
-        assertEquals(
-            playlistColor.toArgb(),
-            resolvePlaylistSelectionTopBarColor(
-                playlistColor = playlistColor,
-                collapseProgress = 0f
-            ).toArgb()
-        )
-        assertEquals(
-            playlistColor.toArgb(),
-            resolvePlaylistSelectionTopBarColor(
-                playlistColor = playlistColor,
-                collapseProgress = 0.75f
-            ).toArgb()
-        )
-        assertEquals(
-            Color.Transparent.toArgb(),
-            resolvePlaylistSelectionTopBarColor(
-                playlistColor = playlistColor,
-                collapseProgress = 1f
-            ).toArgb()
-        )
-        assertEquals(
-            resolvePlaylistSolidTopBarContentColor(playlistColor).toArgb(),
-            resolvePlaylistSelectionTopBarContentColor(
-                playlistColor = playlistColor,
-                collapsedContentColor = collapsedContentColor,
-                collapseProgress = 0.75f
-            ).toArgb()
-        )
-        assertEquals(
-            collapsedContentColor.toArgb(),
-            resolvePlaylistSelectionTopBarContentColor(
-                playlistColor = playlistColor,
-                collapsedContentColor = collapsedContentColor,
-                collapseProgress = 1f
-            ).toArgb()
         )
     }
 

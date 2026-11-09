@@ -1539,8 +1539,6 @@ fun LocalPlaylistDetailScreen(
                         )
                     }
                 }
-                val playlistChromeVisualProgress =
-                    FastOutSlowInEasing.transform(playlistChromeCollapseProgress)
                 val headerSearchAlpha = resolvePlaylistHeaderSearchAlpha(
                     searchVisibilityProgress = searchSlotProgress,
                     chromeCollapseProgress = playlistChromeCollapseProgress
@@ -1549,24 +1547,12 @@ fun LocalPlaylistDetailScreen(
                     searchVisible = searchVisible,
                     visibilityProgress = headerSearchAlpha
                 )
-                val playlistTopBarColor = resolvePlaylistTranslucentTopBarColor(
-                    playlistColor = playlistChromeColor,
-                    collapseProgress = playlistChromeVisualProgress
-                )
-                val playlistTopBarContentColor = interpolatePlaylistColor(
-                    start = resolvePlaylistSolidTopBarContentColor(playlistChromeColor),
-                    end = playlistModernCollapsedTopBarContentColor(),
-                    fraction = playlistChromeVisualProgress
-                )
-                val playlistSelectionTopBarColor = resolvePlaylistSelectionTopBarColor(
-                    playlistColor = playlistChromeColor,
-                    collapseProgress = playlistChromeCollapseProgress
-                )
-                val playlistSelectionTopBarContentColor = resolvePlaylistSelectionTopBarContentColor(
-                    playlistColor = playlistChromeColor,
-                    collapsedContentColor = playlistModernCollapsedTopBarContentColor(),
-                    collapseProgress = playlistChromeCollapseProgress
-                )
+                val playlistTopBarColor = playlistChromeColor
+                val playlistTopBarContentColor =
+                    resolvePlaylistSolidTopBarContentColor(playlistChromeColor)
+                val playlistSelectionTopBarColor = playlistChromeColor
+                val playlistSelectionTopBarContentColor =
+                    resolvePlaylistSolidTopBarContentColor(playlistChromeColor)
                 val dockedSearchGlassColor = playlistModernDockedSearchGlassColor(
                     playlistColor = playlistChromeColor
                 )
@@ -1599,7 +1585,7 @@ fun LocalPlaylistDetailScreen(
                     keyboardController?.show()
                 }
                 Scaffold(
-                containerColor = Color.Transparent,
+                containerColor = playlistChromeColor,
                 snackbarHost = { 
                     LyraSnackbarHost(
                         hostState = snackbarHostState,
@@ -1956,7 +1942,7 @@ fun LocalPlaylistDetailScreen(
                                         it.sameIdentityAs(song)
                                     }
                                     val rowContainerColor = if (isSelectedSong) {
-                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
+                                        playlistModernListPrimaryContentColor().copy(alpha = 0.10f)
                                     } else {
                                         Color.Transparent
                                     }
@@ -2032,7 +2018,9 @@ fun LocalPlaylistDetailScreen(
 
                                         // 标题/歌手
                                         Column(Modifier.weight(1f)) {
-                                            val downloaded = song.stableKey() in downloadedSongKeys
+                                            // 本地歌曲歌单内全是本地文件，无需再标已下载
+                                            val downloaded = !isLocalFilesPlaylist &&
+                                                song.stableKey() in downloadedSongKeys
                                             Text(
                                                 text = song.displayName(),
                                                 maxLines = 1,

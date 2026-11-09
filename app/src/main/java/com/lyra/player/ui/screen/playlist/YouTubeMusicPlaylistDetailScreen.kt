@@ -312,9 +312,6 @@ fun YouTubeMusicPlaylistDetailScreen(
             )
         }
     }
-    val playlistChromeVisualProgress = resolvePlaylistEasedProgress(
-        playlistChromeCollapseProgress
-    )
     val dockedSearchRevealProgress by remember(listState, density) {
         derivedStateOf {
             resolvePlaylistDockedSearchRevealProgress(
@@ -348,24 +345,12 @@ fun YouTubeMusicPlaylistDetailScreen(
     val searchFieldFocusInHeader =
         headerSearchVisible && dockedSearchRevealProgress < 0.5f
     val searchFieldComposed = headerSearchVisible || searchSlotVisible
-    val playlistTopBarColor = resolvePlaylistTranslucentTopBarColor(
-        playlistColor = playlistChromeColor,
-        collapseProgress = playlistChromeVisualProgress
-    )
-    val playlistTopBarContentColor = interpolatePlaylistColor(
-        start = resolvePlaylistSolidTopBarContentColor(playlistChromeColor),
-        end = playlistModernCollapsedTopBarContentColor(),
-        fraction = playlistChromeVisualProgress
-    )
-    val playlistSelectionTopBarColor = resolvePlaylistSelectionTopBarColor(
-        playlistColor = playlistChromeColor,
-        collapseProgress = playlistChromeCollapseProgress
-    )
-    val playlistSelectionTopBarContentColor = resolvePlaylistSelectionTopBarContentColor(
-        playlistColor = playlistChromeColor,
-        collapsedContentColor = playlistModernCollapsedTopBarContentColor(),
-        collapseProgress = playlistChromeCollapseProgress
-    )
+    val playlistTopBarColor = playlistChromeColor
+    val playlistTopBarContentColor =
+        resolvePlaylistSolidTopBarContentColor(playlistChromeColor)
+    val playlistSelectionTopBarColor = playlistChromeColor
+    val playlistSelectionTopBarContentColor =
+        resolvePlaylistSolidTopBarContentColor(playlistChromeColor)
     val autoShowKeyboard by AppContainer.settingsRepo.autoShowKeyboardFlow.collectAsState(
         initial = false
     )
@@ -447,7 +432,7 @@ fun YouTubeMusicPlaylistDetailScreen(
     }
 
     Scaffold(
-        containerColor = Color.Transparent,
+        containerColor = playlistChromeColor,
         snackbarHost = {
             LyraSnackbarHost(
                 hostState = snackbarHostState,
@@ -980,7 +965,7 @@ private fun PartialPlaylistBlock(onRetry: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            containerColor = playlistModernListPrimaryContentColor().copy(alpha = 0.10f)
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -1012,7 +997,10 @@ private fun LoadingBlock() {
     ) {
         CircularProgressIndicator()
         Spacer(modifier = Modifier.width(12.dp))
-        Text(text = stringResource(R.string.playlist_loading_content))
+        Text(
+            text = stringResource(R.string.playlist_loading_content),
+            color = playlistModernListPrimaryContentColor()
+        )
     }
 }
 
@@ -1030,7 +1018,7 @@ private fun ErrorBlock(
     ) {
         Text(
             text = stringResource(R.string.playlist_load_failed_format, message),
-            color = MaterialTheme.colorScheme.error
+            color = playlistModernListErrorContentColor()
         )
         HapticTextButton(onClick = onRetry) {
             Text(text = stringResource(R.string.action_retry))

@@ -505,9 +505,6 @@ fun DetailScreen(
             )
         }
     }
-    val playlistChromeVisualProgress = resolvePlaylistEasedProgress(
-        playlistChromeCollapseProgress
-    )
     val dockedSearchRevealProgress by remember(listState, density) {
         derivedStateOf {
             resolvePlaylistDockedSearchRevealProgress(
@@ -541,24 +538,12 @@ fun DetailScreen(
     val searchFieldFocusInHeader =
         headerSearchVisible && dockedSearchRevealProgress < 0.5f
     val searchFieldComposed = headerSearchVisible || searchSlotVisible
-    val playlistTopBarColor = resolvePlaylistTranslucentTopBarColor(
-        playlistColor = playlistChromeColor,
-        collapseProgress = playlistChromeVisualProgress
-    )
-    val playlistTopBarContentColor = interpolatePlaylistColor(
-        start = resolvePlaylistSolidTopBarContentColor(playlistChromeColor),
-        end = playlistModernCollapsedTopBarContentColor(),
-        fraction = playlistChromeVisualProgress
-    )
-    val playlistSelectionTopBarColor = resolvePlaylistSelectionTopBarColor(
-        playlistColor = playlistChromeColor,
-        collapseProgress = playlistChromeCollapseProgress
-    )
-    val playlistSelectionTopBarContentColor = resolvePlaylistSelectionTopBarContentColor(
-        playlistColor = playlistChromeColor,
-        collapsedContentColor = playlistModernCollapsedTopBarContentColor(),
-        collapseProgress = playlistChromeCollapseProgress
-    )
+    val playlistTopBarColor = playlistChromeColor
+    val playlistTopBarContentColor =
+        resolvePlaylistSolidTopBarContentColor(playlistChromeColor)
+    val playlistSelectionTopBarColor = playlistChromeColor
+    val playlistSelectionTopBarContentColor =
+        resolvePlaylistSolidTopBarContentColor(playlistChromeColor)
     val autoShowKeyboard by AppContainer.settingsRepo.autoShowKeyboardFlow.collectAsState(
         initial = false
     )
@@ -601,7 +586,7 @@ fun DetailScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                color = Color.Transparent
+                color = playlistChromeColor
             ) {
                 val miniPlayerHeight = LocalMiniPlayerHeight.current
                 Column {
@@ -902,7 +887,10 @@ fun DetailScreen(
                                             ) {
                                                 CircularProgressIndicator()
                                                 Spacer(modifier = Modifier.width(12.dp))
-                                                Text(stringResource(R.string.playlist_loading_content))
+                                                Text(
+                                                    text = stringResource(R.string.playlist_loading_content),
+                                                    color = playlistModernListPrimaryContentColor()
+                                                )
                                             }
                                         }
                                     }
@@ -922,7 +910,7 @@ fun DetailScreen(
                                             ) {
                                                 Text(
                                                     text = stringResource(R.string.playlist_load_failed_format, ui.error),
-                                                    color = MaterialTheme.colorScheme.error
+                                                    color = playlistModernListErrorContentColor()
                                                 )
                                                 Spacer(Modifier.height(8.dp))
                                                 RetryChip(onRetry)

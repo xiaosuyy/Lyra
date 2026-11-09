@@ -875,36 +875,6 @@ private fun playlistModernSheetContentColor(): Color {
     }
 }
 
-@Composable
-internal fun playlistModernExpandedTopBarColor(
-    playlistColor: Color
-): Color {
-    return resolvePlaylistTranslucentTopBarColor(
-        playlistColor = playlistColor,
-        collapseProgress = 0f
-    )
-}
-
-@Composable
-internal fun playlistModernCollapsedTopBarColor(
-    playlistColor: Color? = null
-): Color {
-    return playlistColor?.let {
-        resolvePlaylistTranslucentTopBarColor(
-            playlistColor = it,
-            collapseProgress = 1f
-        )
-    } ?: Color.Transparent
-}
-
-@Composable
-internal fun playlistModernCollapsedTopBarContentColor(
-    playlistColor: Color? = null
-): Color {
-    if (playlistColor == null) return playlistModernListPrimaryContentColor()
-    return resolvePlaylistSolidTopBarContentColor(playlistColor)
-}
-
 internal fun resolvePlaylistSolidTopBarContentColor(
     playlistColor: Color
 ): Color {
@@ -915,39 +885,9 @@ internal fun resolvePlaylistSolidTopBarContentColor(
     }
 }
 
-internal fun resolvePlaylistTranslucentTopBarColor(
-    playlistColor: Color,
-    collapseProgress: Float
-): Color {
-    val progress = collapseProgress.coerceIn(0f, 1f)
-    val alpha = 1f - progress
-    return playlistColor.copy(alpha = alpha)
-}
-
-internal fun resolvePlaylistSelectionTopBarColor(
-    playlistColor: Color,
-    collapseProgress: Float
-): Color {
-    val progress = collapseProgress.coerceIn(0f, 1f)
-    return if (progress < 1f) playlistColor else Color.Transparent
-}
-
-internal fun resolvePlaylistSelectionTopBarContentColor(
-    playlistColor: Color,
-    collapsedContentColor: Color,
-    collapseProgress: Float
-): Color {
-    val progress = collapseProgress.coerceIn(0f, 1f)
-    return if (progress < 1f) {
-        resolvePlaylistSolidTopBarContentColor(playlistColor)
-    } else {
-        collapsedContentColor
-    }
-}
-
 @Composable
 internal fun playlistModernListPrimaryContentColor(): Color {
-    return if (playlistModernUsesDarkSurface()) {
+    return if (playlistModernListSurfaceIsDark()) {
         Color.White.copy(alpha = 0.95f)
     } else {
         Color(0xFF17191F)
@@ -956,7 +896,7 @@ internal fun playlistModernListPrimaryContentColor(): Color {
 
 @Composable
 internal fun playlistModernListSecondaryContentColor(): Color {
-    return if (playlistModernUsesDarkSurface()) {
+    return if (playlistModernListSurfaceIsDark()) {
         Color.White.copy(alpha = 0.72f)
     } else {
         Color(0xFF4C505B)
@@ -965,7 +905,7 @@ internal fun playlistModernListSecondaryContentColor(): Color {
 
 @Composable
 internal fun playlistModernListTertiaryContentColor(): Color {
-    return if (playlistModernUsesDarkSurface()) {
+    return if (playlistModernListSurfaceIsDark()) {
         Color.White.copy(alpha = 0.62f)
     } else {
         Color(0xFF5E6270)
@@ -973,8 +913,27 @@ internal fun playlistModernListTertiaryContentColor(): Color {
 }
 
 @Composable
+internal fun playlistModernListErrorContentColor(): Color {
+    return if (playlistModernListSurfaceIsDark()) {
+        Color(0xFFFF8A80)
+    } else {
+        MaterialTheme.colorScheme.error
+    }
+}
+
+@Composable
 private fun playlistModernListContainerColor(): Color {
     return MaterialTheme.colorScheme.background
+}
+
+@Composable
+private fun playlistModernListSurfaceIsDark(): Boolean {
+    val background = LocalPlaylistHeroVisualColors.current?.background
+    return if (background != null) {
+        ColorUtils.calculateLuminance(background.toArgb()) < 0.5f
+    } else {
+        playlistModernUsesDarkSurface()
+    }
 }
 
 @Composable

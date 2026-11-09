@@ -2,7 +2,7 @@
 <resources>
     <!-- Local Playlists & Files -->
     <string name="local_title">Local</string>
-    <string name="local_files">Local Files</string>
+    <string name="local_files">Local Songs</string>
     <string name="local_files_manual_added">Manually Added</string>
     <string name="local_files_downloaded">Downloaded</string>
     <string name="local_files_delete_downloaded_title">Delete Downloaded Songs</string>
