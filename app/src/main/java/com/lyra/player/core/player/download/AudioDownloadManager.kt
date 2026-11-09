@@ -53,6 +53,8 @@ import com.lyra.player.R
 import com.lyra.player.core.api.bili.resolveBiliSong
 import com.lyra.player.core.api.youtube.YouTubePlayableAudio
 import com.lyra.player.core.api.youtube.YouTubePlayableStreamType
+import com.lyra.player.core.customsource.CUSTOM_SOURCE_NETEASE
+import com.lyra.player.core.customsource.customSourceIdForSong
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.download.GlobalDownloadManager.clearSongCancelled
@@ -62,9 +64,17 @@ import com.lyra.player.core.download.policy.shouldUseIndexedSidecarLookup
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.player.engine.datasource.ChunkRequestIOException
 import com.lyra.player.core.player.engine.datasource.ResumableHttpRangeSupport
+import com.lyra.player.core.player.model.SongUrlResult
 import com.lyra.player.core.player.resolver.netease.NeteasePlaybackResponseParser
 import com.lyra.player.core.player.resolver.youtube.YouTubeGoogleVideoRangeSupport
+import com.lyra.player.core.player.url.NETEASE_CUSTOM_SOURCE_QUALITY_ATTEMPTS
+import com.lyra.player.core.player.url.NETEASE_CUSTOM_SOURCE_TIMEOUT_MS
+import com.lyra.player.core.player.url.getCustomSourceAudioUrl
+import com.lyra.player.core.player.url.getNeteaseGdFallbackAudioUrl
+import com.lyra.player.core.player.url.getNeteaseSongUrl
+import com.lyra.player.core.player.url.isGdApiEnabled
 import com.lyra.player.data.platform.bili.BiliAudioStreamInfo
+import com.lyra.player.data.platform.bili.isBiliStreamUrl
 import com.lyra.player.data.local.media.LocalMediaSupport
 import com.lyra.player.data.local.media.LocalSongSupport
 import com.lyra.player.data.auth.youtube.YOUTUBE_MUSIC_ORIGIN
@@ -289,7 +299,9 @@ object AudioDownloadManager {
         val fileExtensionHint: String? = null,
         val streamType: YouTubePlayableStreamType = YouTubePlayableStreamType.DIRECT,
         val contentLength: Long? = null,
-        val durationMs: Long? = null
+        val durationMs: Long? = null,
+        // 网易云受限歌曲兜底到 B 站音源时, 直链同样需要 B 站 Referer/UA/Cookie
+        val requiresBiliHeaders: Boolean = false
     )
 
     internal enum class DownloadTransportKind {
@@ -1135,6 +1147,11 @@ object AudioDownloadManager {
 
                     val isYouTubeMusic = isYouTubeMusicSong(song)
                     val isBili = song.album.startsWith(PlayerManager.BILI_SOURCE_TAG)
+                    val customSourceId = if (isYouTubeMusic || isBili) {
+                        null
+                    } else {
+                        customSourceIdForSong(song)
+                    }
                     var attemptNumber = 1
                     var activeTransportKind: DownloadTransportKind? = null
                     var activeWorkingFileName: String? = null
@@ -1151,7 +1168,8 @@ object AudioDownloadManager {
                                     avoidDirect = avoidYouTubeDirectSource
                                 )
                                 isBili -> resolveBili(song)
-                                else -> resolveNetease(song.id)
+                                customSourceId != null -> resolveCustomSource(song, customSourceId)
+                                else -> resolveNetease(song)
                             }
                             if (resolved == null) {
                                 if (attemptNumber < TRANSIENT_DOWNLOAD_MAX_ATTEMPTS) {
@@ -1214,7 +1232,7 @@ object AudioDownloadManager {
                             val fileName = if (ext.isNullOrBlank()) baseName else "$baseName.$ext"
 
                             val reqBuilder = Request.Builder().url(url)
-                            if (isBili) {
+                            if (isBili || resolved.requiresBiliHeaders) {
                                 val cookieMap = AppContainer.biliCookieRepo.getCookiesOnce()
                                 val cookieHeader = cookieMap.entries.joinToString("; ") { (k, v) -> "$k=$v" }
                                 reqBuilder
@@ -2849,14 +2867,68 @@ object AudioDownloadManager {
     }
 
     // 解析网易云直链
-    private suspend fun resolveNetease(songId: Long): ResolvedDownloadSource? {
+    // 受限/VIP 歌曲的官方接口只会返回试听片段；下载必须复用播放侧同一条取链链路，
+    // 播放能拿到完整音源，下载就从同一个来源取完整音频
+    private suspend fun resolveNetease(song: SongItem): ResolvedDownloadSource? {
+        resolveNeteasePlaybackSource(song)?.let { return it }
+        return resolveNeteaseDirect(song)
+    }
+
+    private suspend fun resolveNeteasePlaybackSource(song: SongItem): ResolvedDownloadSource? {
+        if (!PlayerManager.initialized) return null
+        // allowPreviewFallback=true 只是让最后一档试听结果能被识别出来；
+        // 完整音源存在时这里返回的一定是非试听结果
+        val playbackResult = runCatching {
+            PlayerManager.getNeteaseSongUrl(
+                song = song,
+                suppressError = true,
+                allowLocalFallback = false,
+                allowPreviewFallback = true
+            )
+        }.getOrNull()
+        val success = playbackResult as? SongUrlResult.Success
+        if (success != null && !success.isPreviewClip) {
+            LyraLogger.d(
+                TAG,
+                "下载复用播放取链结果: song=${song.name}, source=${success.audioInfo?.source}, url=${success.url.take(160)}"
+            )
+            return success.toResolvedDownloadSource()
+        }
+        // 播放侧对“仅试听 / 无权限”还有 GD 或通用自定义源兜底
+        resolveNeteaseScriptedFallback(song)?.let { return it }
+        if (success != null) {
+            LyraLogger.w(TAG, "下载未找到完整音源，退回官方试听片段: song=${song.name}")
+            return success.toResolvedDownloadSource()
+        }
+        return null
+    }
+
+    private suspend fun resolveNeteaseScriptedFallback(song: SongItem): ResolvedDownloadSource? {
+        if (!PlayerManager.initialized) return null
+        val result = runCatching {
+            if (isGdApiEnabled()) {
+                PlayerManager.getNeteaseGdFallbackAudioUrl(song = song)
+            } else {
+                PlayerManager.getCustomSourceAudioUrl(
+                    song = song,
+                    sourceId = CUSTOM_SOURCE_NETEASE,
+                    maxQualityAttempts = NETEASE_CUSTOM_SOURCE_QUALITY_ATTEMPTS,
+                    timeoutMs = NETEASE_CUSTOM_SOURCE_TIMEOUT_MS
+                )
+            }
+        }.getOrNull() as? SongUrlResult.Success ?: return null
+        LyraLogger.d(TAG, "下载兜底取链成功: song=${song.name}, url=${result.url.take(160)}")
+        return result.toResolvedDownloadSource()
+    }
+
+    private suspend fun resolveNeteaseDirect(song: SongItem): ResolvedDownloadSource? {
         val quality = try { AppContainer.settingsRepo.audioQualityFlow.first() } catch (_: Exception) { "exhigh" }
-        val raw = AppContainer.neteaseClient.getSongDownloadUrl(songId, level = quality)
+        val raw = AppContainer.neteaseClient.getSongDownloadUrl(song.id, level = quality)
         return try {
             val root = JSONObject(raw)
-            if (root.optInt("code") != 200) return tryWeapiFallback(songId, quality)
+            if (root.optInt("code") != 200) return tryWeapiFallback(song.id, quality)
             val data = NeteasePlaybackResponseParser.parseDownloadInfo(raw)
-                ?: return tryWeapiFallback(songId, quality)
+                ?: return tryWeapiFallback(song.id, quality)
             val url = data.url
             val type = data.type.orEmpty() // e.g., mp3/flac
             val mime = guessMimeFromUrl(url)
@@ -2866,8 +2938,30 @@ object AudioDownloadManager {
                 fileExtensionHint = type.lowercase().ifBlank { extFromUrl(url) }
             )
         } catch (_: Exception) {
-            tryWeapiFallback(songId, quality)
+            tryWeapiFallback(song.id, quality)
         }
+    }
+
+    private suspend fun resolveCustomSource(song: SongItem, sourceId: String): ResolvedDownloadSource? {
+        if (!PlayerManager.initialized) return null
+        val result = runCatching {
+            PlayerManager.getCustomSourceAudioUrl(song = song, sourceId = sourceId)
+        }.getOrNull() as? SongUrlResult.Success ?: return null
+        return result.toResolvedDownloadSource()
+    }
+
+    private fun SongUrlResult.Success.toResolvedDownloadSource(): ResolvedDownloadSource {
+        // 兜底链路返回的就是播放正在使用的直链, 原样保留协议, 避免改写后与播放行为不一致
+        val playbackUrl = url.trim()
+        val resolvedMime = mimeType?.takeIf { it.isNotBlank() } ?: guessMimeFromUrl(playbackUrl)
+        return ResolvedDownloadSource(
+            url = playbackUrl,
+            mimeType = resolvedMime,
+            fileExtensionHint = resolvedMime?.let(::mimeToExt) ?: extFromUrl(playbackUrl),
+            contentLength = expectedContentLength,
+            durationMs = durationMs,
+            requiresBiliHeaders = isBiliStreamUrl(playbackUrl)
+        )
     }
 
     private fun bitrateForQuality(level: String): Int = when (level.lowercase()) {
