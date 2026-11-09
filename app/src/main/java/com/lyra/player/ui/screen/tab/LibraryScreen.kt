@@ -29,6 +29,7 @@ import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +42,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,6 +58,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -67,7 +70,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Delete
@@ -80,10 +82,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import com.lyra.player.ui.melox.theme.MeloxShapes
+import com.lyra.player.ui.melox.theme.MeloxSystemColors
 import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.ui.theme.designsystem.LocalNeriColors
 import com.lyra.player.ui.theme.designsystem.LocalNeriTextStyles
@@ -118,6 +122,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -127,6 +133,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
@@ -536,13 +543,14 @@ private fun LibrarySectionChips(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = LyraSpacing.LG)
+            .padding(horizontal = 16.dp)
+            .height(30.dp)
             .clip(shape)
             // 这一行在内容捕获层内部：再让 backdrop 去采样所在的层会形成自引用，
             // 原生渲染直接 SIGSEGV（已实测）。这里只铺同色半透明表面（与底栏同口径），
             // 不再采样。
-            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f), shape)
-            .padding(5.dp),
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f), shape)
+            .padding(1.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         LibrarySection.entries.forEach { section ->
@@ -559,23 +567,20 @@ private fun LibrarySectionChips(
             Box(
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .clip(shape)
                     .background(highlight)
                     .clickable(
                         interactionSource = null,
                         indication = null,
-                    ) { onSelect(section) }
-                    .padding(vertical = 10.dp),
+                    ) { onSelect(section) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = stringResource(section.labelResId),
-                    style = MeloxType.subheadline,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.onBackground
-                    } else {
-                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.62f)
-                    },
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1
                 )
             }
@@ -689,19 +694,34 @@ private fun LibraryRecentContent(
         contentPadding = PaddingValues(bottom = miniPlayerHeight + LyraSpacing.MD)
     ) {
         item(key = "library_recent_play_all") {
-            LibraryPlayAllRow(onClick = { onSongClick(filteredSongs, 0) })
+            Column {
+                LibraryPlayAllRow(onClick = { onSongClick(filteredSongs, 0) })
+                LibraryInsetDivider(leading = 68.dp)
+            }
         }
         itemsIndexed(
             items = filteredSongs,
             key = { index, song -> "${song.stableKey()}-$index" }
         ) { index, song ->
-            LibraryInlineSongRow(
-                song = song,
-                onClick = { onSongClick(filteredSongs, index) },
-                offlineMode = offlineMode
-            )
+            Column {
+                LibraryInlineSongRow(
+                    song = song,
+                    onClick = { onSongClick(filteredSongs, index) },
+                    offlineMode = offlineMode
+                )
+                LibraryInsetDivider(leading = 68.dp)
+            }
         }
     }
+}
+
+@Composable
+private fun LibraryInsetDivider(leading: Dp) {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = leading, end = 18.dp),
+        thickness = 0.6.dp,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
+    )
 }
 
 @Composable
@@ -792,15 +812,19 @@ private fun LibraryPlayAllRow(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(
-            imageVector = Icons.Filled.PlayArrow,
-            contentDescription = null,
-            modifier = Modifier.size(28.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+        Canvas(Modifier.size(28.dp)) {
+            val path = Path().apply {
+                moveTo(size.width * 0.24f, size.height * 0.12f)
+                lineTo(size.width * 0.86f, size.height * 0.50f)
+                lineTo(size.width * 0.24f, size.height * 0.88f)
+                close()
+            }
+            drawPath(path, MeloxSystemColors.HomeAccent)
+        }
         Text(
             text = stringResource(R.string.player_play_all),
             fontSize = 17.sp,
+            fontWeight = FontWeight.Normal,
             color = MaterialTheme.colorScheme.onBackground
         )
     }
@@ -2019,44 +2043,58 @@ private fun LibraryInlineSearchField(
     onQueryChange: (String) -> Unit,
     placeholderResId: Int
 ) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
+    val shape = RoundedCornerShape(20.dp)
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = LyraSpacing.LG, vertical = LyraSpacing.XS),
-        placeholder = {
-            Text(
-                stringResource(placeholderResId),
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.40f)
-            )
-        },
-        singleLine = true,
-        shape = RoundedCornerShape(LyraRadius.Full),
-        textStyle = MeloxType.body,
-        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.10f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
-            focusedBorderColor = Color.Transparent,
-            unfocusedBorderColor = Color.Transparent,
-            focusedTextColor = MaterialTheme.colorScheme.onBackground,
-            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-            cursorColor = MaterialTheme.colorScheme.primary
-        ),
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                HapticIconButton(onClick = { onQueryChange("") }) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.action_clear),
-                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
-                        modifier = Modifier.size(20.dp)
-                    )
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f), shape)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            textStyle = MeloxType.subheadline.copy(
+                color = MaterialTheme.colorScheme.onBackground
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            decorationBox = { innerTextField ->
+                Box {
+                    if (query.isEmpty()) {
+                        Text(
+                            text = stringResource(placeholderResId),
+                            style = MeloxType.subheadline,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.40f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    innerTextField()
                 }
             }
-        },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
-    )
+        )
+        if (query.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(MeloxShapes.circle)
+                    .clickable { onQueryChange("") },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.action_clear),
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable
