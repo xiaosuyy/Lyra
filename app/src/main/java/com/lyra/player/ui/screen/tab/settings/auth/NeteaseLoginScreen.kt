@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.lyra.player.R
 import com.lyra.player.activity.auth.NeteaseWebLoginActivity
+import com.lyra.player.ui.melox.theme.MeloxShapes
 import com.lyra.player.ui.viewmodel.auth.NeteaseAccountProfile
 import com.lyra.player.ui.viewmodel.auth.NeteaseLoginUiState
 import com.lyra.player.ui.viewmodel.auth.NeteaseLoginViewModel
@@ -75,10 +76,10 @@ internal fun NeteaseAccountEntryCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(MeloxShapes.largeCard)
             .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
-        shape = RoundedCornerShape(18.dp)
+        color = MaterialTheme.colorScheme.surface,
+        shape = MeloxShapes.largeCard
     ) {
         Row(
             modifier = Modifier
@@ -91,29 +92,18 @@ internal fun NeteaseAccountEntryCard(
                 size = 44.dp
             )
             Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = when {
-                        uiState.isLoggedIn && !profile?.nickname.isNullOrBlank() -> profile.nickname
-                        uiState.isLoggedIn -> stringResource(R.string.netease_login_logged_in)
-                        else -> stringResource(R.string.netease_login_entry_title)
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1
-                )
-                Text(
-                    text = if (uiState.isLoggedIn) {
-                        stringResource(R.string.netease_login_logged_in)
-                    } else {
-                        stringResource(R.string.netease_login_entry_desc)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f),
-                    maxLines = 1
-                )
-            }
+            Text(
+                text = when {
+                    uiState.isLoggedIn && !profile?.nickname.isNullOrBlank() -> profile.nickname
+                    uiState.isLoggedIn -> stringResource(R.string.netease_login_logged_in)
+                    else -> stringResource(R.string.netease_login_entry_title)
+                },
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1
+            )
         }
     }
 }

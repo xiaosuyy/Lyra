@@ -103,28 +103,41 @@ internal enum class SettingsPage(
     )
 }
 
-internal val SettingsHomePageGroups: List<List<SettingsPage>> = listOf(
-    listOf(
-        SettingsPage.General
+internal data class SettingsHomeGroup(
+    val titleRes: Int,
+    val pages: List<SettingsPage>
+)
+
+internal val SettingsHomePageGroups: List<SettingsHomeGroup> = listOf(
+    SettingsHomeGroup(
+        titleRes = R.string.settings_group_app,
+        pages = listOf(
+            SettingsPage.General,
+            SettingsPage.Theme,
+            SettingsPage.Personalization,
+            SettingsPage.Motion
+        )
     ),
-    listOf(
-        SettingsPage.Theme,
-        SettingsPage.Personalization,
-        SettingsPage.Motion
+    SettingsHomeGroup(
+        titleRes = R.string.settings_group_playback,
+        pages = listOf(
+            SettingsPage.Playback,
+            SettingsPage.PlaybackSource,
+            SettingsPage.Lyrics
+        )
     ),
-    listOf(
-        SettingsPage.Playback,
-        SettingsPage.PlaybackSource,
-        SettingsPage.Lyrics
+    SettingsHomeGroup(
+        titleRes = R.string.settings_group_network_storage,
+        pages = listOf(
+            SettingsPage.Network,
+            SettingsPage.Downloads,
+            SettingsPage.Storage,
+            SettingsPage.TrafficManagement
+        )
     ),
-    listOf(
-        SettingsPage.Network,
-        SettingsPage.Downloads,
-        SettingsPage.Storage,
-        SettingsPage.TrafficManagement
-    ),
-    listOf(
-        SettingsPage.About
+    SettingsHomeGroup(
+        titleRes = R.string.settings_group_about,
+        pages = listOf(SettingsPage.About)
     )
 )
 

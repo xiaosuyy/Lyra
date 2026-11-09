@@ -9,6 +9,11 @@
     <string name="settings_general">通用</string>
     <string name="settings_general_desc">语言、触感和全局行为</string>
     <string name="settings_accounts_desc">管理哔哩哔哩和 YouTube 登录状态</string>
+    <string name="settings_group_account">账号</string>
+    <string name="settings_group_app">应用</string>
+    <string name="settings_group_playback">播放</string>
+    <string name="settings_group_network_storage">网络与存储</string>
+    <string name="settings_group_about">关于</string>
     <string name="settings_personalization">个性化</string>
     <string name="settings_network">网络设置</string>
     <string name="settings_bypass_proxy">绕过系统代理</string>

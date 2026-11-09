@@ -197,6 +197,7 @@ import com.lyra.player.ui.screen.tab.settings.page.MiuixSettingsPageGroupCard
 import com.lyra.player.ui.screen.tab.settings.page.MiuixSettingsResponsiveDetailScaffold
 import com.lyra.player.ui.screen.tab.settings.page.MiuixSettingsSectionCard
 import com.lyra.player.ui.screen.tab.settings.page.MiuixSettingsSectionIntro
+import com.lyra.player.ui.screen.tab.settings.page.MiuixSettingsSectionLabel
 import com.lyra.player.ui.screen.tab.settings.page.SettingsPage
 import com.lyra.player.ui.screen.tab.settings.page.SettingsHomePageGroups
 import com.lyra.player.ui.screen.tab.settings.page.SettingsSearchEntry
@@ -1154,14 +1155,18 @@ fun SettingsScreen(
             )
         }
         item(key = "settings_netease_account") {
-            NeteaseAccountEntryCard(
-                uiState = neteaseLoginUiState,
-                onClick = {
-                    neteaseLoginVm.clearError()
-                    showNeteaseLogin = true
-                },
-                modifier = Modifier.animateItem()
-            )
+            Column(modifier = Modifier.animateItem()) {
+                MiuixSettingsSectionLabel(
+                    text = stringResource(R.string.settings_group_account)
+                )
+                NeteaseAccountEntryCard(
+                    uiState = neteaseLoginUiState,
+                    onClick = {
+                        neteaseLoginVm.clearError()
+                        showNeteaseLogin = true
+                    }
+                )
+            }
         }
         if (settingsSearchQuery.isNotBlank()) {
             item(key = "settings_search_results") {
@@ -1172,14 +1177,18 @@ fun SettingsScreen(
                 )
             }
         }
-        SettingsHomePageGroups.forEachIndexed { groupIndex, pages ->
+        SettingsHomePageGroups.forEachIndexed { groupIndex, group ->
             item(key = "settings_group_$groupIndex") {
-                MiuixSettingsPageGroupCard(
-                    pages = pages,
-                    onPageClick = { page -> activeSettingsPage = page },
-                    selectedPage = activeSettingsPage?.backTargetPage() ?: activeSettingsPage,
-                    modifier = Modifier.animateItem()
-                )
+                Column(modifier = Modifier.animateItem()) {
+                    MiuixSettingsSectionLabel(
+                        text = stringResource(group.titleRes)
+                    )
+                    MiuixSettingsPageGroupCard(
+                        pages = group.pages,
+                        onPageClick = { page -> activeSettingsPage = page },
+                        selectedPage = activeSettingsPage?.backTargetPage() ?: activeSettingsPage
+                    )
+                }
             }
         }
     }
@@ -1210,7 +1219,6 @@ fun SettingsScreen(
                     MiuixSettingsHeader(
                         icon = selectedPage.icon,
                         title = stringResource(selectedPage.titleRes),
-                        description = stringResource(selectedPage.descriptionRes),
                         modifier = Modifier
                             .animateItem()
                             .settingsHighlightTarget(

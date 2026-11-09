@@ -9,6 +9,11 @@
     <string name="settings_general">General</string>
     <string name="settings_general_desc">Language, haptics, and global behavior</string>
     <string name="settings_accounts_desc">Manage Bilibili and YouTube sign-in states</string>
+    <string name="settings_group_account">Account</string>
+    <string name="settings_group_app">App</string>
+    <string name="settings_group_playback">Playback</string>
+    <string name="settings_group_network_storage">Network &amp; Storage</string>
+    <string name="settings_group_about">About</string>
     <string name="settings_personalization">Personalization</string>
     <string name="settings_network">Network</string>
     <string name="settings_bypass_proxy">Bypass Proxy</string>

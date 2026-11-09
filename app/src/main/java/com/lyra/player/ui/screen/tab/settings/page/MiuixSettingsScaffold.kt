@@ -216,6 +216,21 @@ internal fun Modifier.settingsHighlightTarget(
 }
 
 @Composable
+internal fun MiuixSettingsSectionLabel(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, top = 4.dp, bottom = 6.dp),
+        style = MeloxType.caption,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+    )
+}
+
+@Composable
 internal fun MiuixSettingsSectionIntro(
     title: String,
     description: String,
@@ -317,23 +332,14 @@ private fun MiuixSettingsPageRow(
                 tint = accent
             )
         }
-        Column(
+        Text(
+            text = stringResource(page.titleRes),
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = stringResource(page.titleRes),
-                style = MeloxType.body,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = stringResource(page.descriptionRes),
-                style = MeloxType.subheadline,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+            style = MeloxType.body,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
         Icon(
             imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
             contentDescription = null,
@@ -561,7 +567,6 @@ internal fun MiuixSettingsResponsiveDetailScaffold(
 internal fun MiuixSettingsHeader(
     icon: ImageVector,
     title: String,
-    description: String,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -578,18 +583,11 @@ internal fun MiuixSettingsHeader(
             modifier = Modifier.size(26.dp),
             tint = MaterialTheme.colorScheme.primary
         )
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                text = title,
-                style = MeloxType.headline,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = description,
-                style = MeloxType.subheadline,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f)
-            )
-        }
+        Text(
+            text = title,
+            style = MeloxType.headline,
+            color = MaterialTheme.colorScheme.onBackground
+        )
     }
 }
 

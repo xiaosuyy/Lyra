@@ -18,9 +18,11 @@ class SettingsPageTest {
     @Test
     fun settingsHomePageGroupsDoNotCaptureNullDuringEnumInitialization() {
         @Suppress("UNCHECKED_CAST")
-        val groups = SettingsHomePageGroups as List<List<SettingsPage?>>
+        val pages = SettingsHomePageGroups.flatMap { group ->
+            group.pages as List<SettingsPage?>
+        }
 
-        groups.flatten().forEach { page ->
+        pages.forEach { page ->
             assertNotNull(page)
         }
     }
@@ -60,19 +62,40 @@ class SettingsPageTest {
     }
 
     @Test
-    fun generalPageIsPinnedAsTheFirstHomeItem() {
-        assertEquals(SettingsPage.General, SettingsHomePageGroups.first().first())
+    fun generalPageIsFirstInTheFirstHomeGroup() {
+        assertEquals(
+            SettingsPage.General,
+            SettingsHomePageGroups.first().pages.first()
+        )
     }
 
     @Test
     fun themePersonalizationAndMotionStayInOneHomeGroup() {
         val visualGroup = SettingsHomePageGroups.first {
-            SettingsPage.Theme in it
+            SettingsPage.Theme in it.pages
         }
 
         assertEquals(
-            listOf(SettingsPage.Theme, SettingsPage.Personalization, SettingsPage.Motion),
-            visualGroup
+            listOf(
+                SettingsPage.General,
+                SettingsPage.Theme,
+                SettingsPage.Personalization,
+                SettingsPage.Motion
+            ),
+            visualGroup.pages
+        )
+    }
+
+    @Test
+    fun homeGroupsUseSectionLabels() {
+        assertEquals(
+            listOf(
+                R.string.settings_group_app,
+                R.string.settings_group_playback,
+                R.string.settings_group_network_storage,
+                R.string.settings_group_about
+            ),
+            SettingsHomePageGroups.map { it.titleRes }
         )
     }
 
