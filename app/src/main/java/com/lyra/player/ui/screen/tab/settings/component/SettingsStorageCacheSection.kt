@@ -197,7 +197,6 @@ internal fun SettingsStorageCacheSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_storage_download_section),
-                    description = stringResource(R.string.settings_storage_download_section_desc)
                 )
                 AutoSettingsListItem(
                     setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.DOWNLOAD_DIRECTORY_URI),
@@ -211,7 +210,6 @@ internal fun SettingsStorageCacheSection(
                     },
                     supportingContent = {
                         Column {
-                            Text(stringResource(R.string.settings_download_directory_desc))
                             Text(
                                 text = stringResource(
                                     R.string.settings_download_directory_current,
@@ -219,11 +217,6 @@ internal fun SettingsStorageCacheSection(
                                 ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = stringResource(R.string.settings_download_directory_hint),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
                             )
                             if (!downloadDirectoryChangeEnabled) {
                                 Text(
@@ -266,9 +259,6 @@ internal fun SettingsStorageCacheSection(
                             )
                         },
                         headlineContent = { Text(stringResource(R.string.settings_download_directory_reset)) },
-                        supportingContent = {
-                            Text(stringResource(R.string.settings_download_directory_reset_desc))
-                        },
                         modifier = Modifier
                             .alpha(if (downloadDirectoryChangeEnabled) 1f else 0.6f)
                             .settingsItemClickable(
@@ -286,7 +276,6 @@ internal fun SettingsStorageCacheSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_storage_filename_section),
-                    description = stringResource(R.string.settings_storage_filename_section_desc)
                 )
                 AutoSettingsListItem(
                     setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.DOWNLOAD_FILE_NAME_TEMPLATE),
@@ -300,7 +289,6 @@ internal fun SettingsStorageCacheSection(
                     },
                     supportingContent = {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(stringResource(R.string.settings_download_file_name_format_desc))
                             Text(
                                 text = effectiveTemplate,
                                 style = MaterialTheme.typography.bodySmall,
@@ -336,7 +324,6 @@ internal fun SettingsStorageCacheSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_storage_cache_limit_section),
-                    description = stringResource(R.string.settings_storage_cache_limit_section_desc)
                 )
                 AutoSettingsListItem(
                     setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.MAX_CACHE_SIZE_BYTES),
@@ -402,11 +389,9 @@ internal fun SettingsStorageCacheSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_storage_cache_clear_section),
-                    description = stringResource(R.string.settings_storage_cache_clear_section_desc)
                 )
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_clear_cache)) },
-                    supportingContent = { Text(stringResource(R.string.settings_clear_cache_desc)) },
                     trailingContent = {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             MiuixSettingsOutlinedButton(

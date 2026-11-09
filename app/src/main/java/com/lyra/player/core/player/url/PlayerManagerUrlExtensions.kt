@@ -206,9 +206,6 @@ internal suspend fun PlayerManager.resolveSongUrl(
                 shouldApplyCacheMutation = shouldApplyCacheMutation
             )
         }
-        sideEffects.emitError {
-            postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(R.string.error_no_play_url)))
-        }
         return SongUrlResult.Failure
     }
 
@@ -1316,9 +1313,6 @@ private suspend fun PlayerManager.getGdStudioAudioUrl(
             "LYRA-PlayerManager",
             "GD 取直链失败: source=$gdSource id=$trackId song=${song.name}"
         )
-        sideEffects.emitError {
-            postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(R.string.error_no_play_url)))
-        }
         SongUrlResult.Failure
     } else {
         LyraLogger.i(
@@ -1555,35 +1549,20 @@ internal suspend fun PlayerManager.getNeteaseSongUrl(
 
         // 已经拿到明确的平台响应（无权限 / 无直链）时，重复请求不会改变结果
         onPermanentFailure()
-        // 平台明确拒绝时即使处于“中间重试”也要提示一次，避免用户只看到无声跳过
-        if (!suppressError || lastFailureReason != null) {
-            val messageRes = when (lastFailureReason) {
-                NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION ->
-                    R.string.player_netease_no_permission_switch_platform
-                NeteasePlaybackResponseParser.FailureReason.NO_PLAY_URL,
-                NeteasePlaybackResponseParser.FailureReason.UNKNOWN,
-                null -> R.string.error_no_play_url
-            }
+        // 仅平台明确拒绝时提示切换到其他平台；无直链这类播放失败静默跳过
+        if (lastFailureReason == NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION) {
             sideEffects.emitError {
-                postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(messageRes)))
+                postPlayerEvent(
+                    PlayerEvent.ShowError(
+                        getLocalizedString(R.string.player_netease_no_permission_switch_platform)
+                    )
+                )
             }
         }
         SongUrlResult.Failure
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         LyraLogger.e("LYRA-PlayerManager", "Failed to get url", e)
-        if (!suppressError) {
-            sideEffects.emitError {
-                postPlayerEvent(
-                    PlayerEvent.ShowError(
-                        getLocalizedString(
-                            R.string.player_playback_url_error_detail,
-                            e.message.orEmpty()
-                        )
-                    )
-                )
-            }
-        }
         SongUrlResult.Failure
     }
 }
@@ -1597,15 +1576,6 @@ private suspend fun PlayerManager.getBiliAudioUrl(
     try {
         val resolved = resolveBiliSong(song, biliClient)
         if (resolved == null || resolved.cid == 0L) {
-            if (!suppressError) {
-                sideEffects.emitError {
-                    postPlayerEvent(
-                        PlayerEvent.ShowError(
-                            getLocalizedString(R.string.player_playback_video_info_unavailable)
-                        )
-                    )
-                }
-            }
             return@withContext SongUrlResult.Failure
         }
 
@@ -1655,28 +1625,11 @@ private suspend fun PlayerManager.getBiliAudioUrl(
                 representationIdentity = buildBiliRepresentationIdentity(audioStream)
             )
         } else {
-            if (!suppressError) {
-                sideEffects.emitError {
-                    postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(R.string.error_no_play_url)))
-                }
-            }
             SongUrlResult.Failure
         }
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         LyraLogger.e("LYRA-PlayerManager", "Failed to get Bili play url", e)
-        if (!suppressError) {
-            sideEffects.emitError {
-                postPlayerEvent(
-                    PlayerEvent.ShowError(
-                        getLocalizedString(
-                            R.string.player_playback_url_error_detail,
-                            e.message.orEmpty()
-                        )
-                    )
-                )
-            }
-        }
         SongUrlResult.Failure
     }
 }
@@ -1690,11 +1643,6 @@ private suspend fun PlayerManager.getYouTubeMusicAudioUrl(
 ): SongUrlResult = withContext(Dispatchers.IO) {
     val videoId = extractYouTubeMusicVideoId(song.mediaUri)
     if (videoId.isNullOrBlank()) {
-        if (!suppressError) {
-            sideEffects.emitError {
-                postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(R.string.error_no_play_url)))
-            }
-        }
         return@withContext SongUrlResult.Failure
     }
 
@@ -1745,11 +1693,6 @@ private suspend fun PlayerManager.getYouTubeMusicAudioUrl(
                 "LYRA-PlayerManager",
                 "Resolve YouTube Music stream returned empty: videoId=$videoId, elapsedMs=${System.currentTimeMillis() - resolveStartedAtMs}"
             )
-            if (!suppressError) {
-                sideEffects.emitError {
-                    postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(R.string.error_no_play_url)))
-                }
-            }
             SongUrlResult.Failure
         }
     } catch (e: Exception) {
@@ -1759,18 +1702,6 @@ private suspend fun PlayerManager.getYouTubeMusicAudioUrl(
             "Failed to get YouTube Music play url: videoId=$videoId, elapsedMs=${System.currentTimeMillis() - resolveStartedAtMs}",
             e
         )
-        if (!suppressError) {
-            sideEffects.emitError {
-                postPlayerEvent(
-                    PlayerEvent.ShowError(
-                        getLocalizedString(
-                            R.string.player_playback_url_error_detail,
-                            e.message.orEmpty()
-                        )
-                    )
-                )
-            }
-        }
         SongUrlResult.Failure
     }
 }

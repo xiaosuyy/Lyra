@@ -91,7 +91,6 @@ internal fun SettingsLyricsSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_lyrics_floating_section),
-                    description = stringResource(R.string.settings_lyrics_floating_section_desc)
                 )
                 SettingsFloatingLyricsSection(
                     preferences = floatingLyricsPreferences,
@@ -108,7 +107,6 @@ internal fun SettingsLyricsSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_lyrics_source_section),
-                    description = stringResource(R.string.settings_lyrics_source_section_desc)
                 )
                 AutoSettingsSwitchItems(
                     repository = autoSettingsRepository,

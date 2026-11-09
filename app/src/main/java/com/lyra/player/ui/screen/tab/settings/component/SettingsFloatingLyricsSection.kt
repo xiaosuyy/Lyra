@@ -233,11 +233,6 @@ internal fun SettingsFloatingLyricsSection(
         )
         FloatingLyricsSwitchListItem(
             title = stringResource(R.string.settings_floating_lyrics_enable),
-            description = if (overlayPermissionGranted) {
-                stringResource(R.string.settings_floating_lyrics_enable_desc)
-            } else {
-                stringResource(R.string.settings_floating_lyrics_permission_required)
-            },
             icon = Icons.Outlined.PictureInPictureAlt,
             checked = normalizedPreferences.enabled,
             targetId = "setting:floating_lyrics_enabled",
@@ -253,7 +248,6 @@ internal fun SettingsFloatingLyricsSection(
         )
         FloatingLyricsSwitchListItem(
             title = stringResource(R.string.settings_floating_lyrics_hide_in_app),
-            description = stringResource(R.string.settings_floating_lyrics_hide_in_app_desc),
             icon = Icons.Outlined.VisibilityOff,
             checked = normalizedPreferences.hideInApp,
             onCheckedChange = { hideInApp ->
@@ -262,7 +256,6 @@ internal fun SettingsFloatingLyricsSection(
         )
         FloatingLyricsSwitchListItem(
             title = stringResource(R.string.settings_floating_lyrics_long_press_drag),
-            description = stringResource(R.string.settings_floating_lyrics_long_press_drag_desc),
             icon = Icons.Outlined.OpenWith,
             checked = normalizedPreferences.longPressDragEnabled,
             onCheckedChange = { enabled ->
@@ -512,7 +505,6 @@ internal fun SettingsFloatingLyricsSection(
         )
         FloatingLyricsSwitchListItem(
             title = stringResource(R.string.settings_floating_lyrics_show_translation),
-            description = stringResource(R.string.settings_floating_lyrics_show_translation_desc),
             icon = Icons.Outlined.Translate,
             checked = normalizedPreferences.showTranslation,
             onCheckedChange = { showTranslation ->
@@ -521,9 +513,6 @@ internal fun SettingsFloatingLyricsSection(
         )
         FloatingLyricsSwitchListItem(
             title = stringResource(R.string.settings_floating_lyrics_disable_reveal_animation),
-            description = stringResource(
-                R.string.settings_floating_lyrics_disable_reveal_animation_desc
-            ),
             icon = Icons.Outlined.AutoAwesome,
             checked = !normalizedPreferences.revealAnimationEnabled,
             onCheckedChange = { disabled ->
@@ -536,7 +525,6 @@ internal fun SettingsFloatingLyricsSection(
 @Composable
 private fun FloatingLyricsSwitchListItem(
     title: String,
-    description: String,
     icon: ImageVector,
     checked: Boolean,
     targetId: String? = null,
@@ -563,7 +551,6 @@ private fun FloatingLyricsSwitchListItem(
             )
         },
         headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
         trailingContent = {
             MiuixSettingsSwitch(checked = checked, onCheckedChange = onCheckedChange)
         },

@@ -233,26 +233,16 @@ internal fun MiuixSettingsSectionLabel(
 @Composable
 internal fun MiuixSettingsSectionIntro(
     title: String,
-    description: String,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Text(
+        text = title,
         modifier = modifier
             .fillMaxWidth()
             .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Text(
-            text = title,
-            style = MeloxType.caption,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f)
-        )
-        Text(
-            text = description,
-            style = MeloxType.caption,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.36f)
-        )
-    }
+        style = MeloxType.caption,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f)
+    )
 }
 
 @Composable

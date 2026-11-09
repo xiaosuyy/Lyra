@@ -223,7 +223,6 @@ private fun SettingsDownloadExpandedContent(
                     )
                 },
                 headlineContent = { Text(stringResource(R.string.download_title)) },
-                supportingContent = { Text(stringResource(R.string.download_desc)) },
                 modifier = Modifier.settingsItemClickable(onClick = onNavigateToDownloadManager),
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
             )

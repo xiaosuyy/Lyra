@@ -189,9 +189,6 @@ private fun UsbExclusiveMasterSwitch(
         headlineContent = {
             Text(stringResource(R.string.settings_usb_exclusive_playback))
         },
-        supportingContent = {
-            Text(stringResource(R.string.settings_usb_exclusive_playback_desc))
-        },
         trailingContent = {
             MiuixSettingsSwitch(
                 checked = enabled,

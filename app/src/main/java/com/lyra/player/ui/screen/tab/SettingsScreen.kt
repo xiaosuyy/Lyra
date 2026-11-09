@@ -1270,7 +1270,6 @@ fun SettingsScreen(
                         )
                         MiuixSettingsSectionIntro(
                             title = stringResource(R.string.settings_ui_scale),
-                            description = stringResource(R.string.settings_ui_scale_global_desc)
                         )
                         AutoSettingsListItem(
                             setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.UI_DENSITY_SCALE),
@@ -1302,7 +1301,6 @@ fun SettingsScreen(
                     miuixSettingsSectionCardItem(key = "${selectedPage.name}:mode") {
                         MiuixSettingsSectionIntro(
                             title = stringResource(R.string.settings_theme_mode),
-                            description = stringResource(R.string.settings_theme_mode_desc)
                         )
                         ThemeModeSelectorListItem(
                             isDarkTheme = isDarkTheme,
@@ -1324,7 +1322,6 @@ fun SettingsScreen(
                     miuixSettingsSectionCardItem(key = "${selectedPage.name}:accent_color") {
                         MiuixSettingsSectionIntro(
                             title = stringResource(R.string.settings_accent_color_section),
-                            description = stringResource(R.string.settings_accent_color_section_desc)
                         )
                         AccentColorListItem(
                             accentColorHex = accentColorHex,
@@ -2222,7 +2219,6 @@ private fun ThemeModeSelectorListItem(
         headlineContent = { Text(stringResource(R.string.settings_theme_mode)) },
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.settings_theme_mode_desc))
                 MiuixSettingsSegmentedTabs(
                     modifier = Modifier.onGloballyPositioned { coordinates ->
                         tabsTopLeftInWindow = coordinates.positionInWindow()
@@ -2296,9 +2292,6 @@ private fun ThemeAutoModeListItem(
             )
         },
         headlineContent = { Text(stringResource(R.string.settings_theme_mode_auto)) },
-        supportingContent = {
-            Text(stringResource(R.string.settings_theme_mode_auto_desc))
-        },
         trailingContent = {
             Box(
                 modifier = Modifier.onGloballyPositioned { coordinates ->
@@ -2372,7 +2365,6 @@ private fun SettingsPersonalizationPageContent(
         if (shouldShowCard(0)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_start_section),
-                description = stringResource(R.string.settings_personalization_start_section_desc)
             )
             AutoSettingsListItem(
                 setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.DEFAULT_START_DESTINATION),
@@ -2413,7 +2405,6 @@ private fun SettingsPersonalizationPageContent(
         if (shouldShowCard(1)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_playback_info_section),
-                description = stringResource(R.string.settings_personalization_playback_info_section_desc)
             )
             PersonalizationSwitchItem(
                 setting = AutoSettingsMetadata.requireSetting(
@@ -2454,7 +2445,6 @@ private fun SettingsPersonalizationPageContent(
         if (shouldShowCard(2)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_playback_controls_section),
-                description = stringResource(R.string.settings_personalization_playback_controls_section_desc)
             )
             PersonalizationSwitchItem(
                 setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.NOWPLAYING_KEEP_SCREEN_ON),
@@ -2482,7 +2472,6 @@ private fun SettingsPersonalizationPageContent(
         if (shouldShowCard(3)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_background_section),
-                description = stringResource(R.string.settings_personalization_background_section_desc)
             )
             AutoSettingsListItem(
                 setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.BACKGROUND_IMAGE_URI),
@@ -2569,7 +2558,6 @@ private fun SettingsLyricsAppearanceContent(
 
     MiuixSettingsSectionIntro(
         title = stringResource(R.string.settings_lyrics_appearance_section),
-        description = stringResource(R.string.settings_lyrics_appearance_section_desc)
     )
     PersonalizationSwitchItem(
         setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.SHOW_LYRIC_TRANSLATION),
@@ -2593,7 +2581,6 @@ private fun SettingsLyricsAppearanceContent(
     )
     MiuixSettingsSectionIntro(
         title = stringResource(R.string.settings_lyrics_page_section),
-        description = stringResource(R.string.settings_lyrics_page_section_desc)
     )
     LyricFontScaleSettingsItem(
         setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.LYRICS_PAGE_LYRIC_FONT_SCALE),
@@ -2652,7 +2639,6 @@ private fun PlaybackControlLayoutSettings(
         targetId = "setting:lyrics_control_size",
         icon = Icons.Outlined.TextFields,
         title = stringResource(R.string.settings_lyrics_control_size),
-        description = stringResource(R.string.settings_lyrics_control_size_desc),
         value = playbackControlSizeLabel(preferences.lyricsSize),
         onClick = {
             selectedSetting.value = PlaybackControlLayoutSetting.LYRICS_SIZE
@@ -2700,7 +2686,6 @@ private fun PlaybackControlLayoutListItem(
     targetId: String,
     icon: ImageVector,
     title: String,
-    description: String,
     value: String,
     onClick: () -> Unit,
     highlightTargetId: String?,
@@ -2725,13 +2710,6 @@ private fun PlaybackControlLayoutListItem(
             )
         },
         headlineContent = { Text(title) },
-        supportingContent = {
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
         trailingContent = {
             Text(
                 text = value,

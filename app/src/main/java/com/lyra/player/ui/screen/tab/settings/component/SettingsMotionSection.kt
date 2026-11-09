@@ -219,7 +219,6 @@ internal fun SettingsMotionSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_motion_general_section),
-                    description = stringResource(R.string.settings_motion_general_section_desc)
                 )
                 AutoSettingsSwitchItems(
                     repository = autoSettingsRepository,
@@ -240,7 +239,6 @@ internal fun SettingsMotionSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_motion_glass_section),
-                    description = stringResource(R.string.settings_motion_glass_section_desc)
                 )
                 MotionSwitchItem(
                     setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.ADVANCED_BLUR_ENABLED),
@@ -305,7 +303,6 @@ internal fun SettingsMotionSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_motion_nowplaying_section),
-                    description = stringResource(R.string.settings_motion_nowplaying_section_desc)
                 )
                 MotionSwitchItem(
                     setting = AutoSettingsMetadata.requireSetting(
@@ -407,17 +404,9 @@ internal fun SettingsMotionSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_motion_lyrics_section),
-                    description = stringResource(R.string.settings_motion_lyrics_section_desc)
                 )
                 MotionSwitchItem(
                     setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.LYRIC_BLUR_ENABLED),
-                    descriptionOverride = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        null
-                    } else {
-                        stringResource(R.string.lyrics_blur_desc) +
-                            " · " +
-                            stringResource(R.string.lyrics_blur_low_cost_hint)
-                    },
                     disabledSuffix = null,
                     checked = lyricBlurEnabled,
                     enabled = true,
@@ -649,7 +638,6 @@ private fun advancedBlurQualityDescription(quality: AdvancedBlurQuality): String
 @Composable
 private fun MotionSwitchItem(
     setting: AutoSettingInfo,
-    descriptionOverride: String? = null,
     disabledSuffix: String?,
     checked: Boolean,
     enabled: Boolean,
@@ -660,15 +648,14 @@ private fun MotionSwitchItem(
     highlightPulse: Int = 0,
     onHighlightFinished: (() -> Unit)? = null
 ) {
+    val disabledReason = disabledSuffix?.takeIf { !enabled }
     AutoSettingsListItem(
         setting = setting,
         modifier = Modifier
             .alpha(alpha),
         enabled = enabled,
-        supportingContent = {
-            val suffix = disabledSuffix?.takeIf { !enabled }?.let { " · $it" }.orEmpty()
-            val description = descriptionOverride ?: stringResource(setting.descriptionRes)
-            Text(description + suffix)
+        supportingContent = disabledReason?.let { reason ->
+            { Text(reason) }
         },
         trailingContent = {
             MiuixSettingsSwitch(

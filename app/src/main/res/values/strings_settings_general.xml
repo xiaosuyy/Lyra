@@ -23,7 +23,7 @@
     <string name="settings_about_desc">版本信息、项目主页和开发者模式</string>
     <string name="settings_always_record_logs">始终记录日志</string>
     <string name="settings_always_record_logs_desc">持续写入运行日志</string>
-    <string name="settings_explore_search_history">探索页搜索历史</string>
+    <string name="settings_explore_search_history">搜索历史</string>
     <string name="settings_explore_search_history_desc">显示并记录探索页的搜索关键词</string>
     <string name="settings_usb_device_attach_handling">处理 USB DAC 插入</string>
     <string name="settings_usb_device_attach_handling_desc">关闭后，插入 USB DAC 或 FreeDSP 线束时不会唤起 Lyra 处理此设备</string>

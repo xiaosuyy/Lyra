@@ -178,7 +178,6 @@ internal fun SettingsPlaybackSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_playback_section_behavior),
-                    description = stringResource(R.string.settings_playback_section_behavior_desc)
                 )
 
                 PlaybackSwitchItem(
@@ -299,7 +298,6 @@ internal fun SettingsPlaybackSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_playback_section_audio_output),
-                    description = stringResource(R.string.settings_playback_section_audio_output_desc)
                 )
 
                 PlaybackSwitchItem(
@@ -417,7 +415,6 @@ internal fun SettingsPlaybackSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_playback_fade_in),
-                    description = stringResource(R.string.settings_playback_fade_in_desc)
                 )
 
                 PlaybackSwitchItem(
@@ -467,7 +464,6 @@ internal fun SettingsPlaybackSection(
             ) {
                 MiuixSettingsSectionIntro(
                     title = stringResource(R.string.settings_playback_crossfade_next),
-                    description = stringResource(R.string.settings_playback_crossfade_next_desc)
                 )
 
                 PlaybackSwitchItem(

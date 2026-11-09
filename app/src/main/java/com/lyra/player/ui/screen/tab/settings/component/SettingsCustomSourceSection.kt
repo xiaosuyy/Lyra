@@ -264,13 +264,6 @@ internal fun SettingsCustomSourceSection() {
         headlineContent = {
             Text(stringResource(R.string.settings_netease_local_source_fallback))
         },
-        supportingContent = {
-            Text(
-                text = stringResource(R.string.settings_netease_local_source_fallback_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
         trailingContent = {
             MiuixSettingsSwitch(
                 checked = localFallbackEnabled,
@@ -291,13 +284,6 @@ internal fun SettingsCustomSourceSection() {
     ListItem(
         headlineContent = {
             Text(stringResource(R.string.settings_gd_api_enabled))
-        },
-        supportingContent = {
-            Text(
-                text = stringResource(R.string.settings_gd_api_enabled_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         },
         trailingContent = {
             MiuixSettingsSwitch(
@@ -324,7 +310,6 @@ internal fun SettingsCustomSourceSection() {
 
     MiuixSettingsSectionIntro(
         title = stringResource(R.string.settings_custom_source_section),
-        description = stringResource(R.string.settings_custom_source_section_desc)
     )
 
     if (states.isEmpty()) {

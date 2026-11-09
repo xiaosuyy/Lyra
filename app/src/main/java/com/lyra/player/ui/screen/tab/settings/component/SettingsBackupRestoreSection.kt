@@ -249,7 +249,6 @@ internal fun SettingsBackupRestoreSection(
             ) {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_backup_local_section),
-                description = stringResource(R.string.settings_backup_local_section_desc)
             )
             ListItem(
                 leadingContent = {
@@ -281,7 +280,6 @@ internal fun SettingsBackupRestoreSection(
                     )
                 },
                 headlineContent = { Text(stringResource(R.string.playlist_export)) },
-                supportingContent = { Text(stringResource(R.string.playlist_export_desc)) },
                 modifier = Modifier
                     .settingsHighlightTarget(
                         targetId = "manual:playlist_export",
@@ -302,7 +300,6 @@ internal fun SettingsBackupRestoreSection(
                     )
                 },
                 headlineContent = { Text(stringResource(R.string.playlist_import)) },
-                supportingContent = { Text(stringResource(R.string.playlist_import_desc)) },
                 modifier = Modifier
                     .settingsHighlightTarget(
                         targetId = "manual:playlist_import",
@@ -323,7 +320,6 @@ internal fun SettingsBackupRestoreSection(
                     )
                 },
                 headlineContent = { Text(stringResource(R.string.settings_export_config)) },
-                supportingContent = { Text(stringResource(R.string.settings_export_config_desc)) },
                 modifier = Modifier
                     .settingsHighlightTarget(
                         targetId = "manual:config_export",
@@ -348,7 +344,6 @@ internal fun SettingsBackupRestoreSection(
                     )
                 },
                 headlineContent = { Text(stringResource(R.string.settings_import_config)) },
-                supportingContent = { Text(stringResource(R.string.settings_import_config_desc)) },
                 modifier = Modifier
                     .settingsHighlightTarget(
                         targetId = "manual:config_import",
@@ -502,7 +497,6 @@ internal fun SettingsBackupRestoreSection(
             ) {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_backup_history_section),
-                description = stringResource(R.string.settings_backup_history_section_desc)
             )
 
             ListItem(
@@ -541,7 +535,6 @@ internal fun SettingsBackupRestoreSection(
             ) {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_backup_github_section),
-                description = stringResource(R.string.settings_backup_github_section_desc)
             )
 
             ListItem(
@@ -581,7 +574,6 @@ internal fun SettingsBackupRestoreSection(
                         )
                     },
                     headlineContent = { Text(stringResource(R.string.sync_config)) },
-                    supportingContent = { Text(stringResource(R.string.sync_config_desc)) },
                     modifier = Modifier
                         .settingsHighlightTarget(
                             targetId = "manual:github_auto_sync",
@@ -602,7 +594,6 @@ internal fun SettingsBackupRestoreSection(
                         )
                     },
                     headlineContent = { Text(stringResource(R.string.sync_auto)) },
-                    supportingContent = { Text(stringResource(R.string.sync_auto_desc)) },
                     trailingContent = {
                         MiuixSettingsSwitch(
                             checked = githubState.autoSyncEnabled,
@@ -663,7 +654,6 @@ internal fun SettingsBackupRestoreSection(
                         )
                     },
                     headlineContent = { Text(stringResource(R.string.sync_data_saver)) },
-                    supportingContent = { Text(stringResource(R.string.sync_data_saver_desc)) },
                     trailingContent = {
                         MiuixSettingsSwitch(
                             checked = dataSaverMode,
@@ -708,7 +698,6 @@ internal fun SettingsBackupRestoreSection(
             ) {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_backup_webdav_section),
-                description = stringResource(R.string.settings_backup_webdav_section_desc)
             )
 
             ListItem(
@@ -748,7 +737,6 @@ internal fun SettingsBackupRestoreSection(
                         )
                     },
                     headlineContent = { Text(stringResource(R.string.sync_config)) },
-                    supportingContent = { Text(stringResource(R.string.webdav_sync_desc)) },
                     modifier = Modifier
                         .settingsHighlightTarget(
                             targetId = "manual:webdav_auto_sync",
@@ -769,7 +757,6 @@ internal fun SettingsBackupRestoreSection(
                         )
                     },
                     headlineContent = { Text(stringResource(R.string.sync_auto)) },
-                    supportingContent = { Text(stringResource(R.string.webdav_auto_sync_desc)) },
                     trailingContent = {
                         MiuixSettingsSwitch(
                             checked = webDavState.autoSyncEnabled,
@@ -844,7 +831,6 @@ internal fun SettingsBackupRestoreSection(
                 ) {
                     MiuixSettingsSectionIntro(
                         title = stringResource(R.string.settings_backup_message_section),
-                        description = stringResource(R.string.settings_backup_message_section_desc)
                     )
                     githubState.errorMessage?.let { error ->
                         SyncMessageCard(

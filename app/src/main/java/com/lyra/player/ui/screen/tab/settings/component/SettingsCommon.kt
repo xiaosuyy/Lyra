@@ -186,7 +186,6 @@ internal fun AccentColorListItem(
             )
         },
         headlineContent = { Text(stringResource(R.string.settings_accent_color)) },
-        supportingContent = { Text(stringResource(R.string.settings_accent_color_desc)) },
         trailingContent = {
             Box(
                 modifier = Modifier

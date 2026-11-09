@@ -10,7 +10,6 @@
     <string name="error_test">异常测试</string>
     <string name="error_cannot_open_input">无法打开输入流</string>
     <string name="error_cannot_open_output">无法打开输出流</string>
-    <string name="error_no_play_url">无法获取播放地址</string>
     <string name="toast_cache_cleared">已清理 %d MB 缓存</string>
     <string name="toast_cache_clear_error">清理出错: %s</string>
     <string name="toast_playback_stopped">多首歌曲无法播放，已停止</string>

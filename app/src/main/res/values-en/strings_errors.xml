@@ -10,7 +10,6 @@
     <string name="error_test">Exception Test</string>
     <string name="error_cannot_open_input">Cannot open input stream</string>
     <string name="error_cannot_open_output">Cannot open output stream</string>
-    <string name="error_no_play_url">Cannot get play URL</string>
     <string name="toast_cache_cleared">Cleared %d MB cache</string>
     <string name="toast_cache_clear_error">Clear error: %s</string>
     <string name="toast_playback_stopped">Multiple songs failed, playback stopped</string>

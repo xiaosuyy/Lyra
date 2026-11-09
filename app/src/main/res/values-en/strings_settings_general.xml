@@ -23,7 +23,7 @@
     <string name="settings_about_desc">Version, project home, and developer mode</string>
     <string name="settings_always_record_logs">Always Record Logs</string>
     <string name="settings_always_record_logs_desc">Record runtime logs continuously</string>
-    <string name="settings_explore_search_history">Explore Search History</string>
+    <string name="settings_explore_search_history">Search History</string>
     <string name="settings_explore_search_history_desc">Show and record search keywords on Explore</string>
     <string name="settings_usb_device_attach_handling">Handle USB DAC Attach</string>
     <string name="settings_usb_device_attach_handling_desc">Turn off to stop Lyra from opening to handle USB DACs or FreeDSP cables when attached</string>

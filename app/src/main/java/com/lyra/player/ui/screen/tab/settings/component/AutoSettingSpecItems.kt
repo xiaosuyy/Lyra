@@ -82,7 +82,6 @@ internal fun <T> AutoSettingSpecListItem(
     onClick: (() -> Unit)? = null
 ) {
     val title = autoSettingSpecString(setting.titleRes) ?: setting.key
-    val description = autoSettingSpecString(setting.descriptionRes)
     val highlightedModifier = modifier.settingsHighlightTarget(
         targetId = "setting:${setting.key}",
         highlightTargetId = highlightTargetId,
@@ -105,15 +104,11 @@ internal fun <T> AutoSettingSpecListItem(
     } else {
         null
     }
-    val defaultSupportingContent: (@Composable () -> Unit)? = description?.let { text ->
-        { Text(text) }
-    }
-
     ListItem(
         modifier = clickableModifier,
         leadingContent = leadingContent ?: defaultLeadingContent,
         headlineContent = { Text(title) },
-        supportingContent = supportingContent ?: defaultSupportingContent,
+        supportingContent = supportingContent,
         trailingContent = trailingContent,
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
