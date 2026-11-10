@@ -66,13 +66,21 @@ internal suspend fun PlayerManager.tryResolveNeteaseAutoCrossPlatformSource(
     sideEffects: RefreshResolverSideEffects
 ): SongUrlResult? {
     if (!neteaseAutoSourceSwitchEnabled) return null
+    return tryResolveAutoCrossPlatformSource(song, sideEffects)
+}
 
+internal suspend fun PlayerManager.tryResolveAutoCrossPlatformSource(
+    song: SongItem,
+    sideEffects: RefreshResolverSideEffects
+): SongUrlResult? {
+    val originalSourceId = customSourceIdForChannelId(song.channelId.orEmpty())
     val targetName = (song.originalName ?: song.name).trim()
     val targetArtist = (song.originalArtist ?: song.artist).trim()
     if (targetName.isBlank() || targetArtist.isBlank()) return null
 
     val searchableSources = crossPlatformSourceIds.filter { channelId ->
         val scriptSourceId = customSourceIdForChannelId(channelId) ?: return@filter false
+        if (scriptSourceId == originalSourceId) return@filter false
         CustomSourceManager.availableQualities(application, scriptSourceId).isNotEmpty()
     }
     if (searchableSources.isEmpty()) {
@@ -85,7 +93,7 @@ internal suspend fun PlayerManager.tryResolveNeteaseAutoCrossPlatformSource(
 
     LyraLogger.w(
         "LYRA-PlayerManager",
-        "Netease 无完整音源，尝试跨平台换源: song=$targetName, artist=$targetArtist, " +
+        "尝试同曲备用音源: song=$targetName, artist=$targetArtist, " +
             "duration=${song.durationMs}, sources=${searchableSources.joinToString(",")}"
     )
 
@@ -126,6 +134,8 @@ internal suspend fun PlayerManager.tryResolveNeteaseAutoCrossPlatformSource(
             candidateDurationMs = candidate.durationMs
         )
         if (score < 0) null else CrossPlatformSourceMatch(sourceId, candidate, score)
+    }.filter { match ->
+        originalSourceId == null || matchesNeteaseLocalFallbackMetadata(song, buildCrossPlatformSong(match))
     }.sortedWith(
         compareByDescending<CrossPlatformSourceMatch> { it.score }
             .thenBy { (it.candidate.durationMs - song.durationMs).absoluteValue }

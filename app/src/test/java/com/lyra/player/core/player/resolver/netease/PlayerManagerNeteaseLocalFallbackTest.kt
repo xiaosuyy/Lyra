@@ -274,6 +274,28 @@ class PlayerManagerNeteaseLocalFallbackTest {
         assertFalse(matchesNeteaseLocalFallbackMetadata(song, candidate))
     }
 
+    @Test
+    fun select_channelIdCollisionDoesNotMatchDifferentSong() {
+        val song = neteaseSong(123L, "晴天", "周杰伦", 269_000L).copy(channelId = "tencent")
+        val wrong = localSong(
+            "/music/wrong.flac", "其他歌曲", "其他歌手", 269_000L,
+            "123", MusicPlatform.CLOUD_MUSIC
+        )
+        val correct = wrong.copy(id = 456L, name = "晴天", artist = "周杰伦", localFilePath = "/music/correct.flac")
+        assertEquals(
+            listOf(correct),
+            selectNeteaseLocalFallbackCandidates(song, listOf(wrong, correct), allowIdMatch = false)
+        )
+    }
+
+    @Test
+    fun metadataMatch_rejectsSubstringTitlesAndDifferentVersions() {
+        val song = neteaseSong(123L, "后来", "刘若英", 300_000L)
+        assertFalse(matchesNeteaseLocalFallbackMetadata(song, song.copy(name = "后来的我们")))
+        assertFalse(matchesNeteaseLocalFallbackMetadata(song, song.copy(name = "后来 (Live)")))
+        assertFalse(matchesNeteaseLocalFallbackMetadata(song, song.copy(artist = "刘若英翻唱")))
+    }
+
     private fun neteaseSong(
         id: Long,
         name: String,

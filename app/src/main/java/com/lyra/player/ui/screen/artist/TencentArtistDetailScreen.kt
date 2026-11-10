@@ -1,6 +1,7 @@
 package com.lyra.player.ui.screen.artist
 
 import android.app.Application
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -47,9 +51,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -63,7 +69,10 @@ import coil.compose.AsyncImage
 import com.lyra.player.R
 import com.lyra.player.core.api.search.CustomChannelArtist
 import com.lyra.player.core.api.search.CustomChannelArtistAlbum
+import com.lyra.player.data.local.media.displayAlbum
 import com.lyra.player.data.model.SongItem
+import com.lyra.player.data.model.displayArtist
+import com.lyra.player.data.model.displayName
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.component.overlay.DensityScaledModalBottomSheet as ModalBottomSheet
 import com.lyra.player.ui.screen.playlist.PlaylistModernTopBarCircleButton
@@ -78,6 +87,7 @@ import com.lyra.player.ui.viewmodel.artist.TencentArtistDetailViewModel
 import com.lyra.player.ui.viewmodel.artist.TencentArtistHeader
 import com.lyra.player.util.format.formatPlayCount
 import com.lyra.player.util.media.offlineCachedImageRequest
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +107,10 @@ fun TencentArtistDetailScreen(
     )
     val ui by viewModel.uiState.collectAsState()
     var selectedTab by rememberSaveable(artist.id) { mutableIntStateOf(0) }
+    var searchVisible by rememberSaveable(artist.id) { mutableStateOf(false) }
+    var searchQuery by rememberSaveable(artist.id) { mutableStateOf("") }
+    val focusRequester = remember(artist.id) { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberSaveable(artist.id, saver = LazyListState.Saver) {
         LazyListState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = 0)
     }
@@ -105,6 +119,21 @@ fun TencentArtistDetailScreen(
 
     LaunchedEffect(artist.id) {
         viewModel.start(artist)
+    }
+
+    LaunchedEffect(searchVisible) {
+        if (searchVisible) {
+            delay(120)
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        } else {
+            keyboardController?.hide()
+        }
+    }
+
+    BackHandler(enabled = searchVisible) {
+        searchVisible = false
+        searchQuery = ""
     }
 
     val headerCoverUrl = ui.header?.avatarUrl?.takeIf { it.isNotBlank() }
@@ -127,6 +156,8 @@ fun TencentArtistDetailScreen(
                     listState = listState,
                     selectedTab = selectedTab,
                     onTabSelected = { selectedTab = it },
+                    searchActive = searchVisible,
+                    searchQuery = searchQuery,
                     onRetry = viewModel::retry,
                     onLoadMoreSongs = viewModel::loadMoreSongs,
                     onLoadMoreAlbums = viewModel::loadMoreAlbums,
@@ -148,6 +179,32 @@ fun TencentArtistDetailScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.cd_back),
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                    if (searchVisible) {
+                        ArtistTopSearchField(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            placeholder = stringResource(R.string.artist_search_hint),
+                            focusRequester = focusRequester,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    PlaylistModernTopBarCircleButton(onClick = {
+                        if (searchVisible) {
+                            searchVisible = false
+                            searchQuery = ""
+                        } else {
+                            searchVisible = true
+                            selectedTab = 0
+                        }
+                    }) {
+                        Icon(
+                            if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
+                            contentDescription = stringResource(R.string.cd_search),
                             modifier = Modifier.size(19.dp)
                         )
                     }
@@ -227,6 +284,8 @@ private fun TencentArtistContent(
     listState: LazyListState,
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
+    searchActive: Boolean,
+    searchQuery: String,
     onRetry: () -> Unit,
     onLoadMoreSongs: () -> Unit,
     onLoadMoreAlbums: () -> Unit,
@@ -236,8 +295,22 @@ private fun TencentArtistContent(
     offlineMode: Boolean,
     isTabletLayout: Boolean
 ) {
+    val context = LocalContext.current
     val miniPlayerHeight = LocalMiniPlayerHeight.current
     val horizontalInset = if (isTabletLayout) 36.dp else 0.dp
+    val normalizedQuery = searchQuery.trim()
+    val isFiltering = searchActive && normalizedQuery.isNotEmpty()
+    val filteredSongs = remember(ui.songs, normalizedQuery, searchActive) {
+        if (!isFiltering) {
+            ui.songs
+        } else {
+            ui.songs.filter { song ->
+                song.displayName().contains(normalizedQuery, ignoreCase = true) ||
+                    song.displayArtist().contains(normalizedQuery, ignoreCase = true) ||
+                    song.displayAlbum(context).contains(normalizedQuery, ignoreCase = true)
+            }
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -306,22 +379,35 @@ private fun TencentArtistContent(
                 return@LazyColumn
             }
 
-            item {
-                ArtistTabChips(
-                    selectedTab = selectedTab,
-                    onSelect = onTabSelected,
-                    modifier = Modifier.padding(start = 16.dp, top = 18.dp, end = 16.dp, bottom = 8.dp)
-                )
+            if (!searchActive) {
+                item {
+                    ArtistTabChips(
+                        selectedTab = selectedTab,
+                        onSelect = onTabSelected,
+                        modifier = Modifier.padding(start = 16.dp, top = 18.dp, end = 16.dp, bottom = 8.dp)
+                    )
+                }
             }
 
-            if (selectedTab == 0) {
-                if (ui.songs.isEmpty()) {
-                    item { EmptyBlock(text = stringResource(R.string.artist_songs_empty)) }
+            if (searchActive || selectedTab == 0) {
+                val songs = if (isFiltering) filteredSongs else ui.songs
+                if (songs.isEmpty()) {
+                    item {
+                        EmptyBlock(
+                            text = stringResource(
+                                if (isFiltering) {
+                                    R.string.artist_songs_search_empty
+                                } else {
+                                    R.string.artist_songs_empty
+                                }
+                            )
+                        )
+                    }
                 } else {
-                    itemsIndexed(ui.songs, key = { _, song -> song.id }) { index, song ->
+                    itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
                         ArtistSongRow(
                             song = song,
-                            onClick = { onSongClick(ui.songs, index) },
+                            onClick = { onSongClick(songs, index) },
                             offlineMode = offlineMode
                         )
                     }

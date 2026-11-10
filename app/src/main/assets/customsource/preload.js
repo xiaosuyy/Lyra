@@ -8,7 +8,7 @@
  * 脚本通过 send(EVENT_NAMES.inited, { sources }) 声明音源，
  * 通过 on(EVENT_NAMES.request, handler) 响应 musicUrl 等请求。
  *
- * 与原生（Kotlin）之间通过 window.LyraSource 同步桥接：网络请求、md5 由原生完成。
+ * 网络请求经 window.LyraSource 异步回调，md5 等工具由原生同步完成。
  */
 (function () {
     var bridge = window.LyraSource
@@ -168,6 +168,21 @@
         }
     }
 
+    var httpCallbacks = Object.create(null)
+    var nextHttpRequestId = 0
+
+    globalThis.__neriHttpResult = function (id, json) {
+        var callback = httpCallbacks[id]
+        if (!callback) return
+        delete httpCallbacks[id]
+        var result = buildResponse(json)
+        if (result.error) {
+            callback(new Error(result.error), null, null)
+        } else {
+            callback(null, result.response, result.body)
+        }
+    }
+
     globalThis.lx = {
         EVENT_NAMES: EVENT_NAMES,
         env: 'mobile',
@@ -175,19 +190,20 @@
         currentScriptInfo: JSON.parse(bridge.scriptInfo()),
         utils: utils,
         request: function (url, options, callback) {
-            var result = buildResponse(bridge.request(JSON.stringify({
-                url: String(url),
-                options: options || {}
-            })))
-            // 保持异步语义，和 lx-music 的行为一致
-            Promise.resolve().then(function () {
-                if (result.error) {
-                    callback(new Error(result.error), null, null)
-                } else {
-                    callback(null, result.response, result.body)
-                }
-            })
-            return function () { /* 原生请求已经完成，无需取消 */ }
+            var id = String(++nextHttpRequestId)
+            var payload = JSON.stringify({ url: String(url), options: options || {} })
+            httpCallbacks[id] = callback
+            try {
+                bridge.request(id, payload)
+            } catch (error) {
+                delete httpCallbacks[id]
+                throw error
+            }
+            return function () {
+                if (!httpCallbacks[id]) return
+                delete httpCallbacks[id]
+                bridge.cancelRequest(id)
+            }
         },
         send: function (eventName, data) {
             return new Promise(function (resolve, reject) {

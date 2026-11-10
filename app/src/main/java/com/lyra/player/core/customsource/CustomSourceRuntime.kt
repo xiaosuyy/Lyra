@@ -28,17 +28,24 @@ import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebViewClient
 import android.webkit.WebView
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import com.lyra.player.core.logging.LyraLogger
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONObject
 
 private const val TAG = "CustomSource"
@@ -65,7 +72,7 @@ internal data class CustomSourceLoadState(
  * 运行一个自定义源脚本的环境。
  *
  * 用系统 WebView（V8）执行 lx-music 格式的音源脚本；脚本需要的网络请求、md5 等能力
- * 通过 [Bridge] 同步桥接给原生实现，所以脚本可以像在 lx-music 里一样工作。
+ * 通过 [Bridge] 桥接给原生实现，网络请求异步回传，不阻塞脚本执行。
  */
 internal class CustomSourceRuntime(
     private val context: Context,
@@ -73,7 +80,14 @@ internal class CustomSourceRuntime(
     private val scriptInfoJson: String
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val pendingRequests = ConcurrentHashMap<String, (String) -> Unit>()
+    private val lifecycleLock = Any()
+    private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<String>>()
+    private val httpCalls = ConcurrentHashMap<String, Call>()
+    // 从解析 payload 到主线程投递都保留身份，解析失败及已排队的结果也能被 abort 丢弃。
+    private val pendingHttpRequests = ConcurrentHashMap<String, Any>()
+    private val sourceHttpClient = httpClient.newBuilder()
+        .callTimeout(15, TimeUnit.SECONDS)
+        .build()
 
     @Volatile
     private var webView: WebView? = null
@@ -96,27 +110,53 @@ internal class CustomSourceRuntime(
 
     suspend fun load(scriptText: String): CustomSourceLoadState {
         val ready = CompletableDeferred<Boolean>()
-        readyDeferred = ready
-        declarations = emptyList()
-        withContext(Dispatchers.Main) { ensureWebView() }
-        val environmentReady = withTimeoutOrNull(LOAD_TIMEOUT_MS) { ready.await() } ?: false
-        if (!environmentReady) {
-            return CustomSourceLoadState(false, emptyList(), "自定义源运行环境加载失败")
-        }
-
         val inited = CompletableDeferred<List<CustomSourceDeclaration>>()
-        initedDeferred = inited
-        withContext(Dispatchers.Main) {
-            webView?.evaluateJavascript(scriptText, null)
-        }
-        val loaded = withTimeoutOrNull(LOAD_TIMEOUT_MS) { inited.await() }
-        initedDeferred = null
-        return if (loaded == null) {
+        synchronized(lifecycleLock) {
+            readyDeferred = ready
             declarations = emptyList()
-            CustomSourceLoadState(false, emptyList(), "脚本没有返回音源信息（可能初始化失败）")
-        } else {
-            declarations = loaded
-            CustomSourceLoadState(true, loaded, null)
+        }
+        try {
+            val view = withContext(Dispatchers.Main) {
+                synchronized(lifecycleLock) {
+                    if (readyDeferred !== ready) null else {
+                        ensureWebView()
+                        webView
+                    }
+                }
+            }
+            val environmentReady = view != null &&
+                (withTimeoutOrNull(LOAD_TIMEOUT_MS) { ready.await() } == true)
+            if (!environmentReady) {
+                return CustomSourceLoadState(false, emptyList(), "自定义源运行环境加载失败")
+            }
+
+            withContext(Dispatchers.Main) {
+                synchronized(lifecycleLock) {
+                    if (webView === view && readyDeferred === ready) {
+                        initedDeferred = inited
+                        view?.evaluateJavascript(scriptText, null)
+                    } else {
+                        inited.complete(emptyList())
+                    }
+                }
+            }
+            val loaded = withTimeoutOrNull(LOAD_TIMEOUT_MS) { inited.await() }
+            return synchronized(lifecycleLock) {
+                if (loaded == null || webView !== view || readyDeferred !== ready) {
+                    if (readyDeferred === ready) declarations = emptyList()
+                    CustomSourceLoadState(false, emptyList(), "脚本没有返回音源信息（可能初始化失败）")
+                } else {
+                    declarations = loaded
+                    CustomSourceLoadState(true, loaded, null)
+                }
+            }
+        } finally {
+            synchronized(lifecycleLock) {
+                if (readyDeferred === ready) readyDeferred = null
+                if (initedDeferred === inited) initedDeferred = null
+            }
+            ready.cancel()
+            inited.cancel()
         }
     }
 
@@ -128,7 +168,10 @@ internal class CustomSourceRuntime(
         quality: String,
         musicInfo: JSONObject
     ): String? {
-        if (!isReady) return null
+        val view = synchronized(lifecycleLock) {
+            if (!isReady) return null
+            webView ?: return null
+        }
         val requestId = UUID.randomUUID().toString()
         val payload = JSONObject()
             .put("source", sourceId)
@@ -140,29 +183,54 @@ internal class CustomSourceRuntime(
                     .put("musicInfo", musicInfo)
             )
             .toString()
-        val resultJson = withTimeoutOrNull(REQUEST_TIMEOUT_MS) {
-            val deferred = CompletableDeferred<String>()
-            pendingRequests[requestId] = { json ->
-                if (!deferred.isCompleted) {
-                    deferred.complete(json)
+        val deferred = CompletableDeferred<String>()
+        val resultJson = try {
+            withTimeoutOrNull(REQUEST_TIMEOUT_MS) {
+                val requestContext = currentCoroutineContext()
+                synchronized(lifecycleLock) {
+                    if (view !== webView) {
+                        deferred.complete("")
+                    } else {
+                        pendingRequests[requestId] = deferred
+                        val posted = mainHandler.post {
+                            synchronized(lifecycleLock) {
+                                if (pendingRequests[requestId] !== deferred ||
+                                    !deferred.isActive || !requestContext.isActive
+                                ) {
+                                    return@post
+                                }
+                                if (view !== webView) {
+                                    pendingRequests.remove(requestId, deferred)
+                                    deferred.complete("")
+                                } else {
+                                    runCatching {
+                                        view.evaluateJavascript(
+                                            "__neriInvokeRequest(${JSONObject.quote(requestId)}, " +
+                                                "${JSONObject.quote(payload)})",
+                                            null
+                                        )
+                                    }.onFailure {
+                                        pendingRequests.remove(requestId, deferred)
+                                        deferred.complete("")
+                                    }
+                                }
+                            }
+                        }
+                        if (!posted) {
+                            pendingRequests.remove(requestId, deferred)
+                            deferred.complete("")
+                        }
+                    }
                 }
+                deferred.await()
             }
-            mainHandler.post {
-                val view = webView
-                if (view == null) {
-                    pendingRequests.remove(requestId)
-                    deferred.complete("")
-                } else {
-                    view.evaluateJavascript(
-                        "__neriInvokeRequest(${JSONObject.quote(requestId)}, " +
-                            "${JSONObject.quote(payload)})",
-                        null
-                    )
-                }
+        } finally {
+            // 没有 JS HTTP 的所有权信息；这里只清理本次 native 等待，不取消其他 HTTP。
+            synchronized(lifecycleLock) {
+                pendingRequests.remove(requestId, deferred)
             }
-            deferred.await()
+            deferred.cancel()
         }
-        pendingRequests.remove(requestId)
         if (resultJson.isNullOrBlank()) {
             LyraLogger.w(TAG, "自定义源请求超时或无响应: source=$sourceId quality=$quality")
             return null
@@ -174,27 +242,42 @@ internal class CustomSourceRuntime(
                 // 和 lx-music 一致：只接受真正的 http(s) 直链
                 value.takeIf { it.startsWith("http://") || it.startsWith("https://") }
                     ?: run {
-                        LyraLogger.w(TAG, "自定义源返回的不是直链，已忽略: ${value.take(60)}")
+                        LyraLogger.w(TAG, "自定义源返回的不是直链，已忽略")
                         null
                     }
             } else {
-                LyraLogger.w(
-                    TAG,
-                    "自定义源返回失败: ${json.optString("error")} | " +
-                        resultJson.take(300)
-                )
+                LyraLogger.w(TAG, "自定义源返回失败")
                 null
             }
         }.getOrNull()
     }
 
     fun release() {
-        val view = webView
-        webView = null
-        declarations = emptyList()
-        readyDeferred = null
-        initedDeferred = null
-        pendingRequests.clear()
+        val view: WebView?
+        val ready: CompletableDeferred<Boolean>?
+        val inited: CompletableDeferred<List<CustomSourceDeclaration>>?
+        val requests: List<CompletableDeferred<String>>
+        val calls: List<Call>
+        synchronized(lifecycleLock) {
+            view = webView
+            webView = null
+            declarations = emptyList()
+            ready = readyDeferred
+            readyDeferred = null
+            inited = initedDeferred
+            initedDeferred = null
+            requests = pendingRequests.values.toList()
+            pendingRequests.clear()
+            pendingHttpRequests.clear()
+            calls = httpCalls.values.toList()
+            httpCalls.clear()
+        }
+        // 先移除本次快照，再完成等待者，避免恢复的协程注册新请求后被误清理。
+        // 只取消这个 runtime 的 Call，不影响共享客户端上的其他请求。
+        calls.forEach { it.cancel() }
+        ready?.complete(false)
+        inited?.complete(emptyList())
+        requests.forEach { it.complete("") }
         if (view != null) {
             mainHandler.post {
                 runCatching {
@@ -219,12 +302,12 @@ internal class CustomSourceRuntime(
                 view.settings.allowFileAccessFromFileURLs = true
                 view.settings.allowUniversalAccessFromFileURLs = true
             }
-            view.addJavascriptInterface(Bridge(), BRIDGE_NAME)
+            view.addJavascriptInterface(Bridge(view), BRIDGE_NAME)
             view.webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(message: ConsoleMessage): Boolean {
                     LyraLogger.i(
                         TAG,
-                        "[console] ${message.message()} (${message.sourceId()}:${message.lineNumber()})"
+                        "[console] level=${message.messageLevel()} line=${message.lineNumber()}（内容已省略）"
                     )
                     return true
                 }
@@ -241,31 +324,34 @@ internal class CustomSourceRuntime(
                 ) {
                     LyraLogger.w(
                         TAG,
-                        "自定义源宿主页面加载失败: ${error?.description} (${request?.url})"
+                        "自定义源宿主页面加载失败: host=${request?.url?.host} status=${error?.errorCode}"
                     )
                 }
             }
-            view.loadUrl(HOST_ASSET_URL)
             webView = view
+            view.loadUrl(HOST_ASSET_URL)
             LyraLogger.i(TAG, "自定义源运行环境已创建")
-        }.onFailure { error ->
-            LyraLogger.e(TAG, "创建自定义源运行环境失败: ${error.message}")
+        }.onFailure {
+            LyraLogger.e(TAG, "创建自定义源运行环境失败")
             readyDeferred?.complete(false)
         }
     }
 
-    private inner class Bridge {
+    private inner class Bridge(private val view: WebView) {
         @JavascriptInterface
         fun scriptInfo(): String = scriptInfoJson
 
         @JavascriptInterface
         fun log(message: String) {
-            LyraLogger.i(TAG, "[js] $message")
+            // 脚本日志可能含完整 URL、headers 或凭据，不直接输出原文。
+            LyraLogger.i(TAG, "[js] 日志内容已省略（${message.length} 字符）")
         }
 
         @JavascriptInterface
         fun ready() {
-            readyDeferred?.complete(true)
+            synchronized(lifecycleLock) {
+                if (view === webView) readyDeferred?.complete(true)
+            }
         }
 
         @JavascriptInterface
@@ -274,26 +360,43 @@ internal class CustomSourceRuntime(
         @JavascriptInterface
         fun inited(payloadJson: String) {
             val parsed = parseDeclarations(payloadJson)
-            LyraLogger.i(
-                TAG,
-                "自定义源已声明音源: " + parsed.joinToString(",") {
-                    it.sourceId + "(" + it.qualitys.joinToString("/") + ")"
-                }
-            )
-            initedDeferred?.complete(parsed)
+            synchronized(lifecycleLock) {
+                if (view !== webView) return
+                LyraLogger.i(TAG, "自定义源已声明音源: ${parsed.size} 个")
+                initedDeferred?.complete(parsed)
+            }
         }
 
         @JavascriptInterface
         fun result(id: String, json: String) {
-            pendingRequests.remove(id)?.invoke(json)
+            synchronized(lifecycleLock) {
+                if (view === webView) pendingRequests.remove(id)?.complete(json)
+            }
         }
 
         @JavascriptInterface
-        fun request(payloadJson: String): String = performHttp(payloadJson)
+        fun request(id: String, payloadJson: String) {
+            performHttp(view, id, payloadJson)
+        }
+
+        @JavascriptInterface
+        fun cancelRequest(id: String) {
+            val call = synchronized(lifecycleLock) {
+                if (view !== webView) return
+                pendingHttpRequests.remove(id)
+                httpCalls.remove(id)
+            }
+            call?.cancel()
+        }
     }
 
-    private fun performHttp(payloadJson: String): String {
-        return try {
+    private fun performHttp(view: WebView, id: String, payloadJson: String) {
+        val token = Any()
+        synchronized(lifecycleLock) {
+            if (view !== webView || pendingHttpRequests.putIfAbsent(id, token) != null) return
+        }
+        var call: Call? = null
+        try {
             val payload = JSONObject(payloadJson)
             val url = payload.optString("url")
             val options = payload.optJSONObject("options") ?: JSONObject()
@@ -301,7 +404,6 @@ internal class CustomSourceRuntime(
             val headers = options.optJSONObject("headers")
             val bodyText = options.optString("body").takeIf { it.isNotEmpty() }
             val builder = Request.Builder().url(url)
-            LyraLogger.i(TAG, "自定义源请求头: ${headers?.toString()?.take(300)}")
             headers?.let { headerObject ->
                 headerObject.keys().forEach { key ->
                     val value = headerObject.optString(key)
@@ -317,32 +419,80 @@ internal class CustomSourceRuntime(
                 "DELETE" -> builder.delete(requestBody)
                 else -> builder.get()
             }
-            val response = httpClient.newBuilder()
-                .callTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                .build()
-                .newCall(builder.build())
-                .execute()
-            response.use { result ->
-                val body = result.body?.string().orEmpty()
-                LyraLogger.i(TAG, "自定义源请求 ${result.code}: $url")
-                val headerJson = JSONObject()
-                result.headers.toMultimap().forEach { (name, values) ->
-                    headerJson.put(name, values.joinToString(","))
+            val requestCall = sourceHttpClient.newCall(builder.build())
+            call = requestCall
+            synchronized(lifecycleLock) {
+                if (view !== webView || pendingHttpRequests[id] !== token) {
+                    requestCall.cancel()
+                    return
                 }
-                JSONObject()
-                    .put("ok", true)
-                    .put("statusCode", result.code)
-                    .put("statusMessage", result.message)
-                    .put("headers", headerJson)
-                    .put("body", body.take(MAX_SOURCE_RESPONSE_CHARS))
-                    .toString()
+                httpCalls[id] = requestCall
+                requestCall.enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        postHttpResult(view, id, token, httpErrorJson(e))
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        val responseJson = try {
+                            response.use { result ->
+                                synchronized(lifecycleLock) {
+                                    if (view !== webView || pendingHttpRequests[id] !== token) return
+                                }
+                                val body = result.body?.string().orEmpty()
+                                LyraLogger.i(
+                                    TAG,
+                                    "自定义源请求 host=${result.request.url.host} status=${result.code}"
+                                )
+                                val headerJson = JSONObject()
+                                result.headers.toMultimap().forEach { (name, values) ->
+                                    headerJson.put(name, values.joinToString(","))
+                                }
+                                JSONObject()
+                                    .put("ok", true)
+                                    .put("statusCode", result.code)
+                                    .put("statusMessage", result.message)
+                                    .put("headers", headerJson)
+                                    .put("body", body.take(MAX_SOURCE_RESPONSE_CHARS))
+                                    .toString()
+                            }
+                        } catch (error: Exception) {
+                            httpErrorJson(error)
+                        }
+                        postHttpResult(view, id, token, responseJson)
+                    }
+                })
             }
         } catch (error: Exception) {
-            LyraLogger.w(TAG, "自定义源网络请求失败: ${error.message}")
-            JSONObject()
-                .put("ok", false)
-                .put("error", error.message ?: "request failed")
-                .toString()
+            // 包含 payload/Request 构建和 enqueue 失败；仍走同一可取消的异步结果通道。
+            call?.cancel()
+            postHttpResult(view, id, token, httpErrorJson(error))
+        }
+    }
+
+    private fun httpErrorJson(error: Exception): String = JSONObject()
+        .put("ok", false)
+        .put("error", error.message ?: "request failed")
+        .toString()
+
+    private fun postHttpResult(view: WebView, id: String, token: Any, responseJson: String) {
+        val script = "__neriHttpResult(${JSONObject.quote(id)},${JSONObject.quote(responseJson)})"
+        synchronized(lifecycleLock) {
+            if (view !== webView || pendingHttpRequests[id] !== token) return
+            val posted = mainHandler.post {
+                synchronized(lifecycleLock) {
+                    // Call 保留到实际投递，abort/release 可使已经排队的回调失效。
+                    if (view !== webView || !pendingHttpRequests.remove(id, token)) return@post
+                    httpCalls.remove(id)
+                    runCatching {
+                        view.evaluateJavascript(script, null)
+                    }.onFailure {
+                        LyraLogger.w(TAG, "自定义源网络结果投递失败")
+                    }
+                }
+            }
+            if (!posted && pendingHttpRequests.remove(id, token)) {
+                httpCalls.remove(id)?.cancel()
+            }
         }
     }
 

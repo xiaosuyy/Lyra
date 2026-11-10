@@ -56,6 +56,7 @@ import com.lyra.player.core.player.quality.effectiveYouTubeQuality
 import com.lyra.player.core.player.resolver.netease.NeteasePlaybackResponseParser
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseAutoBiliSource
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseAutoCrossPlatformSource
+import com.lyra.player.core.player.resolver.channel.getChannelSongAudioUrl
 import com.lyra.player.core.player.resolver.netease.tryResolveNeteaseMatchedLocalSource
 import com.lyra.player.core.customsource.CUSTOM_SOURCE_NETEASE
 import com.lyra.player.core.customsource.CustomSourceManager
@@ -303,8 +304,12 @@ internal suspend fun PlayerManager.resolveSongUrl(
         }
     }
     var neteasePermanentFailure = false
+    var channelPermanentFailure = false
     val result = retrySongUrlResolution(
-        shouldRetry = { neteasePermanentFailure.not() && it is SongUrlResult.Failure }
+        shouldRetry = {
+            neteasePermanentFailure.not() && channelPermanentFailure.not() &&
+                it is SongUrlResult.Failure
+        }
     ) { retryAttempt ->
         neteasePermanentFailure = false
         val isFinalAttempt = retryAttempt == SONG_URL_RESOLUTION_RETRY_COUNT
@@ -333,11 +338,18 @@ internal suspend fun PlayerManager.resolveSongUrl(
                 song = song,
                 sideEffects = sideEffects
             )
-            customSourceIdForSong(song) != null -> getCustomSourceAudioUrl(
-                song = song,
-                sourceId = customSourceIdForSong(song).orEmpty(),
-                sideEffects = sideEffects
-            )
+            customSourceIdForSong(song) != null -> {
+                val channelResult = getChannelSongAudioUrl(
+                    song = song,
+                    sourceId = customSourceIdForSong(song).orEmpty(),
+                    sideEffects = sideEffects
+                )
+                if (channelResult is SongUrlResult.Failure) {
+                    // 渠道脚本 + 同名换源都拿不到时，重复整轮只会再次等待，直接结束重试
+                    channelPermanentFailure = true
+                }
+                channelResult
+            }
             else -> {
                 val neteaseResult = try {
                     getNeteaseSongUrl(

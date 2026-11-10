@@ -223,7 +223,7 @@ fun NeteaseArtistDetailScreen(
 }
 
 @Composable
-private fun ArtistTopSearchField(
+internal fun ArtistTopSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
     placeholder: String,

@@ -498,9 +498,18 @@ class NeteaseClient {
         retryHttp1OnStreamReset: Boolean = false
     ): String {
         val session = sessionStore.currentSession()
-        if (mode == CryptoMode.WEAPI) {
-            withContext(Dispatchers.IO) {
-                ensureWeapiSessionIfNeeded(session, mode, usePersistedCookies)
+        if (mode == CryptoMode.WEAPI && session.needsWeapiSessionPreheat(neteaseMainUrl, usePersistedCookies)) {
+            val preheatRequest = buildRequest(
+                url = neteaseMainUrl.toString(),
+                params = emptyMap(),
+                mode = CryptoMode.API,
+                method = "GET",
+                usePersistedCookies = usePersistedCookies,
+                session = session
+            )
+            executeRequestCancellable(session.okHttpClient, preheatRequest)
+            if (session.needsWeapiSessionPreheat(neteaseMainUrl, usePersistedCookies)) {
+                throw IOException("NetEase session preheat did not provide __csrf")
             }
         }
         val request = buildRequest(
@@ -929,33 +938,36 @@ class NeteaseClient {
      * @param level 音质 (standard, exhigh, lossless, hires, jyeffect(高清环绕声), sky(沉浸环绕声), jymaster(超清母带))
      * */
     @Throws(IOException::class)
-    fun getSongDownloadUrl(songId: Long, level: String = "lossless"): String {
-        fun call(usePersistedCookies: Boolean): String {
+    suspend fun getSongDownloadUrl(songId: Long, level: String = "lossless"): String {
+        suspend fun call(usePersistedCookies: Boolean): String {
             val params = mutableMapOf<String, Any>(
                 "ids" to "[$songId]",
                 "level" to level,
                 "encodeType" to "flac",
             )
-            return callEApi(
-                "/song/enhance/player/url/v1",
-                params,
+            return requestCancellable(
+                url = "https://interface.music.163.com/eapi/song/enhance/player/url/v1",
+                params = params,
+                mode = CryptoMode.EAPI,
                 usePersistedCookies = usePersistedCookies,
                 retryHttp1OnStreamReset = true
             )
         }
 
-        val preferPersistedCookies = hasLogin()
-        var resp = call(usePersistedCookies = preferPersistedCookies)
-        return try {
-            val code = JSONObject(resp).optInt("code", -1)
-            if (code == 301 && hasLogin()) {
-                try { ensureWeapiSession() } catch (_: Exception) {}
-                resp = call(usePersistedCookies = true)
-            }
-            resp
-        } catch (_: Exception) {
-            resp
+        val response = call(usePersistedCookies = hasLogin())
+        val code = runCatching { JSONObject(response).optInt("code", -1) }.getOrDefault(-1)
+        if (code != 301 || !hasLogin()) return response
+        try {
+            requestCancellable(
+                url = "https://music.163.com/",
+                params = emptyMap(),
+                mode = CryptoMode.API,
+                method = "GET"
+            )
+        } catch (error: java.io.IOException) {
+            LyraLogger.w("LYRA-NeteaseClient", "Session preheat failed: ${error.message}")
         }
+        return call(usePersistedCookies = true)
     }
 
     @Throws(IOException::class)

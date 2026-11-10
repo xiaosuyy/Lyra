@@ -18,11 +18,14 @@ import kotlin.math.absoluteValue
 internal const val NETEASE_LOCAL_FALLBACK_DURATION_TOLERANCE_MS = 8_000L
 private val localFallbackNonTextRegex = Regex("[^\\p{L}\\p{N}]+")
 
-internal fun PlayerManager.tryResolveNeteaseMatchedLocalSource(song: SongItem): SongUrlResult? {
+internal fun PlayerManager.tryResolveNeteaseMatchedLocalSource(
+    song: SongItem,
+    allowIdMatch: Boolean = true
+): SongUrlResult? {
     if (!neteaseLocalSourceFallbackEnabled) return null
 
     val localSongs = localRepo.playlists.value.flatMap { it.songs }
-    val candidates = selectNeteaseLocalFallbackCandidates(song, localSongs)
+    val candidates = selectNeteaseLocalFallbackCandidates(song, localSongs, allowIdMatch)
     if (candidates.isEmpty()) return null
 
     for (candidate in candidates) {
@@ -55,7 +58,8 @@ internal fun PlayerManager.tryResolveNeteaseMatchedLocalSource(song: SongItem): 
 
 internal fun selectNeteaseLocalFallbackCandidates(
     song: SongItem,
-    localSongs: List<SongItem>
+    localSongs: List<SongItem>,
+    allowIdMatch: Boolean = true
 ): List<SongItem> {
     val localCandidates = localSongs.filter { candidate ->
         LocalSongSupport.isLocalSong(candidate)
@@ -64,7 +68,7 @@ internal fun selectNeteaseLocalFallbackCandidates(
 
     val targetId = song.id.toString()
     val exact = localCandidates.filter { candidate ->
-        candidate.matchedLyricSource == MusicPlatform.CLOUD_MUSIC &&
+        allowIdMatch && candidate.matchedLyricSource == MusicPlatform.CLOUD_MUSIC &&
             candidate.matchedSongId == targetId &&
             isNeteaseLocalFallbackDurationCompatible(song, candidate)
     }
