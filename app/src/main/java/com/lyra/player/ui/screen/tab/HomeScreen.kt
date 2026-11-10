@@ -157,6 +157,8 @@ import com.lyra.player.data.playlist.usage.buildLocalPlaylistUsageLookup
 import com.lyra.player.data.platform.youtube.buildYouTubeMusicMediaUri
 import com.lyra.player.data.local.media.displayAlbum
 import com.lyra.player.ui.melox.theme.MeloxType
+import com.lyra.player.ui.component.song.SongActionMenuItem
+import com.lyra.player.ui.component.song.SongActionsSheet
 import com.lyra.player.ui.util.shouldAllowCollapsingTopAppBar
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
@@ -1502,72 +1504,30 @@ private fun SongRowMini(
                 )
             }
 
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.local_playlist_play_next)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        PlayerManager.addToQueueNext(song)
-                        showMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.playlist_add_to_end)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        PlayerManager.addToQueueEnd(song)
-                        showMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            stringResource(
-                                if (isFavorite) {
-                                    R.string.favorite_remove
-                                } else {
-                                    R.string.favorite_add
-                                }
-                            )
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isFavorite) {
-                                Icons.Filled.Favorite
-                            } else {
-                                Icons.Outlined.FavoriteBorder
-                            },
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        onFavoriteToggle(song, isFavorite)
-                        showMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_copy_song_info)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.ContentCopy,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
+            SongActionsSheet(
+                visible = showMenu,
+                song = song,
+                offlineMode = offlineMode,
+                onDismissRequest = { showMenu = false },
+                actions = listOf(
+                    SongActionMenuItem(
+                        label = stringResource(R.string.local_playlist_play_next),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                    ) { PlayerManager.addToQueueNext(song) },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.playlist_add_to_end),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                    ) { PlayerManager.addToQueueEnd(song) },
+                    SongActionMenuItem(
+                        label = stringResource(
+                            if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                        ),
+                        icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder
+                    ) { onFavoriteToggle(song, isFavorite) },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.action_copy_song_info),
+                        icon = Icons.Outlined.ContentCopy
+                    ) {
                         scope.launch {
                             clipboard.setClipEntry(
                                 ClipEntry(
@@ -1576,10 +1536,9 @@ private fun SongRowMini(
                             )
                             onShowSnackbar(composeResources.getString(R.string.toast_copied))
                         }
-                        showMenu = false
                     }
                 )
-            }
+            )
         }
     }
 }

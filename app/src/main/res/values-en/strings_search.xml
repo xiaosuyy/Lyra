@@ -11,7 +11,7 @@
     <string name="search_artist_songs">Search artist songs</string>
     <string name="search_favorite">Search in Favorites</string>
     <string name="search_result_play_keep_queue">Play (Keep Queue)</string>
-    <string name="search_result_add_to_current_queue">Add to Current Queue</string>
+    <string name="search_result_add_to_current_queue">Add to End</string>
     <string name="search_recent">Search Recent</string>
     <string name="search_history">Search History</string>
     <string name="search_no_result">No Results</string>

@@ -71,18 +71,18 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -152,6 +152,8 @@ import com.lyra.player.ui.component.download.BatchDownloadManagerSheet
 import com.lyra.player.ui.component.playlist.PlaylistExportSheet
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
+import com.lyra.player.ui.component.song.SongActionMenuItem
+import com.lyra.player.ui.component.song.SongActionsSheet
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionDetailUiState
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionDetailViewModel
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionHeader
@@ -1263,81 +1265,38 @@ private fun SongRow(
                     )
                 }
 
-                DropdownMenu(
-                    expanded = showMoreMenu,
-                    onDismissRequest = { showMoreMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.local_playlist_play_next)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                                contentDescription = null
-                            )
-                        },
-                        onClick = {
-                            PlayerManager.addToQueueNext(song)
-                            showMoreMenu = false
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.playlist_add_to_end)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                                contentDescription = null
-                            )
-                        },
-                        onClick = {
-                            PlayerManager.addToQueueEnd(song)
-                            showMoreMenu = false
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                stringResource(
-                                    if (isFavorite) {
-                                        R.string.favorite_remove
-                                    } else {
-                                        R.string.favorite_add
-                                    }
-                                )
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = if (isFavorite) {
-                                    Icons.Filled.Star
-                                } else {
-                                    Icons.Outlined.StarOutline
-                                },
-                                contentDescription = null
-                            )
-                        },
-                        onClick = {
-                            onFavoriteToggle(song, isFavorite)
-                            showMoreMenu = false
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_copy_song_info)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.ContentCopy,
-                                contentDescription = null
-                            )
-                        },
-                        onClick = {
+                SongActionsSheet(
+                    visible = showMoreMenu,
+                    song = song,
+                    offlineMode = offlineMode,
+                    onDismissRequest = { showMoreMenu = false },
+                    actions = listOf(
+                        SongActionMenuItem(
+                            label = stringResource(R.string.local_playlist_play_next),
+                            icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                        ) { PlayerManager.addToQueueNext(song) },
+                        SongActionMenuItem(
+                            label = stringResource(R.string.playlist_add_to_end),
+                            icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                        ) { PlayerManager.addToQueueEnd(song) },
+                        SongActionMenuItem(
+                            label = stringResource(
+                                if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                            ),
+                            icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder
+                        ) { onFavoriteToggle(song, isFavorite) },
+                        SongActionMenuItem(
+                            label = stringResource(R.string.action_copy_song_info),
+                            icon = Icons.Outlined.ContentCopy
+                        ) {
                             val songInfo = "${song.displayName()}-${song.displayArtist()}"
                             scope.launch {
                                 clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", songInfo)))
                                 snackbarHostState.showNeriSnackbar(composeResources.getString(R.string.toast_copied))
                             }
-                            showMoreMenu = false
                         }
                     )
-                }
+                )
             }
         }
     }

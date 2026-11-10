@@ -203,6 +203,8 @@ import com.lyra.player.ui.component.playlist.showPlaylistDeleteResultGlobally
 import com.lyra.player.ui.component.playlist.showPlaylistSongDeleteResult
 import com.lyra.player.ui.component.local.LocalSongDetailsDialog
 import com.lyra.player.ui.component.local.LocalSongSyncConfirmDialog
+import com.lyra.player.ui.component.song.SongActionMenuItem
+import com.lyra.player.ui.component.song.SongActionsSheet
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.util.rememberPlaylistDisplayCoverUrl
@@ -2097,121 +2099,81 @@ fun LocalPlaylistDetailScreen(
                                                             )
                                                         }
 
-                                                        DropdownMenu(
-                                                            expanded = showMoreMenu,
-                                                            onDismissRequest = { showMoreMenu = false }
-                                                        ) {
+                                                        SongActionsSheet(
+                                                            visible = showMoreMenu,
+                                                            song = song,
+                                                            onDismissRequest = { showMoreMenu = false },
+                                                            actions = buildList {
                                                                 if (song.isLocalSong()) {
-                                                                    DropdownMenuItem(
-                                                                        text = { Text(stringResource(R.string.local_song_open_details)) },
-                                                                        leadingIcon = {
-                                                                            Icon(
-                                                                                imageVector = Icons.Outlined.Info,
-                                                                                contentDescription = null
-                                                                            )
-                                                                        },
-                                                                        onClick = {
-                                                                            detailSong = song
-                                                                            showMoreMenu = false
-                                                                    }
-                                                                )
-                                                                    DropdownMenuItem(
-                                                                        text = { Text(stringResource(R.string.action_share)) },
-                                                                        leadingIcon = {
-                                                                            Icon(
-                                                                                imageVector = Icons.Outlined.Share,
-                                                                                contentDescription = null
-                                                                            )
-                                                                        },
-                                                                        onClick = {
-                                                                            showMoreMenu = false
+                                                                    add(
+                                                                        SongActionMenuItem(
+                                                                            label = stringResource(R.string.local_song_open_details),
+                                                                            icon = Icons.Outlined.Info
+                                                                        ) { detailSong = song }
+                                                                    )
+                                                                    add(
+                                                                        SongActionMenuItem(
+                                                                            label = stringResource(R.string.action_share),
+                                                                            icon = Icons.Outlined.Share
+                                                                        ) {
                                                                             scope.launch {
-                                                                            val shared = runCatching {
-                                                                                LocalMediaSupport.shareSongFile(context, song)
-                                                                            }.getOrElse { false }
-                                                                            if (!shared) {
-                                                                                snackbarHostState.showNeriSnackbar(
-                                                                                    composeResources.getString(R.string.local_song_share_failed)
-                                                                                )
+                                                                                val shared = runCatching {
+                                                                                    LocalMediaSupport.shareSongFile(context, song)
+                                                                                }.getOrElse { false }
+                                                                                if (!shared) {
+                                                                                    snackbarHostState.showNeriSnackbar(
+                                                                                        composeResources.getString(R.string.local_song_share_failed)
+                                                                                    )
+                                                                                }
                                                                             }
                                                                         }
-                                                                    }
+                                                                    )
+                                                                }
+                                                                add(
+                                                                    SongActionMenuItem(
+                                                                        label = stringResource(R.string.local_playlist_play_next),
+                                                                        icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                                                                    ) { PlayerManager.addToQueueNext(song) }
                                                                 )
-                                                            }
-                                                            DropdownMenuItem(
-                                                                text = { Text(stringResource(R.string.local_playlist_play_next)) },
-                                                                leadingIcon = {
-                                                                    Icon(
-                                                                        imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                                                                        contentDescription = null
-                                                                    )
-                                                                },
-                                                                onClick = {
-                                                                    PlayerManager.addToQueueNext(song)
-                                                                    showMoreMenu = false
-                                                                }
-                                                            )
-                                                            DropdownMenuItem(
-                                                                text = { Text(stringResource(R.string.playlist_add_to_end)) },
-                                                                leadingIcon = {
-                                                                    Icon(
-                                                                        imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                                                                        contentDescription = null
-                                                                    )
-                                                                },
-                                                                onClick = {
-                                                                    PlayerManager.addToQueueEnd(song)
-                                                                    showMoreMenu = false
-                                                                }
-                                                            )
-                                                            DropdownMenuItem(
-                                                                text = {
-                                                                    Text(
-                                                                        stringResource(
+                                                                add(
+                                                                    SongActionMenuItem(
+                                                                        label = stringResource(R.string.playlist_add_to_end),
+                                                                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                                                                    ) { PlayerManager.addToQueueEnd(song) }
+                                                                )
+                                                                add(
+                                                                    SongActionMenuItem(
+                                                                        label = stringResource(
                                                                             if (isFavoriteSong) {
                                                                                 R.string.favorite_remove
                                                                             } else {
                                                                                 R.string.favorite_add
                                                                             }
-                                                                        )
-                                                                    )
-                                                                },
-                                                                leadingIcon = {
-                                                                    Icon(
-                                                                        imageVector = if (isFavoriteSong) {
+                                                                        ),
+                                                                        icon = if (isFavoriteSong) {
                                                                             Icons.Filled.Favorite
                                                                         } else {
                                                                             Icons.Outlined.FavoriteBorder
-                                                                        },
-                                                                        contentDescription = null
-                                                                    )
-                                                                },
-                                                                onClick = {
-                                                                    toggleSongFavorite(song, isFavoriteSong)
-                                                                    showMoreMenu = false
-                                                                }
-                                                            )
-                                                            DropdownMenuItem(
-                                                                text = { Text(stringResource(R.string.action_copy_song_info)) },
-                                                                leadingIcon = {
-                                                                    Icon(
-                                                                        imageVector = Icons.Outlined.ContentCopy,
-                                                                        contentDescription = null
-                                                                    )
-                                                                },
-                                                                onClick = {
-                                                                    val songInfo =
-                                                                        "${song.displayName()}-${song.displayArtist()}"
-                                                                    scope.launch {
-                                                                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", songInfo)))
-                                                                        snackbarHostState.showNeriSnackbar(
-                                                                            composeResources.getString(R.string.toast_copied)
-                                                                        )
+                                                                        }
+                                                                    ) { toggleSongFavorite(song, isFavoriteSong) }
+                                                                )
+                                                                add(
+                                                                    SongActionMenuItem(
+                                                                        label = stringResource(R.string.action_copy_song_info),
+                                                                        icon = Icons.Outlined.ContentCopy
+                                                                    ) {
+                                                                        val songInfo =
+                                                                            "${song.displayName()}-${song.displayArtist()}"
+                                                                        scope.launch {
+                                                                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", songInfo)))
+                                                                            snackbarHostState.showNeriSnackbar(
+                                                                                composeResources.getString(R.string.toast_copied)
+                                                                            )
+                                                                        }
                                                                     }
-                                                                    showMoreMenu = false
-                                                                }
-                                                            )
-                                                        }
+                                                                )
+                                                            }
+                                                        )
                                                     }
                                                 }
                                             }

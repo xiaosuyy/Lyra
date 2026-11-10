@@ -68,8 +68,6 @@ import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import com.lyra.player.ui.component.overlay.DensityScaledAlertDialog as AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -117,6 +115,8 @@ import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.component.download.SongDownloadSubtitle
+import com.lyra.player.ui.component.song.SongActionMenuItem
+import com.lyra.player.ui.component.song.SongActionsSheet
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.haptic.HapticIconButton
@@ -458,68 +458,36 @@ fun RecentScreen(
                                             contentDescription = stringResource(R.string.cd_more)
                                         )
                                     }
-                                    DropdownMenu(
-                                        expanded = showMenu,
-                                        onDismissRequest = { showMenu = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(stringResource(R.string.local_playlist_play_next))
-                                            },
-                                            leadingIcon = {
-                                                Icon(
-                                                    imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                                                    contentDescription = null
-                                                )
-                                            },
-                                            onClick = {
-                                                PlayerManager.addToQueueNext(song)
-                                                showMenu = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(stringResource(R.string.playlist_add_to_end))
-                                            },
-                                            leadingIcon = {
-                                                Icon(
-                                                    imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                                                    contentDescription = null
-                                                )
-                                            },
-                                            onClick = {
-                                                PlayerManager.addToQueueEnd(song)
-                                                showMenu = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    stringResource(
-                                                        if (isFavoriteSong) {
-                                                            R.string.favorite_remove
-                                                        } else {
-                                                            R.string.favorite_add
-                                                        }
-                                                    )
-                                                )
-                                            },
-                                            leadingIcon = {
-                                                Icon(
-                                                    imageVector = if (isFavoriteSong) {
-                                                        Icons.Filled.Favorite
+                                    SongActionsSheet(
+                                        visible = showMenu,
+                                        song = song,
+                                        offlineMode = offlineMode,
+                                        onDismissRequest = { showMenu = false },
+                                        actions = listOf(
+                                            SongActionMenuItem(
+                                                label = stringResource(R.string.local_playlist_play_next),
+                                                icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                                            ) { PlayerManager.addToQueueNext(song) },
+                                            SongActionMenuItem(
+                                                label = stringResource(R.string.playlist_add_to_end),
+                                                icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                                            ) { PlayerManager.addToQueueEnd(song) },
+                                            SongActionMenuItem(
+                                                label = stringResource(
+                                                    if (isFavoriteSong) {
+                                                        R.string.favorite_remove
                                                     } else {
-                                                        Icons.Outlined.FavoriteBorder
-                                                    },
-                                                    contentDescription = null
-                                                )
-                                            },
-                                            onClick = {
-                                                toggleSongFavorite(song, isFavoriteSong)
-                                                showMenu = false
-                                            }
+                                                        R.string.favorite_add
+                                                    }
+                                                ),
+                                                icon = if (isFavoriteSong) {
+                                                    Icons.Filled.Favorite
+                                                } else {
+                                                    Icons.Outlined.FavoriteBorder
+                                                }
+                                            ) { toggleSongFavorite(song, isFavoriteSong) }
                                         )
-                                    }
+                                    )
                                 }
                             },
                             offlineMode = offlineMode

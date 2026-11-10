@@ -324,6 +324,8 @@ import com.lyra.player.ui.component.playback.scaleButtonSize
 import com.lyra.player.ui.component.playback.scaleIconSize
 import com.lyra.player.ui.component.playback.PlaybackSourceBadge
 import com.lyra.player.ui.component.playback.PlaybackSourceType
+import com.lyra.player.ui.component.song.SongActionMenuItem
+import com.lyra.player.ui.component.song.SongActionsSheet
 import com.lyra.player.ui.component.playback.rememberDelayedPlaybackWaiting
 import com.lyra.player.ui.screen.nowplaying.NowPlayingAmbientBackground
 import com.lyra.player.ui.melox.theme.MeloxShapes
@@ -914,77 +916,41 @@ private fun NowPlayingQueueRow(
                         )
                     }
 
-                    DropdownMenu(
-                        expanded = showMoreMenu,
-                        onDismissRequest = { showMoreMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.local_playlist_play_next)) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.SkipNext,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = {
-                                onPlayNext()
-                                showMoreMenu = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.playlist_add_to_end)) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = {
-                                onAddToEnd()
-                                showMoreMenu = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(
-                                        if (isFavoriteSong) {
-                                            R.string.favorite_remove
-                                        } else {
-                                            R.string.favorite_add
-                                        }
-                                    )
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = if (isFavoriteSong) {
-                                        Icons.Filled.Star
+                    SongActionsSheet(
+                        visible = showMoreMenu,
+                        song = song,
+                        offlineMode = offlineMode,
+                        onDismissRequest = { showMoreMenu = false },
+                        actions = listOf(
+                            SongActionMenuItem(
+                                label = stringResource(R.string.local_playlist_play_next),
+                                icon = Icons.Outlined.SkipNext
+                            ) { onPlayNext() },
+                            SongActionMenuItem(
+                                label = stringResource(R.string.playlist_add_to_end),
+                                icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                            ) { onAddToEnd() },
+                            SongActionMenuItem(
+                                label = stringResource(
+                                    if (isFavoriteSong) {
+                                        R.string.favorite_remove
                                     } else {
-                                        Icons.Outlined.StarOutline
-                                    },
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = {
-                                onFavoriteToggle()
-                                showMoreMenu = false
-                            }
+                                        R.string.favorite_add
+                                    }
+                                ),
+                                icon = if (isFavoriteSong) {
+                                    Icons.Filled.Favorite
+                                } else {
+                                    Icons.Outlined.FavoriteBorder
+                                }
+                            ) { onFavoriteToggle() },
+                            SongActionMenuItem(
+                                label = stringResource(R.string.nowplaying_queue_remove),
+                                icon = Icons.Outlined.DeleteOutline,
+                                tint = MaterialTheme.colorScheme.error
+                            ) { onRemoveFromQueue() }
                         )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.nowplaying_queue_remove)) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.DeleteOutline,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = {
-                                onRemoveFromQueue()
-                                showMoreMenu = false
-                            }
-                        )
-                    }
+                    )
                 }
             } else if (dragHandle != null) {
                 dragHandle()

@@ -209,6 +209,8 @@ import com.lyra.player.ui.component.playlist.PlaylistExportSheet
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
 import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
+import com.lyra.player.ui.component.song.SongActionMenuItem
+import com.lyra.player.ui.component.song.SongActionsSheet
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.data.model.SongItem
@@ -2900,124 +2902,75 @@ internal fun SongRow(
                         tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
                     )
                 }
-                DropdownMenu(
-                    expanded = showMoreMenu,
-                    onDismissRequest = { showMoreMenu = false }
-                ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.search_result_play_keep_queue)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.PlayCircle,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        context.performHapticFeedback()
-                        onPlayNow()
-                        showMoreMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.local_playlist_play_next)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        context.performHapticFeedback()
-                        onPlayNext()
-                        showMoreMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.search_result_add_to_current_queue)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        context.performHapticFeedback()
-                        onAddToQueueEnd()
-                        showMoreMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (isFavorite) {
-                                stringResource(R.string.favorite_remove)
-                            } else {
-                                stringResource(R.string.favorite_add)
-                            }
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isFavorite) {
-                                Icons.Filled.Favorite
-                            } else {
-                                Icons.Outlined.FavoriteBorder
-                            },
-                            contentDescription = null
-                        )
-                    },
-                    enabled = favoriteActionEnabled,
-                    onClick = {
-                        context.performHapticFeedback()
-                        onToggleFavorite()
-                        showMoreMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.download_to_local)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Download,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        context.performHapticFeedback()
-                        onDownload()
-                        showMoreMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_copy_song_info)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.ContentCopy,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        scope.launch {
-                            val messageRes = when (
-                                val result = clipboard.copyPlainTextSafely(
-                                    label = "text",
-                                    text = buildExploreSongInfo(song)
-                                )
-                            ) {
-                                is ClipboardCopyResult.Copied -> if (result.wasTruncated) {
-                                    R.string.toast_copy_truncated
-                                } else {
-                                    R.string.toast_copied
+                SongActionsSheet(
+                    visible = showMoreMenu,
+                    song = song,
+                    offlineMode = offlineMode,
+                    onDismissRequest = { showMoreMenu = false },
+                    actions = listOf(
+                        SongActionMenuItem(
+                            label = stringResource(R.string.search_result_play_keep_queue),
+                            icon = Icons.Filled.PlayCircle
+                        ) {
+                            context.performHapticFeedback()
+                            onPlayNow()
+                        },
+                        SongActionMenuItem(
+                            label = stringResource(R.string.local_playlist_play_next),
+                            icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                        ) {
+                            context.performHapticFeedback()
+                            onPlayNext()
+                        },
+                        SongActionMenuItem(
+                            label = stringResource(R.string.search_result_add_to_current_queue),
+                            icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                        ) {
+                            context.performHapticFeedback()
+                            onAddToQueueEnd()
+                        },
+                        SongActionMenuItem(
+                            label = stringResource(
+                                if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                            ),
+                            icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            enabled = favoriteActionEnabled
+                        ) {
+                            context.performHapticFeedback()
+                            onToggleFavorite()
+                        },
+                        SongActionMenuItem(
+                            label = stringResource(R.string.action_download),
+                            icon = Icons.Outlined.Download
+                        ) {
+                            context.performHapticFeedback()
+                            onDownload()
+                        },
+                        SongActionMenuItem(
+                            label = stringResource(R.string.action_copy_song_info),
+                            icon = Icons.Outlined.ContentCopy
+                        ) {
+                            scope.launch {
+                                val messageRes = when (
+                                    val result = clipboard.copyPlainTextSafely(
+                                        label = "text",
+                                        text = buildExploreSongInfo(song)
+                                    )
+                                ) {
+                                    is ClipboardCopyResult.Copied -> if (result.wasTruncated) {
+                                        R.string.toast_copy_truncated
+                                    } else {
+                                        R.string.toast_copied
+                                    }
+                                    ClipboardCopyResult.TransactionTooLarge -> R.string.toast_copy_failed
                                 }
-                                ClipboardCopyResult.TransactionTooLarge -> R.string.toast_copy_failed
+                                snackbarHostState.showNeriSnackbar(
+                                    composeResources.getString(messageRes)
+                                )
                             }
-                            snackbarHostState.showNeriSnackbar(
-                                composeResources.getString(messageRes)
-                            )
                         }
-                        showMoreMenu = false
-                    }
+                    )
                 )
-                }
             }
         }
         ExploreInsetDivider()

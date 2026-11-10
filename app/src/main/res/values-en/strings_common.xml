@@ -37,6 +37,7 @@
     <string name="action_copy_song_name">Copy Song Name</string>
     <string name="action_copy_artist">Copy Artist</string>
     <string name="action_copy_song_info">Copy Song Info</string>
+    <string name="action_download">Download</string>
     <string name="action_details">Details</string>
     <string name="action_confirm_clear">Confirm Clear</string>
     <string name="action_later">Later</string>
