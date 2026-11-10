@@ -9,9 +9,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -165,6 +168,54 @@ fun Modifier.meloxGlassSurface(
             }
             if (effectiveSurfaceColor != Color.Unspecified) {
                 drawRect(effectiveSurfaceColor.copy(alpha = effectiveSurfaceColor.alpha * alphaScale))
+            }
+        },
+    )
+}
+
+/**
+ * 播放页下拉收起时的玻璃底：叠在每个下拉帧上采样下方页面层，
+ * 刚下拉时磨砂重，越往下越清透。presence / clarity 只在绘制阶段读取，
+ * 拖动过程不触发重组。backdrop 为 null（低版本或不支持）时退化为半透明暗膜。
+ */
+fun Modifier.meloxDragGlassVeil(
+    backdrop: Backdrop?,
+    presence: () -> Float,
+    clarity: () -> Float,
+    maxBlurRadius: Dp = 24.dp,
+): Modifier {
+    if (backdrop == null) {
+        return drawBehind {
+            val p = presence().coerceIn(0f, 1f)
+            if (p <= 0.001f) return@drawBehind
+            val frost = 1f - clarity().coerceIn(0f, 1f)
+            drawRect(Color.Black.copy(alpha = 0.50f * frost * p))
+            drawRect(Color.White.copy(alpha = 0.05f * frost * p))
+        }
+    }
+    return graphicsLayer {
+        alpha = presence().coerceIn(0f, 1f)
+    }.drawBackdrop(
+        backdrop = backdrop,
+        shape = { RectangleShape },
+        effects = {
+            val frost = 1f - clarity().coerceIn(0f, 1f)
+            if (frost > 0.01f) blur((maxBlurRadius * frost).toPx())
+        },
+        highlight = null,
+        shadow = null,
+        innerShadow = null,
+        onDrawBackdrop = { draw ->
+            if (presence() > 0.001f) draw()
+        },
+        onDrawSurface = {
+            val frost = 1f - clarity().coerceIn(0f, 1f)
+            if (frost > 0.001f) {
+                drawRect(
+                    Color.White.copy(alpha = 0.06f * frost),
+                    blendMode = BlendMode.Screen,
+                )
+                drawRect(Color.Black.copy(alpha = 0.42f * frost))
             }
         },
     )

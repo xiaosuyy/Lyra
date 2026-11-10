@@ -103,6 +103,7 @@ import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.component.song.SwipeRevealMoreRow
+import com.lyra.player.ui.component.song.rememberShowSongArtist
 import com.lyra.player.ui.feedback.LyraOverlaySnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.viewmodel.tab.BiliPlaylist
@@ -137,6 +138,7 @@ fun BiliPlaylistDetailScreen(
 ) {
     val context = LocalContext.current
     val composeResources = LocalResources.current
+    val showSongArtist = rememberShowSongArtist()
     val snackbarHostState = remember { SnackbarHostState() }
     val vm: BiliPlaylistDetailViewModel = viewModel(
         factory = viewModelFactory {
@@ -790,7 +792,8 @@ fun BiliPlaylistDetailScreen(
                                                 }
                                             },
                                             snackbarHostState = snackbarHostState,
-                                            offlineMode = offlineMode
+                                            offlineMode = offlineMode,
+                                            showSongArtist = showSongArtist
                                         )
                                     }
                                 }
@@ -1160,7 +1163,8 @@ private fun VideoRow(
     swipeExpanded: Boolean,
     onSwipeExpandedChange: (Boolean) -> Unit,
     snackbarHostState: SnackbarHostState,
-    offlineMode: Boolean
+    offlineMode: Boolean,
+    showSongArtist: Boolean
 ) {
     val context = LocalContext.current
     val composeResources = LocalResources.current
@@ -1191,8 +1195,8 @@ private fun VideoRow(
     SwipeRevealMoreRow(
         expanded = swipeExpanded,
         onExpandedChange = onSwipeExpandedChange,
-        revealWidth = 112.dp,
-        slideWidth = 112.dp,
+        revealWidth = 116.dp,
+        slideWidth = 116.dp,
         swipeEnabled = !selectionMode,
         rowModifier = Modifier
             .fillMaxWidth()
@@ -1227,7 +1231,7 @@ private fun VideoRow(
                     .size(width = 100.dp, height = 60.dp)
                     .clip(RoundedCornerShape(8.dp))
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(16.dp))
         },
         moreMenu = {
             SongActionsMenu(
@@ -1283,14 +1287,16 @@ private fun VideoRow(
                 style = MaterialTheme.typography.bodyLarge,
                 color = playlistModernListPrimaryContentColor()
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = video.uploader,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = playlistModernListSecondaryContentColor()
-            )
+            if (showSongArtist) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = video.uploader,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = playlistModernListSecondaryContentColor()
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         if (isCurrentSong) {
@@ -1298,13 +1304,13 @@ private fun VideoRow(
                 color = MaterialTheme.colorScheme.primary,
                 animate = animatePlayingIndicator
             )
-        } else {
-            Text(
-                text = formatDurationSec(video.durationSec),
-                style = MaterialTheme.typography.bodySmall,
-                color = playlistModernListSecondaryContentColor()
-            )
+            Spacer(Modifier.width(8.dp))
         }
+        Text(
+            text = formatDurationSec(video.durationSec),
+            style = MaterialTheme.typography.bodySmall,
+            color = playlistModernListSecondaryContentColor()
+        )
         
     }
 

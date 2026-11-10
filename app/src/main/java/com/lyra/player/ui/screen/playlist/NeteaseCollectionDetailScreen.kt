@@ -153,6 +153,7 @@ import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResul
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.component.song.SwipeRevealMoreRow
+import com.lyra.player.ui.component.song.rememberShowSongArtist
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionDetailUiState
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionDetailViewModel
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionHeader
@@ -377,6 +378,7 @@ fun DetailScreen(
 ) {
 
     val context = LocalContext.current
+    val showSongArtist = rememberShowSongArtist()
 
     // 下载进度
     var showDownloadManager by remember { mutableStateOf(false) }
@@ -971,7 +973,8 @@ fun DetailScreen(
                                                         swipeRevealedKey = if (open) item.stableKey() else null
                                                     },
                                                     snackbarHostState = snackbarHostState,
-                                                    offlineMode = offlineMode
+                                                    offlineMode = offlineMode,
+                                                    showSongArtist = showSongArtist
                                                 )
                                                 if (index != displayedTracks.lastIndex) {
                                                     HorizontalDivider(
@@ -1159,7 +1162,8 @@ private fun SongRow(
     swipeExpanded: Boolean,
     onSwipeExpandedChange: (Boolean) -> Unit,
     snackbarHostState: SnackbarHostState,
-    offlineMode: Boolean
+    offlineMode: Boolean,
+    showSongArtist: Boolean
 ) {
     val current by PlayerManager.currentSongFlow.collectAsState()
     val isPlaying by PlayerManager.isPlayingFlow.collectAsState()
@@ -1177,7 +1181,7 @@ private fun SongRow(
     val displayCoverUrl = rememberSongDisplayCoverUrl(song)
     val hasLeading = showCover || trackNumber > 0
     val leadingWidth = when {
-        showCover -> 60.dp
+        showCover -> 64.dp
         trackNumber > 0 -> 40.dp
         else -> 0.dp
     }
@@ -1248,7 +1252,7 @@ private fun SongRow(
                         )
                     }
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(16.dp))
             }
         },
         moreMenu = {
@@ -1292,16 +1296,18 @@ private fun SongRow(
                 style = MaterialTheme.typography.titleMedium,
                 color = playlistModernListPrimaryContentColor()
             )
-            Text(
-                text = listOfNotNull(
-                    song.displayArtist().takeIf { it.isNotBlank() },
-                    (song.album.takeIf { it.isNotBlank() })?.replace("Netease", "") ?: ""
-                ).joinToString(" · "),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = playlistModernListSecondaryContentColor()
-            )
+            if (showSongArtist) {
+                Text(
+                    text = listOfNotNull(
+                        song.displayArtist().takeIf { it.isNotBlank() },
+                        (song.album.takeIf { it.isNotBlank() })?.replace("Netease", "") ?: ""
+                    ).joinToString(" · "),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = playlistModernListSecondaryContentColor()
+                )
+            }
         }
 
         if (isCurrentSong) {
@@ -1309,13 +1315,13 @@ private fun SongRow(
                 color = MaterialTheme.colorScheme.primary,
                 animate = isPlaying
             )
-        } else {
-            Text(
-                text = formatDuration(song.durationMs),
-                style = MaterialTheme.typography.bodySmall,
-                color = playlistModernListSecondaryContentColor()
-            )
+            Spacer(Modifier.width(8.dp))
         }
+        Text(
+            text = formatDuration(song.durationMs),
+            style = MaterialTheme.typography.bodySmall,
+            color = playlistModernListSecondaryContentColor()
+        )
     }
 }
 

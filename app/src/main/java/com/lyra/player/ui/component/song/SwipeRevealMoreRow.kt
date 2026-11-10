@@ -142,14 +142,15 @@ internal fun SwipeRevealMoreRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (leading != null) {
-                Box(
+                Row(
                     modifier = Modifier.graphicsLayer {
                         alpha = if (revealPx <= 0f) {
                             1f
                         } else {
                             (1f - offsetPx / revealPx).coerceIn(0f, 1f)
                         }
-                    }
+                    },
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     leading()
                 }

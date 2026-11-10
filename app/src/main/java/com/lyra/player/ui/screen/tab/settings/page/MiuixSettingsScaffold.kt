@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -54,11 +55,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.lyra.player.R
@@ -625,7 +629,73 @@ internal fun MiuixSettingsSectionCard(
                 .background(highlightColor)
                 .padding(MiuixSettingsContentPadding)
         ) {
-            content()
+            SettingsRowsWithDividers(content = content)
+        }
+    }
+}
+
+@Composable
+internal fun MiuixSettingsRowsColumn(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    SettingsRowsWithDividers(modifier = modifier, content = content)
+}
+
+@Composable
+private fun SettingsRowsWithDividers(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val dividerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+    val density = LocalDensity.current
+    SubcomposeLayout(modifier = modifier.fillMaxWidth()) { constraints ->
+        val rowWidth = constraints.maxWidth
+        val rows = subcompose("settings_rows") { content() }
+            .map { it.measure(Constraints(maxWidth = rowWidth)) }
+
+        val lineStart = with(density) { 48.dp.roundToPx() }.toFloat()
+        val lineEndInset = with(density) { 16.dp.roundToPx() }.toFloat()
+        val lineThickness = with(density) { 1.dp.roundToPx() }.coerceAtLeast(1).toFloat()
+
+        val dividerYs = mutableListOf<Int>()
+        var currentY = 0
+        var hasVisibleRow = false
+        rows.forEach { row ->
+            if (row.height > 0) {
+                if (hasVisibleRow) dividerYs.add(currentY)
+                hasVisibleRow = true
+            }
+            currentY += row.height
+        }
+
+        val dividers = dividerYs.mapIndexed { index, _ ->
+            subcompose("settings_row_divider_$index") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .drawBehind {
+                            drawLine(
+                                color = dividerColor,
+                                start = Offset(lineStart, 0f),
+                                end = Offset(size.width - lineEndInset, 0f),
+                                strokeWidth = lineThickness
+                            )
+                        }
+                )
+            }.first().measure(Constraints(maxWidth = rowWidth))
+        }
+
+        layout(rowWidth, currentY) {
+            var y = 0
+            rows.forEach { row ->
+                row.placeRelative(0, y)
+                y += row.height
+            }
+            dividerYs.forEachIndexed { index, dividerY ->
+                dividers[index].placeRelative(0, dividerY)
+            }
         }
     }
 }

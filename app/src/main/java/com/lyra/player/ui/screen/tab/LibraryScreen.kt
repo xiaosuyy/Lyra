@@ -28,15 +28,12 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +41,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -68,6 +66,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.BarChart
@@ -76,10 +76,13 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -115,7 +118,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -128,30 +130,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
@@ -159,7 +152,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -197,6 +189,7 @@ import com.lyra.player.data.local.playlist.system.SystemLocalPlaylists
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
+import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.component.playlist.showPlaylistDeleteResultGlobally
@@ -211,6 +204,11 @@ import com.lyra.player.ui.viewmodel.tab.YouTubeMusicPlaylist
 import com.lyra.player.ui.viewmodel.tab.favoriteId
 import com.lyra.player.ui.util.rememberPlaylistDisplayCoverUrl
 import com.lyra.player.util.media.fastScrollableImageRequest
+import com.lyra.player.core.player.PlayerManager
+import com.lyra.player.ui.component.song.SongActionMenuItem
+import com.lyra.player.ui.component.song.SongActionsMenu
+import com.lyra.player.ui.component.song.SwipeRevealMoreRow
+import com.lyra.player.ui.component.song.rememberShowSongArtist
 import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.ui.haptic.HapticTextButton
 import com.lyra.player.ui.haptic.performHapticFeedback
@@ -413,6 +411,7 @@ fun LibraryScreen(
     val localPlaylistRepo = remember(context) {
         LocalPlaylistRepository.getInstance(context)
     }
+    val showSongArtist = rememberShowSongArtist()
     // 旧版本用枚举序列化保存页签，移除「下载」后按名称恢复可避免反序列化失败。
     var librarySection by rememberSaveable(
         stateSaver = Saver(
@@ -534,6 +533,7 @@ fun LibraryScreen(
                             songs = localFilesSongs,
                             query = libraryQuery,
                             listState = songsListState,
+                            showSongArtist = showSongArtist,
                             onSongClick = onSongClick,
                             onDeleteSong = { song -> vm.deleteLocalSong(song) }
                         )
@@ -598,6 +598,7 @@ fun LibraryScreen(
                         LibrarySection.RECENT -> LibraryRecentContent(
                             query = libraryQuery,
                             listState = recentListState,
+                            showSongArtist = showSongArtist,
                             onSongClick = onSongClick,
                             offlineMode = offlineMode
                         )
@@ -675,6 +676,7 @@ private fun LibrarySongsContent(
     songs: List<SongItem>,
     query: String,
     listState: LazyListState,
+    showSongArtist: Boolean,
     onSongClick: (List<SongItem>, Int) -> Unit,
     onDeleteSong: (SongItem) -> Unit
 ) {
@@ -690,6 +692,12 @@ private fun LibrarySongsContent(
         }
     }
     val context = LocalContext.current
+    val playlistRepo = remember(context) { LocalPlaylistRepository.getInstance(context) }
+    val allLocalPlaylists by playlistRepo.playlists.collectAsStateWithLifecycle()
+    val favoriteSongs = remember(allLocalPlaylists, context) {
+        FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
+    }
+    val scope = rememberCoroutineScope()
     val sortPreferences = remember(context) { LibrarySortPreferences.getInstance(context) }
     val sortMode by sortPreferences.sortMode.collectAsStateWithLifecycle()
     val sortGroups = remember(filteredSongs, sortMode) {
@@ -743,6 +751,7 @@ private fun LibrarySongsContent(
                 Column {
                     LibraryInlineSongRow(
                         song = song,
+                        showSongArtist = showSongArtist,
                         onClick = {
                             if (expandedKey != null) expandedKey = null
                             else onSongClick(displayedSongs, index)
@@ -750,6 +759,16 @@ private fun LibrarySongsContent(
                         swipeKey = itemKey,
                         expandedKey = expandedKey,
                         onExpandedChange = { expandedKey = it },
+                        isFavorite = favoriteSongs.any { it.sameIdentityAs(song) },
+                        onToggleFavorite = {
+                            scope.launch {
+                                if (favoriteSongs.any { it.sameIdentityAs(song) }) {
+                                    playlistRepo.removeFromFavorites(song)
+                                } else {
+                                    playlistRepo.addToFavorites(song)
+                                }
+                            }
+                        },
                         onDeleteClick = {
                             expandedKey = null
                             pendingDeleteSong = song
@@ -779,6 +798,7 @@ private fun LibrarySongsContent(
                     Column {
                         LibraryInlineSongRow(
                             song = song,
+                            showSongArtist = showSongArtist,
                             onClick = {
                                 if (expandedKey != null) expandedKey = null
                                 else onSongClick(displayedSongs, displayIndex)
@@ -786,6 +806,16 @@ private fun LibrarySongsContent(
                             swipeKey = itemKey,
                             expandedKey = expandedKey,
                             onExpandedChange = { expandedKey = it },
+                            isFavorite = favoriteSongs.any { it.sameIdentityAs(song) },
+                            onToggleFavorite = {
+                                scope.launch {
+                                    if (favoriteSongs.any { it.sameIdentityAs(song) }) {
+                                        playlistRepo.removeFromFavorites(song)
+                                    } else {
+                                        playlistRepo.addToFavorites(song)
+                                    }
+                                }
+                            },
                             onDeleteClick = {
                                 expandedKey = null
                                 pendingDeleteSong = song
@@ -832,11 +862,18 @@ private fun LibrarySongsContent(
 private fun LibraryRecentContent(
     query: String,
     listState: LazyListState,
+    showSongArtist: Boolean,
     onSongClick: (List<SongItem>, Int) -> Unit,
     offlineMode: Boolean = false
 ) {
     val context = LocalContext.current
     val historyRepo = remember { AppContainer.playHistoryRepo }
+    val playlistRepo = remember(context) { LocalPlaylistRepository.getInstance(context) }
+    val allLocalPlaylists by playlistRepo.playlists.collectAsStateWithLifecycle()
+    val favoriteSongs = remember(allLocalPlaylists, context) {
+        FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
+    }
+    val scope = rememberCoroutineScope()
     val history by historyRepo.historyFlow.collectAsStateWithLifecycle()
     val songs = remember(history) { history.map { it.toSongItem() } }
     val filteredSongs = remember(songs, query, context) {
@@ -900,6 +937,7 @@ private fun LibraryRecentContent(
             Column {
                 LibraryInlineSongRow(
                     song = song,
+                    showSongArtist = showSongArtist,
                     onClick = {
                         if (expandedKey != null) expandedKey = null
                         else onSongClick(filteredSongs, index)
@@ -908,6 +946,16 @@ private fun LibraryRecentContent(
                     swipeKey = itemKey,
                     expandedKey = expandedKey,
                     onExpandedChange = { expandedKey = it },
+                    isFavorite = favoriteSongs.any { it.sameIdentityAs(song) },
+                    onToggleFavorite = {
+                        scope.launch {
+                            if (favoriteSongs.any { it.sameIdentityAs(song) }) {
+                                playlistRepo.removeFromFavorites(song)
+                            } else {
+                                playlistRepo.addToFavorites(song)
+                            }
+                        }
+                    },
                     onDeleteClick = {
                         expandedKey = null
                         historyRepo.removeSongs(listOf(song))
@@ -939,6 +987,10 @@ private fun LibraryInlinePlaylistRow(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     selectionControl: (@Composable () -> Unit)? = null,
+    swipeExpanded: Boolean = false,
+    onSwipeExpandedChange: ((Boolean) -> Unit)? = null,
+    swipeEnabled: Boolean = false,
+    moreActions: List<SongActionMenuItem>? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -946,76 +998,124 @@ private fun LibraryInlinePlaylistRow(
         playlist = playlist,
         resolveLocalFallback = true
     )
+    val clickModifier = when {
+        onClick == null -> Modifier
+        onLongClick == null -> Modifier.clickable(onClick = onClick)
+        else -> Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+    }
+
+    if (swipeEnabled && onSwipeExpandedChange != null && moreActions != null) {
+        var showMoreMenu by remember { mutableStateOf(false) }
+        LaunchedEffect(swipeExpanded) {
+            if (!swipeExpanded) showMoreMenu = false
+        }
+        SwipeRevealMoreRow(
+            expanded = swipeExpanded,
+            onExpandedChange = onSwipeExpandedChange,
+            revealWidth = 60.dp,
+            slideWidth = 60.dp,
+            swipeEnabled = true,
+            rowModifier = modifier
+                .fillMaxWidth()
+                .height(66.dp)
+                .background(containerColor)
+                .then(clickModifier)
+                .padding(horizontal = 18.dp),
+            onMoreClick = { showMoreMenu = true },
+            moreTint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+            moreContentDescription = stringResource(R.string.common_more_actions),
+            leading = {
+                PlaylistRowCover(context = context, cover = cover, offlineMode = offlineMode)
+                Spacer(Modifier.width(16.dp))
+            },
+            moreMenu = {
+                SongActionsMenu(
+                    expanded = showMoreMenu,
+                    onDismissRequest = { showMoreMenu = false },
+                    actions = moreActions
+                )
+            }
+        ) {
+            PlaylistRowText(title = title, subtitle = subtitle)
+            trailing?.invoke()
+        }
+        return
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(66.dp)
             .background(containerColor)
-            .then(
-                when {
-                    onClick == null -> Modifier
-                    onLongClick == null -> Modifier.clickable(onClick = onClick)
-                    else -> Modifier.combinedClickable(
-                        onClick = onClick,
-                        onLongClick = onLongClick
-                    )
-                }
-            )
+            .then(clickModifier)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         selectionControl?.invoke()
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (!cover.isNullOrBlank()) {
-                AsyncImage(
-                    model = fastScrollableImageRequest(
-                        context = context,
-                        data = cover,
-                        sizePx = 160,
-                        offlineMode = offlineMode
-                    ),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = title,
-                fontSize = 17.sp,
-                lineHeight = 21.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = subtitle,
-                fontSize = 13.sp,
-                lineHeight = 16.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
-            )
-        }
+        PlaylistRowCover(context = context, cover = cover, offlineMode = offlineMode)
+        PlaylistRowText(title = title, subtitle = subtitle)
         trailing?.invoke()
+    }
+}
+
+@Composable
+private fun PlaylistRowCover(context: Context, cover: String?, offlineMode: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!cover.isNullOrBlank()) {
+            AsyncImage(
+                model = fastScrollableImageRequest(
+                    context = context,
+                    data = cover,
+                    sizePx = 160,
+                    offlineMode = offlineMode
+                ),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowScope.PlaylistRowText(title: String, subtitle: String) {
+    Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 17.sp,
+            lineHeight = 21.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = subtitle,
+            fontSize = 13.sp,
+            lineHeight = 16.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+        )
     }
 }
 
@@ -1269,28 +1369,82 @@ private fun LibraryPlayAllRow(onClick: () -> Unit) {
 @Composable
 private fun LibraryInlineSongRow(
     song: SongItem,
+    showSongArtist: Boolean,
     onClick: () -> Unit,
     offlineMode: Boolean = false,
     swipeKey: String? = null,
     expandedKey: String? = null,
     onExpandedChange: ((String?) -> Unit)? = null,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
     onDeleteClick: (() -> Unit)? = null
 ) {
-    if (swipeKey != null && onExpandedChange != null && onDeleteClick != null) {
-        LibrarySwipeToDeleteRow(
-            isExpanded = expandedKey == swipeKey,
-            onExpandedChange = { expanded -> onExpandedChange(if (expanded) swipeKey else null) },
-            onDeleteClick = onDeleteClick,
-            onClick = onClick
-        ) {
-            LibrarySongRowContent(song = song, offlineMode = offlineMode)
-        }
-    } else {
+    if (swipeKey == null || onExpandedChange == null || onDeleteClick == null) {
         LibrarySongRowContent(
             song = song,
             offlineMode = offlineMode,
+            showSongArtist = showSongArtist,
             modifier = Modifier.clickable(onClick = onClick)
         )
+        return
+    }
+
+    var showMoreMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(expandedKey == swipeKey) {
+        if (expandedKey != swipeKey) showMoreMenu = false
+    }
+
+    SwipeRevealMoreRow(
+        expanded = expandedKey == swipeKey,
+        onExpandedChange = { expanded -> onExpandedChange(if (expanded) swipeKey else null) },
+        revealWidth = 60.dp,
+        slideWidth = 60.dp,
+        swipeEnabled = true,
+        rowModifier = Modifier
+            .fillMaxWidth()
+            .height(66.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp),
+        onMoreClick = { showMoreMenu = true },
+        moreTint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+        moreContentDescription = stringResource(R.string.common_more_actions),
+        leading = {
+            LibrarySongCover(song = song, offlineMode = offlineMode)
+            Spacer(Modifier.width(16.dp))
+        },
+        moreMenu = {
+            SongActionsMenu(
+                expanded = showMoreMenu,
+                onDismissRequest = { showMoreMenu = false },
+                actions = listOf(
+                    SongActionMenuItem(
+                        label = stringResource(R.string.local_playlist_play_next),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                    ) { PlayerManager.addToQueueNext(song) },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.playlist_add_to_end),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                    ) { PlayerManager.addToQueueEnd(song) },
+                    SongActionMenuItem(
+                        label = stringResource(
+                            if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                        ),
+                        icon = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder
+                    ) { onToggleFavorite?.invoke() },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.action_delete),
+                        icon = Icons.Outlined.Delete,
+                        tint = MaterialTheme.colorScheme.error
+                    ) {
+                        onExpandedChange(null)
+                        onDeleteClick()
+                    }
+                )
+            )
+        }
+    ) {
+        LibrarySongTextContent(song = song, showSongArtist = showSongArtist)
+        LibrarySongDuration(song = song)
     }
 }
 
@@ -1298,45 +1452,59 @@ private fun LibraryInlineSongRow(
 private fun LibrarySongRowContent(
     song: SongItem,
     offlineMode: Boolean,
+    showSongArtist: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val coverUrl = rememberSongDisplayCoverUrl(song)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(66.dp)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        AsyncImage(
-            model = offlineCachedImageRequest(
-                context = context,
-                data = coverUrl,
-                sizePx = 192,
-                allowHardware = false,
-                offlineMode = offlineMode
-            ),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
+        LibrarySongCover(song = song, offlineMode = offlineMode)
+        LibrarySongTextContent(song = song, showSongArtist = showSongArtist)
+        LibrarySongDuration(song = song)
+    }
+}
+
+@Composable
+private fun LibrarySongCover(song: SongItem, offlineMode: Boolean) {
+    val context = LocalContext.current
+    val coverUrl = rememberSongDisplayCoverUrl(song)
+    AsyncImage(
+        model = offlineCachedImageRequest(
+            context = context,
+            data = coverUrl,
+            sizePx = 192,
+            allowHardware = false,
+            offlineMode = offlineMode
+        ),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
+    )
+}
+
+@Composable
+private fun RowScope.LibrarySongTextContent(song: SongItem, showSongArtist: Boolean) {
+    Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = song.displayName(),
+            fontSize = 17.sp,
+            lineHeight = 21.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground
         )
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = song.displayName(),
-                fontSize = 17.sp,
-                lineHeight = 21.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+        if (showSongArtist) {
             Text(
                 text = song.displayArtist(),
                 fontSize = 13.sp,
@@ -1346,134 +1514,17 @@ private fun LibrarySongRowContent(
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
             )
         }
-        if (song.durationMs > 0L) {
-            Text(
-                text = formatDuration(song.durationMs),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
-            )
-        }
     }
 }
 
-/**
- * 右滑露出删除按钮：整行右移后，在原来封面的位置滑入一个与封面等大的红色圆形按钮
- * （44dp，白色垃圾桶图标）；时长等尾部内容随行移出裁切区。左滑/返回/点其他位置回弹归位。
- */
 @Composable
-private fun LibrarySwipeToDeleteRow(
-    isExpanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onDeleteClick: () -> Unit,
-    onClick: () -> Unit,
-    content: @Composable () -> Unit
-) {
-    val density = LocalDensity.current
-    val haptics = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
-    // 右移量让封面左缘落在 74dp（18dp 页边距 + 44dp 封面 + 12dp 间距），
-    // 与下一行歌词首个字的起始位置对齐。
-    val revealPx = with(density) { 56.dp.toPx() }
-    var offsetPx by remember { mutableFloatStateOf(0f) }
-    var settleJob by remember { mutableStateOf<Job?>(null) }
-    var crossedThreshold by remember { mutableStateOf(false) }
-    val deleteLabel = stringResource(R.string.download_delete)
-
-    fun animateTo(target: Float) {
-        settleJob?.cancel()
-        settleJob = scope.launch {
-            animate(
-                initialValue = offsetPx,
-                targetValue = target,
-                animationSpec = spring(dampingRatio = 0.82f, stiffness = 260f)
-            ) { value, _ -> offsetPx = value }
-        }
-    }
-
-    LaunchedEffect(isExpanded) {
-        animateTo(if (isExpanded) revealPx else 0f)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(66.dp)
-            .clipToBounds()
-    ) {
-        if (offsetPx > 0.5f) {
-            val progress = (offsetPx / revealPx).coerceIn(0f, 1f)
-            Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 18.dp)
-                        .size(44.dp)
-                        .graphicsLayer {
-                            alpha = progress
-                            val buttonScale = 0.72f + 0.28f * progress
-                            scaleX = buttonScale
-                            scaleY = buttonScale
-                        }
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.error)
-                        .clickable(onClick = {
-                            onExpandedChange(false)
-                            onDeleteClick()
-                        })
-                        .semantics { contentDescription = deleteLabel },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = Color.White
-                    )
-                }
-            }
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .offset { IntOffset(offsetPx.roundToInt(), 0) }
-                .pointerInput(revealPx) {
-                    detectHorizontalDragGestures(
-                        onDragStart = {
-                            settleJob?.cancel()
-                            crossedThreshold = false
-                        },
-                        onHorizontalDrag = { change, amount ->
-                            change.consume()
-                            val proposed = (offsetPx + amount).coerceAtLeast(0f)
-                            offsetPx = if (proposed <= revealPx) {
-                                proposed
-                            } else {
-                                revealPx + (proposed - revealPx) * 0.18f
-                            }
-                            val crossed = offsetPx >= revealPx * 0.45f
-                            if (crossed != crossedThreshold) {
-                                crossedThreshold = crossed
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            }
-                        },
-                        onDragCancel = { onExpandedChange(false) },
-                        onDragEnd = {
-                            val expanded = offsetPx >= revealPx * 0.45f
-                            animateTo(if (expanded) revealPx else 0f)
-                            onExpandedChange(expanded)
-                        }
-                    )
-                }
-                .clickable {
-                    if (offsetPx > 1f) {
-                        onExpandedChange(false)
-                        animateTo(0f)
-                    } else {
-                        onClick()
-                    }
-                }
-        ) {
-            content()
-        }
+private fun LibrarySongDuration(song: SongItem) {
+    if (song.durationMs > 0L) {
+        Text(
+            text = formatDuration(song.durationMs),
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
+        )
     }
 }
 
@@ -1614,6 +1665,7 @@ private fun LocalPlaylistList(
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showDeleteSelectedConfirm by rememberSaveable { mutableStateOf(false) }
+    var swipeRevealedPlaylistId by remember { mutableStateOf<Long?>(null) }
     val focusRequester = remember { FocusRequester() }
     val defaultPlaylistName = composeResources.getString(R.string.library_create_playlist_default)
     val maxNameLength = LocalPlaylistRepository.MAX_PLAYLIST_NAME_LENGTH
@@ -1659,6 +1711,15 @@ private fun LocalPlaylistList(
     }
 
     BackHandler(enabled = selectionMode) { exitSelection() }
+    BackHandler(enabled = !selectionMode && swipeRevealedPlaylistId != null) {
+        swipeRevealedPlaylistId = null
+    }
+    LaunchedEffect(selectionMode) {
+        if (selectionMode) swipeRevealedPlaylistId = null
+    }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) swipeRevealedPlaylistId = null
+    }
 
     LaunchedEffect(editablePlaylists) {
         val validIds = editablePlaylists.map { it.id }.toSet()
@@ -2074,12 +2135,9 @@ private fun LocalPlaylistList(
                     Color.Transparent
                 }
 
-                var showMenu by remember { mutableStateOf(false) }
                 var showRenameDialog by remember { mutableStateOf(false) }
                 var showDeleteDialog by remember { mutableStateOf(false) }
                 var renameText by remember { mutableStateOf(pl.name.take(maxNameLength)) }
-
-                if (selectionMode && showMenu) showMenu = false
 
                 Column(modifier = Modifier.animateItem()) {
                     LibraryInlinePlaylistRow(
@@ -2116,6 +2174,27 @@ private fun LocalPlaylistList(
                                 )
                             }
                         } else null,
+                        swipeExpanded = swipeRevealedPlaylistId == pl.id,
+                        onSwipeExpandedChange = { expanded ->
+                            swipeRevealedPlaylistId = if (expanded) pl.id else null
+                        },
+                        swipeEnabled = !selectionMode && !isSystemPlaylist,
+                        moreActions = if (isSystemPlaylist) null else listOf(
+                            SongActionMenuItem(
+                                label = stringResource(R.string.action_rename),
+                                icon = Icons.Outlined.Edit
+                            ) {
+                                renameText = pl.name.take(maxNameLength)
+                                showRenameDialog = true
+                            },
+                            SongActionMenuItem(
+                                label = stringResource(R.string.action_delete),
+                                icon = Icons.Outlined.Delete,
+                                tint = MaterialTheme.colorScheme.error
+                            ) {
+                                showDeleteDialog = true
+                            }
+                        ),
                         trailing = {
                             if (selectionMode && !isSystemPlaylist) {
                                 Box(
@@ -2129,37 +2208,6 @@ private fun LocalPlaylistList(
                                         tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f),
                                         modifier = Modifier.size(LyraIconSize.Large)
                                     )
-                                }
-                            } else if (!selectionMode && !isSystemPlaylist) {
-                                Box {
-                                    HapticIconButton(onClick = { showMenu = true }) {
-                                        Icon(
-                                            imageVector = Icons.Filled.MoreVert,
-                                            contentDescription = stringResource(R.string.common_more_options),
-                                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f),
-                                            modifier = Modifier.size(LyraIconSize.Large)
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = showMenu,
-                                        onDismissRequest = { showMenu = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.action_rename)) },
-                                            onClick = {
-                                                showMenu = false
-                                                renameText = pl.name.take(maxNameLength)
-                                                showRenameDialog = true
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.action_delete)) },
-                                            onClick = {
-                                                showMenu = false
-                                                showDeleteDialog = true
-                                            }
-                                        )
-                                    }
                                 }
                             }
                         }

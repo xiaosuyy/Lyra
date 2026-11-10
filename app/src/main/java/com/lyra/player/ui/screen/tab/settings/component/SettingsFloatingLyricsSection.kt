@@ -75,6 +75,7 @@ import com.lyra.player.data.settings.normalizeFloatingLyricsPosition
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsSegmentedTabs
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsSlider
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsSwitch
+import com.lyra.player.ui.screen.tab.settings.page.MiuixSettingsRowsColumn
 import com.lyra.player.ui.screen.tab.settings.page.settingsHighlightTarget
 import kotlin.math.roundToInt
 
@@ -223,9 +224,8 @@ internal fun SettingsFloatingLyricsSection(
         landscapePositionY = pendingLandscapePositionY
     )
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    MiuixSettingsRowsColumn(
+        modifier = Modifier.fillMaxWidth()
     ) {
         FloatingLyricsPreview(
             preferences = previewPreferences,

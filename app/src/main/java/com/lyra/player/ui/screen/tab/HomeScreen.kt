@@ -159,6 +159,7 @@ import com.lyra.player.data.local.media.displayAlbum
 import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
+import com.lyra.player.ui.component.song.rememberShowSongArtist
 import com.lyra.player.ui.util.shouldAllowCollapsingTopAppBar
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
@@ -322,6 +323,7 @@ fun HomeScreen(
             ?.songs
             .orEmpty()
     }
+    val showSongArtist = rememberShowSongArtist()
     val localPlaylistUsageLookup = remember(localPlaylists, context) {
         buildLocalPlaylistUsageLookup(localPlaylists, context)
     }
@@ -659,6 +661,7 @@ fun HomeScreen(
                         LyraSongRow(
                             song = continueSong,
                             isCurrent = true,
+                            showArtist = showSongArtist,
                             onClick = { onSongClick(listOf(continueSong), 0) }
                         )
                     }
@@ -694,6 +697,7 @@ fun HomeScreen(
                                             LyraSongRow(
                                                 song = song,
                                                 isCurrent = currentSong?.sameIdentityAs(song) == true,
+                                                showArtist = showSongArtist,
                                                 onClick = { onSongClick(displaySongs, songIndex) },
                                                 modifier = Modifier.animateItem()
                                             )
@@ -1281,6 +1285,7 @@ private fun MeloxSongCarousel(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val showSongArtist = rememberShowSongArtist()
     val columnWidth = if (isTabletLayout) 390.dp else 320.dp
     val columns = songs.chunked(3)
     LazyRow(
@@ -1320,7 +1325,7 @@ private fun MeloxSongCarousel(
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(16.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
                                 text = song.displayName(),
@@ -1329,17 +1334,19 @@ private fun MeloxSongCarousel(
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
-                            Text(
-                                text = song.displayArtist(),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f),
-                                fontSize = 13.sp
-                            )
+                            if (showSongArtist) {
+                                Text(
+                                    text = song.displayArtist(),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f),
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
                     }
                     HorizontalDivider(
-                        modifier = Modifier.padding(start = 54.dp, end = 10.dp),
+                        modifier = Modifier.padding(start = 64.dp, end = 10.dp),
                         thickness = 0.6.dp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
                     )
@@ -1431,6 +1438,7 @@ private fun SongRowMini(
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val coverUrl = rememberSongDisplayCoverUrl(song)
+    val showSongArtist = rememberShowSongArtist()
     var showMenu by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
@@ -1464,9 +1472,9 @@ private fun SongRowMini(
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(8.dp))
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(16.dp))
         } else {
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(16.dp))
         }
 
         Column(
@@ -1480,16 +1488,18 @@ private fun SongRowMini(
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleSmall
             )
-            Text(
-                text = listOfNotNull(
-                    song.displayArtist().takeIf { it.isNotBlank() },
-                    song.displayAlbum(context).takeIf { it.isNotBlank() }
-                ).joinToString(" / "),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (showSongArtist) {
+                Text(
+                    text = listOfNotNull(
+                        song.displayArtist().takeIf { it.isNotBlank() },
+                        song.displayAlbum(context).takeIf { it.isNotBlank() }
+                    ).joinToString(" / "),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Box {

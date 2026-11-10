@@ -1362,7 +1362,7 @@ fun SettingsScreen(
                 }
 
                 SettingsPage.Personalization -> {
-                    for (cardIndex in 0..4) {
+                    for (cardIndex in 0..5) {
                         item(key = "${selectedPage.name}:card:$cardIndex") {
                             SettingsPersonalizationPageContent(
                                 autoSettingsRepository = autoSettingsRepository,
@@ -2363,6 +2363,7 @@ private fun SettingsPersonalizationPageContent(
         val nowPlayingProgressShowAudioSpec by autoSettingsRepository
             .nowPlayingProgressShowAudioSpecFlow
             .collectAsState(initial = true)
+        val showSongArtist by autoSettingsRepository.showSongArtistFlow.collectAsState(initial = true)
         if (shouldShowCard(0)) PersonalizationDetailCard {
             MiuixSettingsSectionIntro(
                 title = stringResource(R.string.settings_personalization_start_section),
@@ -2552,6 +2553,22 @@ private fun SettingsPersonalizationPageContent(
                     )
                 }
             }
+        }
+
+        if (shouldShowCard(5)) PersonalizationDetailCard {
+            MiuixSettingsSectionIntro(
+                title = stringResource(R.string.settings_display),
+            )
+            PersonalizationSwitchItem(
+                setting = AutoSettingsMetadata.requireSetting(AutoSettingsKeys.SHOW_SONG_ARTIST),
+                checked = showSongArtist,
+                onCheckedChange = { enabled ->
+                    scope.launch { autoSettingsRepository.setShowSongArtist(enabled) }
+                },
+                highlightTargetId = highlightTargetId,
+                highlightPulse = highlightPulse,
+                onHighlightFinished = onHighlightFinished
+            )
         }
     }
 }

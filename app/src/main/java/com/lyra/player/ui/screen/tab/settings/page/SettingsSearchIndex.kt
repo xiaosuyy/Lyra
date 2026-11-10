@@ -334,6 +334,7 @@ private fun personalizationCardIndex(targetId: String): Int {
         in PersonalizationPlaybackControlTargets -> 2
         in PersonalizationLibraryTargets -> 3
         in PersonalizationBackgroundTargets -> 4
+        in PersonalizationDisplayTargets -> 5
         else -> 0
     }
 }
@@ -378,6 +379,10 @@ private val PersonalizationBackgroundTargets = setOf(
     "setting:background_image_uri",
     "setting:background_image_blur",
     "setting:background_image_alpha"
+)
+
+private val PersonalizationDisplayTargets = setOf(
+    "setting:show_song_artist"
 )
 
 private fun SettingsSearchEntry.visibleDedupeKey(): String {

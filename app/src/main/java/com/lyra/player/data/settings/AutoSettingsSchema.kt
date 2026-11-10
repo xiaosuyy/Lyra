@@ -527,6 +527,18 @@ object AutoSettingsSchema {
             icon = AutoSettingIcon.Info
         )
 
+        @AutoSetting(
+            key = "show_song_artist",
+            type = SettingValueType.Boolean,
+            defaultBoolean = true,
+            order = 12,
+            ui = SettingUiType.Switch
+        )
+        val showSongArtist = autoSetting(
+            titleRes = R.string.settings_show_song_artist,
+            icon = AutoSettingIcon.RecordVoiceOver
+        )
+
         @AutoSetting(order = 15)
         val alwaysUseNewTabStyle = autoSwitchSetting(
             key = "always_use_new_tab_style",

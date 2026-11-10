@@ -123,6 +123,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
@@ -279,6 +280,7 @@ import com.lyra.player.util.media.adjustedAccentColorArgb
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.lyra.player.ui.melox.glass.LocalMeloxBackdrop
+import com.lyra.player.ui.melox.glass.meloxDragGlassVeil
 import com.lyra.player.ui.haptic.HapticTextButton
 import com.lyra.player.ui.haptic.performHapticFeedback
 import com.lyra.player.util.platform.openAppBackgroundSettings
@@ -4577,6 +4579,50 @@ private fun LyraAppContent(
                             }
                         }
 
+                        // 下拉收起时播放页背景换成玻璃：刚下拉是磨砂的，越往下越透亮。
+                        // 进度只在绘制阶段读取，拖动过程不触发重组。
+                        val glassPresenceRampPx = with(LocalDensity.current) { 32.dp.toPx() }
+                        val glassClearStartPx = with(LocalDensity.current) { 8.dp.toPx() }
+                        val glassClearRampPx = with(LocalDensity.current) { 240.dp.toPx() }
+                        val nowPlayingGlassPresence = remember(glassPresenceRampPx) {
+                            {
+                                (nowPlayingSheetOffsetPx.floatValue / glassPresenceRampPx)
+                                    .coerceIn(0f, 1f)
+                            }
+                        }
+                        val nowPlayingGlassClarity = remember(
+                            glassClearStartPx,
+                            glassClearRampPx
+                        ) {
+                            {
+                                (
+                                    (nowPlayingSheetOffsetPx.floatValue - glassClearStartPx) /
+                                        glassClearRampPx
+                                    ).coerceIn(0f, 1f)
+                            }
+                        }
+                        val glassBackdrop = if (
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            LocalView.current.isHardwareAccelerated
+                        ) {
+                            meloxBackdrop
+                        } else {
+                            null
+                        }
+                        val dragGlassModifier = remember(
+                            glassBackdrop,
+                            nowPlayingGlassPresence,
+                            nowPlayingGlassClarity
+                        ) {
+                            Modifier
+                                .fillMaxSize()
+                                .meloxDragGlassVeil(
+                                    backdrop = glassBackdrop,
+                                    presence = nowPlayingGlassPresence,
+                                    clarity = nowPlayingGlassClarity
+                                )
+                        }
+
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -4699,52 +4745,89 @@ private fun LyraAppContent(
                                         translationY = nowPlayingSheetOffsetPx.floatValue
                                     }
                             ) {
-                            if (!useCoverBlurBackground) {
-                                // 背景固定按暗色逻辑渲染
-                                NowPlayingAccentBackdrop(
-                                    coverUrl = nowPlayingCoverUrl,
-                                    isDark = true,
-                                    refreshKey = coverArtRefreshToken,
-                                    modifier = Modifier.fillMaxSize(),
-                                    offlineMode = offlineMode
-                                )
-                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        alpha = 1f - nowPlayingGlassPresence()
+                                    }
+                            ) {
+                                if (!useCoverBlurBackground) {
+                                    // 背景固定按暗色逻辑渲染
+                                    NowPlayingAccentBackdrop(
+                                        coverUrl = nowPlayingCoverUrl,
+                                        isDark = true,
+                                        refreshKey = coverArtRefreshToken,
+                                        modifier = Modifier.fillMaxSize(),
+                                        offlineMode = offlineMode
+                                    )
+                                }
 
-                            if (useCoverBlurBackground) {
-                                // 先铺一层强调色背景, 避免首次加载和旋转重建时黑底闪烁
-                                NowPlayingAccentBackdrop(
-                                    coverUrl = blurBackdropCoverUrl,
-                                    isDark = true,
-                                    refreshKey = coverArtRefreshToken,
-                                    modifier = Modifier.fillMaxSize(),
-                                    offlineMode = offlineMode
-                                )
-                                val shouldShowStable =
-                                    stableCoverUrl != null &&
-                                        (
-                                            stableCoverUrl != nowPlayingCoverUrl ||
-                                                stableBlurStrength != effectiveBlurStrength
-                                            )
-                                if (shouldShowStable) {
+                                if (useCoverBlurBackground) {
+                                    // 先铺一层强调色背景, 避免首次加载和旋转重建时黑底闪烁
+                                    NowPlayingAccentBackdrop(
+                                        coverUrl = blurBackdropCoverUrl,
+                                        isDark = true,
+                                        refreshKey = coverArtRefreshToken,
+                                        modifier = Modifier.fillMaxSize(),
+                                        offlineMode = offlineMode
+                                    )
+                                    val shouldShowStable =
+                                        stableCoverUrl != null &&
+                                            (
+                                                stableCoverUrl != nowPlayingCoverUrl ||
+                                                    stableBlurStrength != effectiveBlurStrength
+                                                )
+                                    if (shouldShowStable) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(stableCoverUrl)
+                                                .allowHardware(false)
+                                                .bitmapConfig(Bitmap.Config.RGB_565)
+                                                .size(blurImageSizePx)
+                                                .precision(Precision.INEXACT)
+                                                .memoryCacheKey("nowplaying-blur:$stableCoverUrl:$stableBlurStrength")
+                                                .diskCacheKey("nowplaying-blur:$stableCoverUrl:$stableBlurStrength")
+                                                .networkCachePolicy(
+                                                    if (offlineMode && isRemoteImageSource(stableCoverUrl)) {
+                                                        CachePolicy.DISABLED
+                                                    } else {
+                                                        CachePolicy.ENABLED
+                                                    }
+                                                )
+                                                .transformations(
+                                                    if ((stableBlurStrength ?: 0f) > 0f) {
+                                                        listOf(BlurTransformation(context, stableBlurStrength ?: 0f))
+                                                    } else {
+                                                        emptyList()
+                                                    }
+                                                )
+                                                .build(),
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
                                     AsyncImage(
                                         model = ImageRequest.Builder(context)
-                                            .data(stableCoverUrl)
+                                            .data(nowPlayingCoverUrl)
+                                            .crossfade(NOW_PLAYING_BACKGROUND_CROSSFADE_MS)
                                             .allowHardware(false)
                                             .bitmapConfig(Bitmap.Config.RGB_565)
                                             .size(blurImageSizePx)
                                             .precision(Precision.INEXACT)
-                                            .memoryCacheKey("nowplaying-blur:$stableCoverUrl:$stableBlurStrength")
-                                            .diskCacheKey("nowplaying-blur:$stableCoverUrl:$stableBlurStrength")
+                                            .memoryCacheKey("nowplaying-blur:$nowPlayingCoverUrl:$effectiveBlurStrength")
+                                            .diskCacheKey("nowplaying-blur:$nowPlayingCoverUrl:$effectiveBlurStrength")
                                             .networkCachePolicy(
-                                                if (offlineMode && isRemoteImageSource(stableCoverUrl)) {
+                                                if (offlineMode && isRemoteImageSource(nowPlayingCoverUrl)) {
                                                     CachePolicy.DISABLED
                                                 } else {
                                                     CachePolicy.ENABLED
                                                 }
                                             )
                                             .transformations(
-                                                if ((stableBlurStrength ?: 0f) > 0f) {
-                                                    listOf(BlurTransformation(context, stableBlurStrength ?: 0f))
+                                                if (effectiveBlurStrength > 0f) {
+                                                    listOf(BlurTransformation(context, effectiveBlurStrength))
                                                 } else {
                                                     emptyList()
                                                 }
@@ -4752,68 +4835,42 @@ private fun LyraAppContent(
                                             .build(),
                                         contentDescription = null,
                                         contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier.fillMaxSize(),
+                                        onSuccess = {
+                                            if (latestCoverBlurRequestKey == coverBlurRequestKey) {
+                                                stableCoverUrl = nowPlayingCoverUrl
+                                                stableBlurStrength = effectiveBlurStrength
+                                                coverBlurLoadFailed = false
+                                            }
+                                        },
+                                        onError = {
+                                            if (latestCoverBlurRequestKey == coverBlurRequestKey) {
+                                                coverBlurLoadFailed = stableCoverUrl.isNullOrBlank()
+                                            }
+                                        }
                                     )
-                                }
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context)
-                                        .data(nowPlayingCoverUrl)
-                                        .crossfade(NOW_PLAYING_BACKGROUND_CROSSFADE_MS)
-                                        .allowHardware(false)
-                                        .bitmapConfig(Bitmap.Config.RGB_565)
-                                        .size(blurImageSizePx)
-                                        .precision(Precision.INEXACT)
-                                        .memoryCacheKey("nowplaying-blur:$nowPlayingCoverUrl:$effectiveBlurStrength")
-                                        .diskCacheKey("nowplaying-blur:$nowPlayingCoverUrl:$effectiveBlurStrength")
-                                        .networkCachePolicy(
-                                            if (offlineMode && isRemoteImageSource(nowPlayingCoverUrl)) {
-                                                CachePolicy.DISABLED
-                                            } else {
-                                                CachePolicy.ENABLED
-                                            }
+                                    if (nowPlayingCoverBlurDarken > 0f) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Black.copy(alpha = nowPlayingCoverBlurDarken.coerceIn(0f, 0.8f)))
                                         )
-                                        .transformations(
-                                            if (effectiveBlurStrength > 0f) {
-                                                listOf(BlurTransformation(context, effectiveBlurStrength))
-                                            } else {
-                                                emptyList()
-                                            }
-                                        )
-                                        .build(),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                    onSuccess = {
-                                        if (latestCoverBlurRequestKey == coverBlurRequestKey) {
-                                            stableCoverUrl = nowPlayingCoverUrl
-                                            stableBlurStrength = effectiveBlurStrength
-                                            coverBlurLoadFailed = false
-                                        }
-                                    },
-                                    onError = {
-                                        if (latestCoverBlurRequestKey == coverBlurRequestKey) {
-                                            coverBlurLoadFailed = stableCoverUrl.isNullOrBlank()
-                                        }
                                     }
-                                )
-                                if (nowPlayingCoverBlurDarken > 0f) {
-                                    Box(
+                                } else if (effectiveDynamicBackgroundEnabled) {
+                                    HyperBackground(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(Color.Black.copy(alpha = nowPlayingCoverBlurDarken.coerceIn(0f, 0.8f)))
+                                            .graphicsLayer { alpha = 0.80f },
+                                        isDark = true,
+                                        coverUrl = nowPlayingCoverUrl,
+                                        refreshKey = coverArtRefreshToken,
+                                        offlineMode = offlineMode
                                     )
                                 }
-                            } else if (effectiveDynamicBackgroundEnabled) {
-                                HyperBackground(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .graphicsLayer { alpha = 0.80f },
-                                    isDark = true,
-                                    coverUrl = nowPlayingCoverUrl,
-                                    refreshKey = coverArtRefreshToken,
-                                    offlineMode = offlineMode
-                                )
                             }
+
+                            // 玻璃底随下拉一起位移：刚下拉磨砂遮住底页，越往下越透亮。
+                            Box(modifier = dragGlassModifier)
                             }
                             }
 

@@ -292,6 +292,7 @@ fun LyraSongRow(
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
     sourceLabel: String? = null,
+    showArtist: Boolean = true,
     trailing: (@Composable () -> Unit)? = null,
     onMore: (() -> Unit)? = null
 ) {
@@ -314,7 +315,7 @@ fun LyraSongRow(
                 .clip(RoundedCornerShape(LyraRadius.Small))
                 .background(colors.elevatedSurface)
         )
-        Spacer(Modifier.width(LyraSpacing.MD))
+        Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = song.displayName(),
@@ -323,13 +324,15 @@ fun LyraSongRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = song.displayArtist(),
-                style = textStyles.captionSecondary,
-                color = colors.secondaryText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (showArtist) {
+                Text(
+                    text = song.displayArtist(),
+                    style = textStyles.captionSecondary,
+                    color = colors.secondaryText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         if (sourceLabel != null) {
             Spacer(Modifier.width(LyraSpacing.SM))

@@ -29,9 +29,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
@@ -64,6 +62,7 @@ import com.lyra.player.core.player.download.normalizeDownloadParallelism
 import com.lyra.player.data.settings.AutoSettingsSchema
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsSlider
 import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsTextButton
+import com.lyra.player.ui.screen.tab.settings.page.MiuixSettingsRowsColumn
 
 @Composable
 internal fun SettingsDownloadSection(
@@ -118,7 +117,7 @@ private fun SettingsDownloadExpandedContent(
             (taskSummary.pendingTaskCount <= 1 || progress.totalSongs >= taskSummary.pendingTaskCount)
     }
 
-    Column(
+    MiuixSettingsRowsColumn(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.Transparent)
@@ -135,8 +134,6 @@ private fun SettingsDownloadExpandedContent(
             onHighlightFinished = onHighlightFinished
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
-
         AutoSettingSpecSwitchItem(
             setting = AutoSettingsSchema.download.standardizedLyricEmbeddingEnabled,
             highlightTargetId = highlightTargetId,
@@ -144,15 +141,11 @@ private fun SettingsDownloadExpandedContent(
             onHighlightFinished = onHighlightFinished
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
-
         DownloadParallelismSettingItem(
             highlightTargetId = highlightTargetId,
             highlightPulse = highlightPulse,
             onHighlightFinished = onHighlightFinished
         )
-
-        Spacer(modifier = Modifier.height(4.dp))
 
         if (visibleProgress != null || taskSummary.hasPendingTasks) {
             ListItem(

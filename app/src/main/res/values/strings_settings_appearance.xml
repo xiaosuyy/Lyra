@@ -44,6 +44,7 @@
     <string name="settings_force_dark_desc">不跟随系统时可手动指定</string>
     <string name="settings_cover_source_badge">封面显示歌曲来源</string>
     <string name="settings_cover_source_badge_desc">在封面区域显示当前歌曲的平台来源</string>
+    <string name="settings_show_song_artist">显示歌手名</string>
     <string name="settings_nowplaying_title">显示“正在播放”标题</string>
     <string name="settings_nowplaying_title_desc">控制播放页顶部是否显示“正在播放”四个字</string>
     <string name="settings_nowplaying_song_title_marquee">滚动显示长歌曲名</string>

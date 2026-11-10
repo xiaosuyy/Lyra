@@ -121,6 +121,7 @@ import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResul
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.component.song.SwipeRevealMoreRow
+import com.lyra.player.ui.component.song.rememberShowSongArtist
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.util.rememberSongDisplayCoverUrl
@@ -158,6 +159,7 @@ fun YouTubeMusicPlaylistDetailScreen(
 ) {
     val context = LocalContext.current
     val composeResources = LocalResources.current
+    val showSongArtist = rememberShowSongArtist()
     val viewModel: YouTubeMusicPlaylistDetailViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
@@ -837,7 +839,8 @@ fun YouTubeMusicPlaylistDetailScreen(
                                                 )
                                             }
                                         },
-                                        offlineMode = offlineMode
+                                        offlineMode = offlineMode,
+                                        showSongArtist = showSongArtist
                                     )
                                 }
                             }
@@ -1079,7 +1082,8 @@ private fun YouTubeMusicSongRow(
     onPlayNext: () -> Unit,
     onAddToQueueEnd: () -> Unit,
     onDownload: () -> Unit,
-    offlineMode: Boolean
+    offlineMode: Boolean,
+    showSongArtist: Boolean
 ) {
     val context = LocalContext.current
     val composeResources = LocalResources.current
@@ -1097,8 +1101,8 @@ private fun YouTubeMusicSongRow(
     SwipeRevealMoreRow(
         expanded = swipeExpanded,
         onExpandedChange = onSwipeExpandedChange,
-        revealWidth = 60.dp,
-        slideWidth = 60.dp,
+        revealWidth = 64.dp,
+        slideWidth = 64.dp,
         swipeEnabled = !selectionMode,
         rowModifier = Modifier
             .fillMaxWidth()
@@ -1150,7 +1154,7 @@ private fun YouTubeMusicSongRow(
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(16.dp))
         },
         moreMenu = {
             SongActionsMenu(
@@ -1207,16 +1211,18 @@ private fun YouTubeMusicSongRow(
                 overflow = TextOverflow.Ellipsis,
                 color = playlistModernListPrimaryContentColor()
             )
-            Text(
-                text = listOfNotNull(
-                    displayArtist.takeIf { it.isNotBlank() },
-                    song.album.takeIf { it.isNotBlank() }
-                ).joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = playlistModernListSecondaryContentColor(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (showSongArtist) {
+                Text(
+                    text = listOfNotNull(
+                        displayArtist.takeIf { it.isNotBlank() },
+                        song.album.takeIf { it.isNotBlank() }
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = playlistModernListSecondaryContentColor(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         if (isCurrentSong) {
@@ -1224,13 +1230,13 @@ private fun YouTubeMusicSongRow(
                 color = MaterialTheme.colorScheme.primary,
                 animate = animatePlayingIndicator
             )
-        } else {
-            Text(
-                text = formatDuration(song.durationMs),
-                style = MaterialTheme.typography.bodySmall,
-                color = playlistModernListSecondaryContentColor()
-            )
+            Spacer(Modifier.width(8.dp))
         }
+        Text(
+            text = formatDuration(song.durationMs),
+            style = MaterialTheme.typography.bodySmall,
+            color = playlistModernListSecondaryContentColor()
+        )
 
     }
 }

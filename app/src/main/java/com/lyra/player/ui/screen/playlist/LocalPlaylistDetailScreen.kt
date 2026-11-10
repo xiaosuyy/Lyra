@@ -206,6 +206,7 @@ import com.lyra.player.ui.component.local.LocalSongSyncConfirmDialog
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.component.song.SwipeRevealMoreRow
+import com.lyra.player.ui.component.song.rememberShowSongArtist
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.util.rememberPlaylistDisplayCoverUrl
@@ -842,6 +843,7 @@ fun LocalPlaylistDetailScreen(
 
             // 左滑露出的「更多」行，同屏仅一行展开
             var swipeRevealedKey by remember(playlistId) { mutableStateOf<String?>(null) }
+            val showSongArtist = rememberShowSongArtist()
 
             fun launchWithLocalSyncWarning(songs: List<SongItem>, actionLabel: String, action: () -> Unit) {
                 if (songs.any { !it.isSyncableRemoteSong(context) }) {
@@ -1975,8 +1977,8 @@ fun LocalPlaylistDetailScreen(
                                             onExpandedChange = { open ->
                                                 swipeRevealedKey = if (open) song.stableKey() else null
                                             },
-                                            revealWidth = 56.dp,
-                                            slideWidth = 56.dp,
+                                            revealWidth = 60.dp,
+                                            slideWidth = 60.dp,
                                             swipeEnabled = !selectionMode,
                                             rowModifier = Modifier
                                                 .fillMaxWidth()
@@ -2035,7 +2037,7 @@ fun LocalPlaylistDetailScreen(
                                                 } else {
                                                     Spacer(Modifier.size(44.dp))
                                                 }
-                                                Spacer(Modifier.width(12.dp))
+                                                Spacer(Modifier.width(16.dp))
                                             },
                                             moreMenu = {
                                                 SongActionsMenu(
@@ -2127,26 +2129,36 @@ fun LocalPlaylistDetailScreen(
                                                 lineHeight = 22.sp,
                                                 color = playlistModernListPrimaryContentColor()
                                             )
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = song.displayArtist(),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    fontSize = 13.sp,
-                                                    lineHeight = 16.sp,
-                                                    color = playlistModernListSecondaryContentColor(),
-                                                    modifier = Modifier.weight(1f, fill = false)
-                                                )
-                                                if (downloaded) {
-                                                    Spacer(Modifier.width(5.dp))
-                                                    Icon(
-                                                        imageVector = Icons.Outlined.DownloadDone,
-                                                        contentDescription = stringResource(R.string.downloaded),
-                                                        modifier = Modifier.size(13.dp),
-                                                        tint = playlistModernListSecondaryContentColor()
-                                                            .copy(alpha = 0.75f)
+                                            if (showSongArtist) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = song.displayArtist(),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        fontSize = 13.sp,
+                                                        lineHeight = 16.sp,
+                                                        color = playlistModernListSecondaryContentColor(),
+                                                        modifier = Modifier.weight(1f, fill = false)
                                                     )
+                                                    if (downloaded) {
+                                                        Spacer(Modifier.width(5.dp))
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.DownloadDone,
+                                                            contentDescription = stringResource(R.string.downloaded),
+                                                            modifier = Modifier.size(13.dp),
+                                                            tint = playlistModernListSecondaryContentColor()
+                                                                .copy(alpha = 0.75f)
+                                                        )
+                                                    }
                                                 }
+                                            } else if (downloaded) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.DownloadDone,
+                                                    contentDescription = stringResource(R.string.downloaded),
+                                                    modifier = Modifier.size(13.dp),
+                                                    tint = playlistModernListSecondaryContentColor()
+                                                        .copy(alpha = 0.75f)
+                                                )
                                             }
                                         }
 
@@ -2160,12 +2172,14 @@ fun LocalPlaylistDetailScreen(
                                                 enter = fadeIn(tween(120)),
                                                 exit = fadeOut(tween(100))
                                             ) {
-                                                if (isPlayingSong) {
-                                                    PlayingIndicator(
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        animate = isPlaying
-                                                    )
-                                                } else {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    if (isPlayingSong) {
+                                                        PlayingIndicator(
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            animate = isPlaying
+                                                        )
+                                                        Spacer(Modifier.width(8.dp))
+                                                    }
                                                     Text(
                                                         text = formatDuration(song.durationMs),
                                                         color = playlistModernListSecondaryContentColor()
