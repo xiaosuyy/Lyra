@@ -325,7 +325,7 @@ import com.lyra.player.ui.component.playback.scaleIconSize
 import com.lyra.player.ui.component.playback.PlaybackSourceBadge
 import com.lyra.player.ui.component.playback.PlaybackSourceType
 import com.lyra.player.ui.component.song.SongActionMenuItem
-import com.lyra.player.ui.component.song.SongActionsSheet
+import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.component.playback.rememberDelayedPlaybackWaiting
 import com.lyra.player.ui.screen.nowplaying.NowPlayingAmbientBackground
 import com.lyra.player.ui.melox.theme.MeloxShapes
@@ -916,10 +916,8 @@ private fun NowPlayingQueueRow(
                         )
                     }
 
-                    SongActionsSheet(
-                        visible = showMoreMenu,
-                        song = song,
-                        offlineMode = offlineMode,
+                    SongActionsMenu(
+                        expanded = showMoreMenu,
                         onDismissRequest = { showMoreMenu = false },
                         actions = listOf(
                             SongActionMenuItem(

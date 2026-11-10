@@ -116,7 +116,7 @@ import com.lyra.player.data.model.stableKey
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.component.download.SongDownloadSubtitle
 import com.lyra.player.ui.component.song.SongActionMenuItem
-import com.lyra.player.ui.component.song.SongActionsSheet
+import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.haptic.HapticIconButton
@@ -458,10 +458,8 @@ fun RecentScreen(
                                             contentDescription = stringResource(R.string.cd_more)
                                         )
                                     }
-                                    SongActionsSheet(
-                                        visible = showMenu,
-                                        song = song,
-                                        offlineMode = offlineMode,
+                                    SongActionsMenu(
+                                        expanded = showMenu,
                                         onDismissRequest = { showMenu = false },
                                         actions = listOf(
                                             SongActionMenuItem(

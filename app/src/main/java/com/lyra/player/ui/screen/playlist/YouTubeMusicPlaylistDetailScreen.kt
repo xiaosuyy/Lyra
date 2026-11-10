@@ -120,7 +120,7 @@ import com.lyra.player.ui.component.playlist.PlaylistExportSheet
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
 import com.lyra.player.ui.component.song.SongActionMenuItem
-import com.lyra.player.ui.component.song.SongActionsSheet
+import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.util.rememberSongDisplayCoverUrl
@@ -1171,10 +1171,8 @@ private fun YouTubeMusicSongRow(
                         tint = playlistModernListSecondaryContentColor()
                     )
                 }
-            SongActionsSheet(
-                visible = showMenu,
-                song = song,
-                offlineMode = offlineMode,
+            SongActionsMenu(
+                expanded = showMenu,
                 onDismissRequest = { showMenu = false },
                 actions = listOf(
                     SongActionMenuItem(

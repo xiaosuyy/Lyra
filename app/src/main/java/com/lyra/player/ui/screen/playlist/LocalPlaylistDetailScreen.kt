@@ -204,7 +204,7 @@ import com.lyra.player.ui.component.playlist.showPlaylistSongDeleteResult
 import com.lyra.player.ui.component.local.LocalSongDetailsDialog
 import com.lyra.player.ui.component.local.LocalSongSyncConfirmDialog
 import com.lyra.player.ui.component.song.SongActionMenuItem
-import com.lyra.player.ui.component.song.SongActionsSheet
+import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.util.rememberPlaylistDisplayCoverUrl
@@ -2099,9 +2099,8 @@ fun LocalPlaylistDetailScreen(
                                                             )
                                                         }
 
-                                                        SongActionsSheet(
-                                                            visible = showMoreMenu,
-                                                            song = song,
+                                                        SongActionsMenu(
+                                                            expanded = showMoreMenu,
                                                             onDismissRequest = { showMoreMenu = false },
                                                             actions = buildList {
                                                                 if (song.isLocalSong()) {

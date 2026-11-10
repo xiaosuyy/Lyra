@@ -158,7 +158,7 @@ import com.lyra.player.data.platform.youtube.buildYouTubeMusicMediaUri
 import com.lyra.player.data.local.media.displayAlbum
 import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.ui.component.song.SongActionMenuItem
-import com.lyra.player.ui.component.song.SongActionsSheet
+import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.util.shouldAllowCollapsingTopAppBar
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
@@ -1504,10 +1504,8 @@ private fun SongRowMini(
                 )
             }
 
-            SongActionsSheet(
-                visible = showMenu,
-                song = song,
-                offlineMode = offlineMode,
+            SongActionsMenu(
+                expanded = showMenu,
                 onDismissRequest = { showMenu = false },
                 actions = listOf(
                     SongActionMenuItem(

@@ -102,7 +102,7 @@ import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
 import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
 import com.lyra.player.ui.component.song.SongActionMenuItem
-import com.lyra.player.ui.component.song.SongActionsSheet
+import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.feedback.LyraOverlaySnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.viewmodel.tab.BiliPlaylist
@@ -1247,10 +1247,8 @@ private fun VideoRow(
                     )
                 }
                 
-                SongActionsSheet(
-                    visible = showMoreMenu,
-                    song = songItem,
-                    offlineMode = offlineMode,
+                SongActionsMenu(
+                    expanded = showMoreMenu,
                     onDismissRequest = { showMoreMenu = false },
                     actions = listOf(
                         SongActionMenuItem(

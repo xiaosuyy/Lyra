@@ -210,7 +210,7 @@ import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
 import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
 import com.lyra.player.ui.component.song.SongActionMenuItem
-import com.lyra.player.ui.component.song.SongActionsSheet
+import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.data.model.SongItem
@@ -2902,10 +2902,8 @@ internal fun SongRow(
                         tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f)
                     )
                 }
-                SongActionsSheet(
-                    visible = showMoreMenu,
-                    song = song,
-                    offlineMode = offlineMode,
+                SongActionsMenu(
+                    expanded = showMoreMenu,
                     onDismissRequest = { showMoreMenu = false },
                     actions = listOf(
                         SongActionMenuItem(

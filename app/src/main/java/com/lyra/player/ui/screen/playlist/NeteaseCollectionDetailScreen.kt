@@ -153,7 +153,7 @@ import com.lyra.player.ui.component.playlist.PlaylistExportSheet
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
 import com.lyra.player.ui.component.song.SongActionMenuItem
-import com.lyra.player.ui.component.song.SongActionsSheet
+import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionDetailUiState
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionDetailViewModel
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionHeader
@@ -1265,10 +1265,8 @@ private fun SongRow(
                     )
                 }
 
-                SongActionsSheet(
-                    visible = showMoreMenu,
-                    song = song,
-                    offlineMode = offlineMode,
+                SongActionsMenu(
+                    expanded = showMoreMenu,
                     onDismissRequest = { showMoreMenu = false },
                     actions = listOf(
                         SongActionMenuItem(
