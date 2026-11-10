@@ -51,16 +51,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -121,6 +120,7 @@ import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
+import com.lyra.player.ui.component.song.SwipeRevealMoreRow
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.util.rememberSongDisplayCoverUrl
@@ -207,6 +207,12 @@ fun YouTubeMusicPlaylistDetailScreen(
         }
     }
     fun exitSelection() { selectionMode = false; clearSelection() }
+
+    // 左滑露出的「更多」行，同屏仅一行展开
+    var swipeRevealedKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) swipeRevealedKey = null
+    }
     fun showWaitForFullLoadMessage() {
         scope.launch {
             snackbarHostState.showNeriSnackbar(
@@ -505,9 +511,9 @@ fun YouTubeMusicPlaylistDetailScreen(
                         ) {
                             Icon(
                                 imageVector = if (isFavorite) {
-                                    Icons.Filled.Favorite
+                                    Icons.Filled.Star
                                 } else {
-                                    Icons.Outlined.FavoriteBorder
+                                    Icons.Outlined.StarBorder
                                 },
                                 contentDescription = if (isFavorite) {
                                     stringResource(R.string.action_unfavorite)
@@ -817,6 +823,10 @@ fun YouTubeMusicPlaylistDetailScreen(
                                                 }
                                             }
                                         },
+                                        swipeExpanded = swipeRevealedKey == song.stableKey(),
+                                        onSwipeExpandedChange = { open ->
+                                            swipeRevealedKey = if (open) song.stableKey() else null
+                                        },
                                         onPlayNext = { PlayerManager.addToQueueNext(song) },
                                         onAddToQueueEnd = { PlayerManager.addToQueueEnd(song) },
                                         onDownload = {
@@ -933,7 +943,10 @@ fun YouTubeMusicPlaylistDetailScreen(
         }
         
         BackHandler(enabled = selectionMode) { exitSelection() }
-        
+        BackHandler(enabled = !selectionMode && swipeRevealedKey != null) {
+            swipeRevealedKey = null
+        }
+
         if (showDownloadManager) {
             val batchDownloadProgress by AudioDownloadManager.batchProgressFlow.collectAsState()
             val downloadTasks by GlobalDownloadManager.downloadTasks.collectAsState()
@@ -1061,6 +1074,8 @@ private fun YouTubeMusicSongRow(
     onToggleSelect: () -> Unit,
     onLongPress: () -> Unit,
     onClick: () -> Unit,
+    swipeExpanded: Boolean,
+    onSwipeExpandedChange: (Boolean) -> Unit,
     onPlayNext: () -> Unit,
     onAddToQueueEnd: () -> Unit,
     onDownload: () -> Unit,
@@ -1071,9 +1086,21 @@ private fun YouTubeMusicSongRow(
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     var showMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(swipeExpanded) {
+        if (!swipeExpanded) showMenu = false
+    }
 
-    Row(
-        modifier = Modifier
+    val coverModel = rememberSongDisplayCoverUrl(song).takeUnless { it.isNullOrBlank() }
+    val displayName = song.displayName()
+    val displayArtist = song.displayArtist()
+
+    SwipeRevealMoreRow(
+        expanded = swipeExpanded,
+        onExpandedChange = onSwipeExpandedChange,
+        revealWidth = 60.dp,
+        slideWidth = 60.dp,
+        swipeEnabled = !selectionMode,
+        rowModifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = {
@@ -1086,24 +1113,21 @@ private fun YouTubeMusicSongRow(
                 }
             )
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (selectionMode) {
-            Box(
-                modifier = Modifier.width(48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.Checkbox(
-                    checked = selected,
-                    onCheckedChange = { onToggleSelect() }
-                )
+        onMoreClick = { showMenu = true },
+        moreTint = playlistModernListSecondaryContentColor(),
+        moreContentDescription = stringResource(R.string.common_more_actions),
+        leading = {
+            if (selectionMode) {
+                Box(
+                    modifier = Modifier.width(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.Checkbox(
+                        checked = selected,
+                        onCheckedChange = { onToggleSelect() }
+                    )
+                }
             }
-        }
-
-        val coverModel = rememberSongDisplayCoverUrl(song).takeUnless { it.isNullOrBlank() }
-        val displayName = song.displayName()
-        val displayArtist = song.displayArtist()
-        if (!coverModel.isNullOrBlank()) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -1113,20 +1137,66 @@ private fun YouTubeMusicSongRow(
                         shape = RoundedCornerShape(10.dp)
                     )
             ) {
-                AsyncImage(
-                    model = offlineCachedImageRequest(
-                        context = context,
-                        data = coverModel,
-                        offlineMode = offlineMode
-                    ),
-                    contentDescription = displayName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (!coverModel.isNullOrBlank()) {
+                    AsyncImage(
+                        model = offlineCachedImageRequest(
+                            context = context,
+                            data = coverModel,
+                            offlineMode = offlineMode
+                        ),
+                        contentDescription = displayName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(12.dp))
+        },
+        moreMenu = {
+            SongActionsMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+                actions = listOf(
+                    SongActionMenuItem(
+                        label = stringResource(R.string.local_playlist_play_next),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                    ) { onPlayNext() },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.playlist_add_to_end),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                    ) { onAddToQueueEnd() },
+                    SongActionMenuItem(
+                        label = stringResource(
+                            if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                        ),
+                        icon = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder
+                    ) { onFavoriteToggle(song, isFavorite) },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.action_download),
+                        icon = Icons.Outlined.Download
+                    ) { onDownload() },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.action_copy_song_info),
+                        icon = Icons.Outlined.ContentCopy
+                    ) {
+                        scope.launch {
+                            clipboard.setClipEntry(
+                                ClipEntry(
+                                    ClipData.newPlainText(
+                                        "text",
+                                        "${displayName}-${displayArtist}"
+                                    )
+                                )
+                            )
+                            snackbarHostState.showNeriSnackbar(
+                                composeResources.getString(R.string.toast_copied)
+                            )
+                        }
+                    }
+                )
+            )
         }
-
+    ) {
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -1162,58 +1232,5 @@ private fun YouTubeMusicSongRow(
             )
         }
 
-        if (!selectionMode) {
-            Box {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = stringResource(R.string.common_more_actions),
-                        tint = playlistModernListSecondaryContentColor()
-                    )
-                }
-            SongActionsMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false },
-                actions = listOf(
-                    SongActionMenuItem(
-                        label = stringResource(R.string.local_playlist_play_next),
-                        icon = Icons.AutoMirrored.Outlined.PlaylistPlay
-                    ) { onPlayNext() },
-                    SongActionMenuItem(
-                        label = stringResource(R.string.playlist_add_to_end),
-                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd
-                    ) { onAddToQueueEnd() },
-                    SongActionMenuItem(
-                        label = stringResource(
-                            if (isFavorite) R.string.favorite_remove else R.string.favorite_add
-                        ),
-                        icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder
-                    ) { onFavoriteToggle(song, isFavorite) },
-                    SongActionMenuItem(
-                        label = stringResource(R.string.action_download),
-                        icon = Icons.Outlined.Download
-                    ) { onDownload() },
-                    SongActionMenuItem(
-                        label = stringResource(R.string.action_copy_song_info),
-                        icon = Icons.Outlined.ContentCopy
-                    ) {
-                        scope.launch {
-                            clipboard.setClipEntry(
-                                ClipEntry(
-                                    ClipData.newPlainText(
-                                        "text",
-                                        "${displayName}-${displayArtist}"
-                                    )
-                                )
-                            )
-                            snackbarHostState.showNeriSnackbar(
-                                composeResources.getString(R.string.toast_copied)
-                            )
-                        }
-                    }
-                )
-            )
-        }
-        }
     }
 }

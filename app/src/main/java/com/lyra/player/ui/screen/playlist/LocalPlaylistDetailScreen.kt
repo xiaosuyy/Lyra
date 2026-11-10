@@ -80,13 +80,13 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.DownloadDone
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Share
@@ -205,6 +205,7 @@ import com.lyra.player.ui.component.local.LocalSongDetailsDialog
 import com.lyra.player.ui.component.local.LocalSongSyncConfirmDialog
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
+import com.lyra.player.ui.component.song.SwipeRevealMoreRow
 import com.lyra.player.ui.feedback.LyraSnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.util.rememberPlaylistDisplayCoverUrl
@@ -839,6 +840,9 @@ fun LocalPlaylistDetailScreen(
                 selectionMode = false; clearSelection()
             }
 
+            // 左滑露出的「更多」行，同屏仅一行展开
+            var swipeRevealedKey by remember(playlistId) { mutableStateOf<String?>(null) }
+
             fun launchWithLocalSyncWarning(songs: List<SongItem>, actionLabel: String, action: () -> Unit) {
                 if (songs.any { !it.isSyncableRemoteSong(context) }) {
                     pendingSyncConfirmLabel = actionLabel
@@ -1091,6 +1095,9 @@ fun LocalPlaylistDetailScreen(
             var savedListOffset by rememberSaveable(playlistId) { mutableIntStateOf(0) }
             val hasRestoredScroll = rememberSaveable(playlistId) { mutableStateOf(false) }
             val listState = reorderState.listState
+            LaunchedEffect(listState.isScrollInProgress) {
+                if (listState.isScrollInProgress) swipeRevealedKey = null
+            }
             val baseQueue by remember(localSongs) {
                 derivedStateOf { snapshotDisplayOrderList(localSongs) }
             }
@@ -1956,8 +1963,22 @@ fun LocalPlaylistDetailScreen(
                                             .graphicsLayer { scaleX = rowScale; scaleY = rowScale }
                                     ) {
                                         Column {
-                                        Row(
-                                            modifier = Modifier
+                                        var showMoreMenu by remember { mutableStateOf(false) }
+                                        LaunchedEffect(swipeRevealedKey == song.stableKey()) {
+                                            if (swipeRevealedKey != song.stableKey()) showMoreMenu = false
+                                        }
+                                        // 封面
+                                        val itemContext = LocalContext.current
+                                        val displayCoverUrl = rememberSongDisplayCoverUrl(song)
+                                        SwipeRevealMoreRow(
+                                            expanded = swipeRevealedKey == song.stableKey(),
+                                            onExpandedChange = { open ->
+                                                swipeRevealedKey = if (open) song.stableKey() else null
+                                            },
+                                            revealWidth = 56.dp,
+                                            slideWidth = 56.dp,
+                                            swipeEnabled = !selectionMode,
+                                            rowModifier = Modifier
                                                 .fillMaxWidth()
                                                 .background(rowContainerColor)
                                                 .combinedClickable(
@@ -1985,39 +2006,114 @@ fun LocalPlaylistDetailScreen(
                                                     end = 10.dp,
                                                     bottom = 11.dp
                                                 ),
-                                            verticalAlignment = Alignment.CenterVertically
+                                            onMoreClick = { showMoreMenu = true },
+                                            moreTint = playlistModernListSecondaryContentColor(),
+                                            moreContentDescription = stringResource(R.string.cd_more_actions),
+                                            leading = {
+                                                if (selectionMode) {
+                                                    Checkbox(
+                                                        checked = selectedKeysState.value.contains(song.stableKey()),
+                                                        onCheckedChange = { toggleSelect(song) },
+                                                        modifier = Modifier.padding(end = 10.dp)
+                                                    )
+                                                }
+                                                if (!displayCoverUrl.isNullOrBlank()) {
+                                                    AsyncImage(
+                                                        model = fastScrollableImageRequest(
+                                                            context = itemContext,
+                                                            data = displayCoverUrl,
+                                                            sizePx = 128,
+                                                            crossfade = false,
+                                                            offlineMode = offlineMode
+                                                        ),
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier
+                                                            .size(44.dp)
+                                                            .clip(RoundedCornerShape(6.dp))
+                                                    )
+                                                } else {
+                                                    Spacer(Modifier.size(44.dp))
+                                                }
+                                                Spacer(Modifier.width(12.dp))
+                                            },
+                                            moreMenu = {
+                                                SongActionsMenu(
+                                                    expanded = showMoreMenu,
+                                                    onDismissRequest = { showMoreMenu = false },
+                                                    actions = buildList {
+                                                        if (song.isLocalSong()) {
+                                                            add(
+                                                                SongActionMenuItem(
+                                                                    label = stringResource(R.string.local_song_open_details),
+                                                                    icon = Icons.Outlined.Info
+                                                                ) { detailSong = song }
+                                                            )
+                                                            add(
+                                                                SongActionMenuItem(
+                                                                    label = stringResource(R.string.action_share),
+                                                                    icon = Icons.Outlined.Share
+                                                                ) {
+                                                                    scope.launch {
+                                                                        val shared = runCatching {
+                                                                            LocalMediaSupport.shareSongFile(context, song)
+                                                                        }.getOrElse { false }
+                                                                        if (!shared) {
+                                                                            snackbarHostState.showNeriSnackbar(
+                                                                                composeResources.getString(R.string.local_song_share_failed)
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                            )
+                                                        }
+                                                        add(
+                                                            SongActionMenuItem(
+                                                                label = stringResource(R.string.local_playlist_play_next),
+                                                                icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                                                            ) { PlayerManager.addToQueueNext(song) }
+                                                        )
+                                                        add(
+                                                            SongActionMenuItem(
+                                                                label = stringResource(R.string.playlist_add_to_end),
+                                                                icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                                                            ) { PlayerManager.addToQueueEnd(song) }
+                                                        )
+                                                        add(
+                                                            SongActionMenuItem(
+                                                                label = stringResource(
+                                                                    if (isFavoriteSong) {
+                                                                        R.string.favorite_remove
+                                                                    } else {
+                                                                        R.string.favorite_add
+                                                                    }
+                                                                ),
+                                                                icon = if (isFavoriteSong) {
+                                                                    Icons.Filled.Star
+                                                                } else {
+                                                                    Icons.Outlined.StarBorder
+                                                                }
+                                                            ) { toggleSongFavorite(song, isFavoriteSong) }
+                                                        )
+                                                        add(
+                                                            SongActionMenuItem(
+                                                                label = stringResource(R.string.action_copy_song_info),
+                                                                icon = Icons.Outlined.ContentCopy
+                                                            ) {
+                                                                val songInfo =
+                                                                    "${song.displayName()}-${song.displayArtist()}"
+                                                                scope.launch {
+                                                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", songInfo)))
+                                                                    snackbarHostState.showNeriSnackbar(
+                                                                        composeResources.getString(R.string.toast_copied)
+                                                                    )
+                                                                }
+                                                            }
+                                                        )
+                                                    }
+                                                )
+                                            }
                                         ) {
-                                        if (selectionMode) {
-                                            Checkbox(
-                                                checked = selectedKeysState.value.contains(song.stableKey()),
-                                                onCheckedChange = { toggleSelect(song) },
-                                                modifier = Modifier.padding(end = 10.dp)
-                                            )
-                                        }
-
-                                        // 封面
-                                        val itemContext = LocalContext.current
-                                        val displayCoverUrl = rememberSongDisplayCoverUrl(song)
-                                        if (!displayCoverUrl.isNullOrBlank()) {
-                                            AsyncImage(
-                                                model = fastScrollableImageRequest(
-                                                    context = itemContext,
-                                                    data = displayCoverUrl,
-                                                    sizePx = 128,
-                                                    crossfade = false,
-                                                    offlineMode = offlineMode
-                                                ),
-                                                contentDescription = null,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier
-                                                    .size(44.dp)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                            )
-                                        } else {
-                                            Spacer(Modifier.size(44.dp))
-                                        }
-                                        Spacer(Modifier.width(12.dp))
-
                                         // 标题/歌手
                                         Column(Modifier.weight(1f)) {
                                             // 本地歌曲歌单内全是本地文件，无需再标已下载
@@ -2064,116 +2160,19 @@ fun LocalPlaylistDetailScreen(
                                                 enter = fadeIn(tween(120)),
                                                 exit = fadeOut(tween(100))
                                             ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                                ) {
-                                                    if (isPlayingSong) {
-                                                        PlayingIndicator(
-                                                            color = MaterialTheme.colorScheme.primary,
-                                                            animate = isPlaying
-                                                        )
-                                                    } else {
-                                                        Text(
-                                                            text = formatDuration(song.durationMs),
-                                                            color = playlistModernListSecondaryContentColor()
-                                                                .copy(alpha = 0.46f),
-                                                            fontSize = 13.sp,
-                                                            maxLines = 1
-                                                        )
-                                                    }
-
-                                                    // 更多操作菜单
-                                                    var showMoreMenu by remember { mutableStateOf(false) }
-                                                    Box {
-                                                        IconButton(
-                                                            onClick = { showMoreMenu = true },
-                                                            modifier = Modifier.size(30.dp)
-                                                        ) {
-                                                            Icon(
-                                                                Icons.Filled.MoreVert,
-                                                                contentDescription = stringResource(R.string.cd_more_actions),
-                                                                modifier = Modifier.size(18.dp),
-                                                                tint = playlistModernListSecondaryContentColor()
-                                                                    .copy(alpha = 0.40f)
-                                                            )
-                                                        }
-
-                                                        SongActionsMenu(
-                                                            expanded = showMoreMenu,
-                                                            onDismissRequest = { showMoreMenu = false },
-                                                            actions = buildList {
-                                                                if (song.isLocalSong()) {
-                                                                    add(
-                                                                        SongActionMenuItem(
-                                                                            label = stringResource(R.string.local_song_open_details),
-                                                                            icon = Icons.Outlined.Info
-                                                                        ) { detailSong = song }
-                                                                    )
-                                                                    add(
-                                                                        SongActionMenuItem(
-                                                                            label = stringResource(R.string.action_share),
-                                                                            icon = Icons.Outlined.Share
-                                                                        ) {
-                                                                            scope.launch {
-                                                                                val shared = runCatching {
-                                                                                    LocalMediaSupport.shareSongFile(context, song)
-                                                                                }.getOrElse { false }
-                                                                                if (!shared) {
-                                                                                    snackbarHostState.showNeriSnackbar(
-                                                                                        composeResources.getString(R.string.local_song_share_failed)
-                                                                                    )
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    )
-                                                                }
-                                                                add(
-                                                                    SongActionMenuItem(
-                                                                        label = stringResource(R.string.local_playlist_play_next),
-                                                                        icon = Icons.AutoMirrored.Outlined.PlaylistPlay
-                                                                    ) { PlayerManager.addToQueueNext(song) }
-                                                                )
-                                                                add(
-                                                                    SongActionMenuItem(
-                                                                        label = stringResource(R.string.playlist_add_to_end),
-                                                                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd
-                                                                    ) { PlayerManager.addToQueueEnd(song) }
-                                                                )
-                                                                add(
-                                                                    SongActionMenuItem(
-                                                                        label = stringResource(
-                                                                            if (isFavoriteSong) {
-                                                                                R.string.favorite_remove
-                                                                            } else {
-                                                                                R.string.favorite_add
-                                                                            }
-                                                                        ),
-                                                                        icon = if (isFavoriteSong) {
-                                                                            Icons.Filled.Favorite
-                                                                        } else {
-                                                                            Icons.Outlined.FavoriteBorder
-                                                                        }
-                                                                    ) { toggleSongFavorite(song, isFavoriteSong) }
-                                                                )
-                                                                add(
-                                                                    SongActionMenuItem(
-                                                                        label = stringResource(R.string.action_copy_song_info),
-                                                                        icon = Icons.Outlined.ContentCopy
-                                                                    ) {
-                                                                        val songInfo =
-                                                                            "${song.displayName()}-${song.displayArtist()}"
-                                                                        scope.launch {
-                                                                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", songInfo)))
-                                                                            snackbarHostState.showNeriSnackbar(
-                                                                                composeResources.getString(R.string.toast_copied)
-                                                                            )
-                                                                        }
-                                                                    }
-                                                                )
-                                                            }
-                                                        )
-                                                    }
+                                                if (isPlayingSong) {
+                                                    PlayingIndicator(
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        animate = isPlaying
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = formatDuration(song.durationMs),
+                                                        color = playlistModernListSecondaryContentColor()
+                                                            .copy(alpha = 0.46f),
+                                                        fontSize = 13.sp,
+                                                        maxLines = 1
+                                                    )
                                                 }
                                             }
                                         } else if (canReorderCurrentSongs) {
@@ -2614,6 +2613,9 @@ fun LocalPlaylistDetailScreen(
 
                 // 多选优先退出
                 BackHandler(enabled = selectionMode) { exitSelectionMode() }
+                BackHandler(enabled = !selectionMode && swipeRevealedKey != null) {
+                    swipeRevealedKey = null
+                }
             }
             }
         }

@@ -47,13 +47,12 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -103,6 +102,7 @@ import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResul
 import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
+import com.lyra.player.ui.component.song.SwipeRevealMoreRow
 import com.lyra.player.ui.feedback.LyraOverlaySnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.viewmodel.tab.BiliPlaylist
@@ -259,6 +259,12 @@ fun BiliPlaylistDetailScreen(
     fun clearSelection() { selectedIds = emptySet() }
     fun selectAll() { selectedIds = ui.videos.map { it.bvid }.toSet() }
     fun exitSelection() { selectionMode = false; clearSelection() }
+
+    // 左滑露出的「更多」行，同屏仅一行展开
+    var swipeRevealedKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) swipeRevealedKey = null
+    }
 
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -490,7 +496,7 @@ fun BiliPlaylistDetailScreen(
                                 }
                             }) {
                                 Icon(
-                                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                    imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                     contentDescription = if (isFavorite) {
                                         stringResource(R.string.action_unfavorite)
                                     } else {
@@ -760,6 +766,10 @@ fun BiliPlaylistDetailScreen(
                                                     selectionMode = true
                                                     selectedIds = setOf(item.bvid)
                                                 }
+                                            },
+                                            swipeExpanded = swipeRevealedKey == item.bvid,
+                                            onSwipeExpandedChange = { open ->
+                                                swipeRevealedKey = if (open) item.bvid else null
                                             },
                                             onClick = {
                                                 scope.launch {
@@ -1112,6 +1122,9 @@ fun BiliPlaylistDetailScreen(
                 }
             }
             BackHandler(enabled = selectionMode) { exitSelection() }
+            BackHandler(enabled = !selectionMode && swipeRevealedKey != null) {
+                swipeRevealedKey = null
+            }
         }
     }
 }
@@ -1144,6 +1157,8 @@ private fun VideoRow(
     onToggleSelect: () -> Unit,
     onLongPress: () -> Unit,
     onClick: () -> Unit,
+    swipeExpanded: Boolean,
+    onSwipeExpandedChange: (Boolean) -> Unit,
     snackbarHostState: SnackbarHostState,
     offlineMode: Boolean
 ) {
@@ -1167,8 +1182,19 @@ private fun VideoRow(
             offlineMode = offlineMode
         )
     }
-    Row(
-        modifier = Modifier
+    var showMoreMenu by remember { mutableStateOf(false) }
+    var showVideoSkipSheet by remember(video.bvid) { mutableStateOf(false) }
+    LaunchedEffect(swipeExpanded) {
+        if (!swipeExpanded) showMoreMenu = false
+    }
+
+    SwipeRevealMoreRow(
+        expanded = swipeExpanded,
+        onExpandedChange = onSwipeExpandedChange,
+        revealWidth = 112.dp,
+        slideWidth = 112.dp,
+        swipeEnabled = !selectionMode,
+        rowModifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = {
@@ -1178,29 +1204,77 @@ private fun VideoRow(
                 onLongClick = onLongPress
             )
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (selectionMode) {
-            Box(
-                modifier = Modifier.width(40.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { onToggleSelect() }
-                )
+        onMoreClick = { showMoreMenu = true },
+        moreTint = playlistModernListSecondaryContentColor(),
+        moreContentDescription = stringResource(R.string.common_more_actions),
+        leading = {
+            if (selectionMode) {
+                Box(
+                    modifier = Modifier.width(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Checkbox(
+                        checked = selected,
+                        onCheckedChange = { onToggleSelect() }
+                    )
+                }
             }
+            AsyncImage(
+                model = coverRequest,
+                contentDescription = video.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(width = 100.dp, height = 60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+            Spacer(Modifier.width(12.dp))
+        },
+        moreMenu = {
+            SongActionsMenu(
+                expanded = showMoreMenu,
+                onDismissRequest = { showMoreMenu = false },
+                actions = listOf(
+                    SongActionMenuItem(
+                        label = stringResource(R.string.local_playlist_play_next),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                    ) { PlayerManager.addToQueueNext(songItem) },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.playlist_add_to_end),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                    ) { PlayerManager.addToQueueEnd(songItem) },
+                    SongActionMenuItem(
+                        label = stringResource(
+                            if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                        ),
+                        icon = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder
+                    ) { onFavoriteToggle(songItem, isFavorite) },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.bili_video_skip_manage),
+                        icon = Icons.Outlined.SkipNext
+                    ) { showVideoSkipSheet = true },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.action_copy_song_info),
+                        icon = Icons.Outlined.ContentCopy
+                    ) {
+                        val songInfo = "${video.title}-${video.uploader}"
+                        scope.launch {
+                            val messageRes = when (
+                                val result = clipboard.copyPlainTextSafely("text", songInfo)
+                            ) {
+                                is ClipboardCopyResult.Copied -> if (result.wasTruncated) {
+                                    R.string.toast_copy_truncated
+                                } else {
+                                    R.string.toast_copied
+                                }
+                                ClipboardCopyResult.TransactionTooLarge -> R.string.toast_copy_failed
+                            }
+                            snackbarHostState.showNeriSnackbar(composeResources.getString(messageRes))
+                        }
+                    }
+                )
+            )
         }
-
-        AsyncImage(
-            model = coverRequest,
-            contentDescription = video.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(width = 100.dp, height = 60.dp)
-                .clip(RoundedCornerShape(8.dp))
-        )
-        Spacer(Modifier.width(12.dp))
+    ) {
         Column(Modifier.weight(1f)) {
             Text(
                 text = video.title,
@@ -1232,78 +1306,19 @@ private fun VideoRow(
             )
         }
         
-        // 更多操作菜单
-        if (!selectionMode) {
-            var showMoreMenu by remember { mutableStateOf(false) }
-            var showVideoSkipSheet by remember(video.bvid) { mutableStateOf(false) }
-            Box {
-                IconButton(
-                    onClick = { showMoreMenu = true }
-                ) {
-                    Icon(
-                        Icons.Filled.MoreVert,
-                        contentDescription = stringResource(R.string.common_more_actions),
-                        tint = playlistModernListSecondaryContentColor()
-                    )
-                }
-                
-                SongActionsMenu(
-                    expanded = showMoreMenu,
-                    onDismissRequest = { showMoreMenu = false },
-                    actions = listOf(
-                        SongActionMenuItem(
-                            label = stringResource(R.string.local_playlist_play_next),
-                            icon = Icons.AutoMirrored.Outlined.PlaylistPlay
-                        ) { PlayerManager.addToQueueNext(songItem) },
-                        SongActionMenuItem(
-                            label = stringResource(R.string.playlist_add_to_end),
-                            icon = Icons.AutoMirrored.Outlined.PlaylistAdd
-                        ) { PlayerManager.addToQueueEnd(songItem) },
-                        SongActionMenuItem(
-                            label = stringResource(
-                                if (isFavorite) R.string.favorite_remove else R.string.favorite_add
-                            ),
-                            icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder
-                        ) { onFavoriteToggle(songItem, isFavorite) },
-                        SongActionMenuItem(
-                            label = stringResource(R.string.bili_video_skip_manage),
-                            icon = Icons.Outlined.SkipNext
-                        ) { showVideoSkipSheet = true },
-                        SongActionMenuItem(
-                            label = stringResource(R.string.action_copy_song_info),
-                            icon = Icons.Outlined.ContentCopy
-                        ) {
-                            val songInfo = "${video.title}-${video.uploader}"
-                            scope.launch {
-                                val messageRes = when (
-                                    val result = clipboard.copyPlainTextSafely("text", songInfo)
-                                ) {
-                                    is ClipboardCopyResult.Copied -> if (result.wasTruncated) {
-                                        R.string.toast_copy_truncated
-                                    } else {
-                                        R.string.toast_copied
-                                    }
-                                    ClipboardCopyResult.TransactionTooLarge -> R.string.toast_copy_failed
-                                }
-                                snackbarHostState.showNeriSnackbar(composeResources.getString(messageRes))
-                            }
-                        }
-                    )
+    }
+
+    if (showVideoSkipSheet) {
+        BiliVideoSkipIntervalsSheet(
+            title = stringResource(R.string.bili_video_skip_title),
+            targetResolverKey = video.bvid,
+            loadTargetOptions = {
+                resolveBiliVideoSkipTargetOptions(
+                    bvid = video.bvid,
+                    client = AppContainer.biliClient
                 )
-            }
-            if (showVideoSkipSheet) {
-                BiliVideoSkipIntervalsSheet(
-                    title = stringResource(R.string.bili_video_skip_title),
-                    targetResolverKey = video.bvid,
-                    loadTargetOptions = {
-                        resolveBiliVideoSkipTargetOptions(
-                            bvid = video.bvid,
-                            client = AppContainer.biliClient
-                        )
-                    },
-                    onDismiss = { showVideoSkipSheet = false }
-                )
-            }
-        }
+            },
+            onDismiss = { showVideoSkipSheet = false }
+        )
     }
 }

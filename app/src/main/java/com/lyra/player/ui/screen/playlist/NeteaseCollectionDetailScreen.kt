@@ -71,13 +71,11 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -154,6 +152,7 @@ import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
 import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
+import com.lyra.player.ui.component.song.SwipeRevealMoreRow
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionDetailUiState
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionDetailViewModel
 import com.lyra.player.ui.viewmodel.playlist.NeteaseCollectionHeader
@@ -418,6 +417,12 @@ fun DetailScreen(
     fun clearSelection() { selectedIds = emptySet() }
     fun selectAll() { selectedIds = ui.tracks.map { it.id }.toSet() }
     fun exitSelection() { selectionMode = false; clearSelection();}
+
+    // 左滑露出的「更多」行，同屏仅一行展开
+    var swipeRevealedKey by remember(playlistId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) swipeRevealedKey = null
+    }
 
     // 收藏歌单
     val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
@@ -961,6 +966,10 @@ fun DetailScreen(
                                                         val pos = full.indexOfFirst { it.stableKey() == itemKey }
                                                         if (pos >= 0) onSongClick(full, pos)
                                                     },
+                                                    swipeExpanded = swipeRevealedKey == item.stableKey(),
+                                                    onSwipeExpandedChange = { open ->
+                                                        swipeRevealedKey = if (open) item.stableKey() else null
+                                                    },
                                                     snackbarHostState = snackbarHostState,
                                                     offlineMode = offlineMode
                                                 )
@@ -1080,6 +1089,9 @@ fun DetailScreen(
                 }
                 // 允许返回键优先退出多选
                 BackHandler(enabled = selectionMode) { exitSelection() }
+                BackHandler(enabled = !selectionMode && swipeRevealedKey != null) {
+                    swipeRevealedKey = null
+                }
 
                 LyraOverlaySnackbarHost(
                     hostState = snackbarHostState,
@@ -1144,6 +1156,8 @@ private fun SongRow(
     onToggleSelect: () -> Unit,
     onLongPress: () -> Unit,
     onClick: () -> Unit,
+    swipeExpanded: Boolean,
+    onSwipeExpandedChange: (Boolean) -> Unit,
     snackbarHostState: SnackbarHostState,
     offlineMode: Boolean
 ) {
@@ -1154,9 +1168,27 @@ private fun SongRow(
     val composeResources = LocalResources.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
+    var showMoreMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(swipeExpanded) {
+        if (!swipeExpanded) showMoreMenu = false
+    }
 
-    Row(
-        modifier = Modifier
+    val itemContext = LocalContext.current
+    val displayCoverUrl = rememberSongDisplayCoverUrl(song)
+    val hasLeading = showCover || trackNumber > 0
+    val leadingWidth = when {
+        showCover -> 60.dp
+        trackNumber > 0 -> 40.dp
+        else -> 0.dp
+    }
+
+    SwipeRevealMoreRow(
+        expanded = swipeExpanded,
+        onExpandedChange = onSwipeExpandedChange,
+        revealWidth = if (hasLeading) leadingWidth else 48.dp,
+        slideWidth = leadingWidth,
+        swipeEnabled = !selectionMode,
+        rowModifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = {
@@ -1166,58 +1198,92 @@ private fun SongRow(
                 onLongClick = { onLongPress() }
             )
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (selectionMode) {
-            Box(
-                modifier = Modifier.width(48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { onToggleSelect() }
+        onMoreClick = { showMoreMenu = true },
+        moreTint = playlistModernListSecondaryContentColor(),
+        moreContentDescription = stringResource(R.string.cd_more_actions),
+        leading = {
+            if (selectionMode) {
+                Box(
+                    modifier = Modifier.width(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Checkbox(
+                        checked = selected,
+                        onCheckedChange = { onToggleSelect() }
+                    )
+                }
+            }
+            if (!showCover && trackNumber > 0) {
+                Text(
+                    text = trackNumber.toString(),
+                    modifier = Modifier
+                        .width(40.dp)
+                        .padding(start = 8.dp, end = 8.dp),
+                    color = playlistModernListSecondaryContentColor(),
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
                 )
             }
-        }
-
-        val itemContext = LocalContext.current
-        val displayCoverUrl = rememberSongDisplayCoverUrl(song)
-        if (!showCover && trackNumber > 0) {
-            Text(
-                text = trackNumber.toString(),
-                modifier = Modifier
-                    .width(40.dp)
-                    .padding(start = 8.dp, end = 8.dp),
-                color = playlistModernListSecondaryContentColor(),
-                fontSize = 20.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 1
+            if (showCover) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                ) {
+                    if (!displayCoverUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = offlineCachedImageRequest(
+                                context = itemContext,
+                                data = displayCoverUrl,
+                                offlineMode = offlineMode
+                            ),
+                            contentDescription = song.displayName(),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.matchParentSize()
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+            }
+        },
+        moreMenu = {
+            SongActionsMenu(
+                expanded = showMoreMenu,
+                onDismissRequest = { showMoreMenu = false },
+                actions = listOf(
+                    SongActionMenuItem(
+                        label = stringResource(R.string.local_playlist_play_next),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                    ) { PlayerManager.addToQueueNext(song) },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.playlist_add_to_end),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                    ) { PlayerManager.addToQueueEnd(song) },
+                    SongActionMenuItem(
+                        label = stringResource(
+                            if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                        ),
+                        icon = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder
+                    ) { onFavoriteToggle(song, isFavorite) },
+                    SongActionMenuItem(
+                        label = stringResource(R.string.action_copy_song_info),
+                        icon = Icons.Outlined.ContentCopy
+                    ) {
+                        val songInfo = "${song.displayName()}-${song.displayArtist()}"
+                        scope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", songInfo)))
+                            snackbarHostState.showNeriSnackbar(composeResources.getString(R.string.toast_copied))
+                        }
+                    }
+                )
             )
         }
-        if (showCover && !displayCoverUrl.isNullOrBlank()) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(10.dp)
-                    )
-            ) {
-                AsyncImage(
-                    model = offlineCachedImageRequest(
-                        context = itemContext,
-                        data = displayCoverUrl,
-                        offlineMode = offlineMode
-                    ),
-                    contentDescription = song.displayName(),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.matchParentSize()
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-        }
-
+    ) {
         Column(Modifier.weight(1f)) {
             Text(
                 text = song.displayName(),
@@ -1249,53 +1315,6 @@ private fun SongRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = playlistModernListSecondaryContentColor()
             )
-        }
-
-        // 更多操作菜单
-        if (!selectionMode) {
-            var showMoreMenu by remember { mutableStateOf(false) }
-            Box {
-                IconButton(
-                    onClick = { showMoreMenu = true }
-                ) {
-                    Icon(
-                        Icons.Filled.MoreVert,
-                        contentDescription = stringResource(R.string.cd_more_actions),
-                        tint = playlistModernListSecondaryContentColor()
-                    )
-                }
-
-                SongActionsMenu(
-                    expanded = showMoreMenu,
-                    onDismissRequest = { showMoreMenu = false },
-                    actions = listOf(
-                        SongActionMenuItem(
-                            label = stringResource(R.string.local_playlist_play_next),
-                            icon = Icons.AutoMirrored.Outlined.PlaylistPlay
-                        ) { PlayerManager.addToQueueNext(song) },
-                        SongActionMenuItem(
-                            label = stringResource(R.string.playlist_add_to_end),
-                            icon = Icons.AutoMirrored.Outlined.PlaylistAdd
-                        ) { PlayerManager.addToQueueEnd(song) },
-                        SongActionMenuItem(
-                            label = stringResource(
-                                if (isFavorite) R.string.favorite_remove else R.string.favorite_add
-                            ),
-                            icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder
-                        ) { onFavoriteToggle(song, isFavorite) },
-                        SongActionMenuItem(
-                            label = stringResource(R.string.action_copy_song_info),
-                            icon = Icons.Outlined.ContentCopy
-                        ) {
-                            val songInfo = "${song.displayName()}-${song.displayArtist()}"
-                            scope.launch {
-                                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", songInfo)))
-                                snackbarHostState.showNeriSnackbar(composeResources.getString(R.string.toast_copied))
-                            }
-                        }
-                    )
-                )
-            }
         }
     }
 }
