@@ -149,7 +149,7 @@ internal fun SongActionsMenu(
                 color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.84f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = 0.dp,
-                shadowElevation = 18.dp,
+                shadowElevation = 0.dp,
                 border = BorderStroke(
                     width = 0.5.dp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)
