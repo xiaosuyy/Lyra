@@ -47,6 +47,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import com.lyra.player.R
 import com.lyra.player.core.api.netease.mergeNeteaseSessionCookies
+import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.api.youtube.YouTubeMusicHomeShelf
 import com.lyra.player.core.customsource.CustomSourceManager
 import com.lyra.player.core.di.AppContainer
@@ -74,6 +75,7 @@ import kotlin.random.Random
 import com.lyra.player.data.platform.netease.neteaseRadarCacheContext
 import com.lyra.player.util.platform.LanguageManager
 import com.lyra.player.core.logging.LyraLogger
+import org.json.JSONObject
 import java.io.IOException
 
 private const val TAG = "LYRA-HomeVM"
@@ -1155,8 +1157,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 心动模式与 MeloX 一致：只用「我喜欢的音乐」中的随机歌曲做种子，
-     * 且歌单必须是「我喜欢的音乐」——接口不支持榜单等其他歌单类型。
+     * 心动模式：官方心动接口以「我喜欢的音乐」为推荐基础，收藏为空时服务端会拒绝生成，
+     * 此时改用官方私人漫游的推荐歌曲。
      */
     suspend fun loadHeartModeSongs(): List<SongItem> {
         val localizedContext = localizedAppContext()
@@ -1168,18 +1170,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val userId = withContext(Dispatchers.IO) { client.getCurrentUserId() }
             val likedPlaylistId = withContext(Dispatchers.IO) {
                 parseNeteaseLikedPlaylistId(client.getLikedPlaylistId(userId))
-            } ?: throw IllegalStateException(
-                localizedContext.getString(R.string.home_heart_mode_no_liked_playlist)
-            )
-            val likedRaw = withContext(Dispatchers.IO) {
-                client.getPlaylistDetail(playlistId = likedPlaylistId, n = 100, s = 0)
             }
-            val likedSongs = parseSongsOnWorker(likedRaw)
-                .filter { it.channelId == "netease" && it.id > 0L }
-            val seed = likedSongs.randomOrNull() ?: throw IllegalStateException(
-                localizedContext.getString(R.string.home_heart_mode_empty_likes)
-            )
-            fetchHeartModeSongsFor(seed.id, likedPlaylistId)
+            val likedSongs = if (likedPlaylistId != null) {
+                val likedRaw = withContext(Dispatchers.IO) {
+                    client.getPlaylistDetail(playlistId = likedPlaylistId, n = 100, s = 0)
+                }
+                parseSongsOnWorker(likedRaw)
+                    .filter { it.channelId == "netease" && it.id > 0L }
+                    .also { LyraLogger.d(TAG, "heart mode: likedPlaylistId=$likedPlaylistId liked=${it.size}") }
+            } else {
+                emptyList()
+            }
+            if (likedSongs.isNotEmpty()) {
+                // 官方心动模式围绕开启时正在播放的单曲推荐, 没有在播网易云歌曲时用收藏里的随机一首。
+                val nowPlayingSeed = PlayerManager.currentSongFlow.value
+                    ?.takeIf { it.channelId == "netease" && it.id > 0L }
+                val heartSongs = try {
+                    fetchHeartModeSongsFor((nowPlayingSeed ?: likedSongs.random()).id, likedPlaylistId)
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    LyraLogger.d(TAG, "heart mode api failed, use roaming: ${error.message}")
+                    emptyList()
+                }
+                if (heartSongs.isNotEmpty()) return heartSongs
+            }
+            // 心动接口不可用时改用官方私人漫游推荐，避免点击后无歌可放。
+            val roamingSongs = loadHeartModeRoamingSongs()
+            if (roamingSongs.isNotEmpty()) return roamingSongs
+            throw IllegalStateException(emptyMessage)
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
         } catch (error: ApiCodeException) {
@@ -1193,7 +1212,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun fetchHeartModeSongsFor(seedId: Long, playlistId: Long): List<SongItem> {
+    private suspend fun fetchHeartModeSongsFor(seedId: Long, playlistId: Long?): List<SongItem> {
         val raw = withContext(Dispatchers.IO) {
             client.getIntelligenceModeSongs(
                 seedSongId = seedId,
@@ -1202,9 +1221,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         // 与 MeloX 一致：接口通常只返回歌曲 ID，需要再查一次详情补全歌手/封面。
+        val code = runCatching { JSONObject(raw).optInt("code", -1) }.getOrDefault(-1)
+        val dataSize = runCatching {
+            JSONObject(raw).optJSONArray("data")?.length() ?: 0
+        }.getOrDefault(0)
+        LyraLogger.d(TAG, "heart mode: intelligence code=$code data=$dataSize")
+        if (code != 200) {
+            LyraLogger.d(TAG, "heart mode: intelligence error raw=${raw.take(300)}")
+        }
         val ids = withContext(Dispatchers.Default) {
             parseNeteaseIntelligenceSongIds(raw).take(HOME_NETEASE_SONG_LIMIT)
         }
+        LyraLogger.d(TAG, "heart mode: intelligence ids=${ids.size}")
         if (ids.isNotEmpty()) {
             val detailRaw = withContext(Dispatchers.IO) { client.getSongDetail(ids) }
             val details = parseSongsOnWorker(detailRaw)
@@ -1212,6 +1240,33 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         // 接口偶尔直接返回完整歌曲，此时走通用解析兜底。
         return parseSongsOnWorker(raw)
+    }
+
+    /** 官方私人漫游：多批次取随机推荐，拼成心动模式的播放队列。 */
+    private suspend fun loadHeartModeRoamingSongs(): List<SongItem> {
+        val collected = LinkedHashMap<String, SongItem>()
+        for (attempt in 0 until HOME_PRIVATE_FM_MAX_BATCHES) {
+            if (collected.size >= HOME_NETEASE_SONG_LIMIT) break
+            val songs = try {
+                parseSongsOnWorker(
+                    withContext(Dispatchers.IO) { client.getPersonalFmSongs() }
+                )
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                LyraLogger.d(TAG, "heart mode roaming batch failed: ${error.message}")
+                break
+            }
+            val neteaseSongs = songs.filter { it.channelId == "netease" && it.id > 0L }
+            if (neteaseSongs.isEmpty()) break
+            neteaseSongs.forEach { song ->
+                if (collected.size < HOME_NETEASE_SONG_LIMIT) {
+                    collected.putIfAbsent(song.stableKey(), song)
+                }
+            }
+        }
+        LyraLogger.d(TAG, "heart mode: roaming songs=${collected.size}")
+        return collected.values.take(HOME_NETEASE_SONG_LIMIT).toList()
     }
 
     /** 将首页来源的请求参数集中在一起，避免登录态契约在调用点分散 */

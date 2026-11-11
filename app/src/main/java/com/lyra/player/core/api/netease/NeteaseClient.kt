@@ -372,6 +372,7 @@ internal class NeteaseRequestSessionStore {
 class NeteaseClient {
     private companion object {
         const val MAX_RESPONSE_BYTES = 4L * 1024L * 1024L
+        val syntheticEapiDeviceId: String = newNeteaseSessionCookieValue().uppercase(Locale.getDefault())
     }
 
     private val sessionStore = NeteaseRequestSessionStore()
@@ -575,13 +576,22 @@ class NeteaseClient {
         }
 
         var reqUrl = requestUrl
+        // 带登录态的 EAPI 请求需伪装成官方客户端, 否则服务端会按未登录/异常客户端处理。
+        val authenticatedEapi = mode == CryptoMode.EAPI && usePersistedCookies && session.hasLogin()
         val builder = Request.Builder()
             .header("Accept", "*/*")
             .header("Accept-Language", "zh-CN,zh-Hans;q=0.9")
             .header("Connection", "keep-alive")
             .header("Referer", "https://music.163.com")
             .header("Host", requestUrl.host)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; LyraPlayer) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+            .header(
+                "User-Agent",
+                if (authenticatedEapi) {
+                    "NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)"
+                } else {
+                    "Mozilla/5.0 (Linux; Android 10; LyraPlayer) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+                }
+            )
 
         // WEAPI 的 csrf_token 优先用持久化 Cookie, 再回退本地 CookieJar
         if (mode == CryptoMode.WEAPI) {
@@ -742,6 +752,26 @@ class NeteaseClient {
         )
     }
 
+    /** 带登录态的 EAPI 头部, 服务端据此识别为官方客户端登录用户。 */
+    private fun neteaseAuthenticatedEapiHeader(cookies: Map<String, String>): Map<String, Any> {
+        val now = System.currentTimeMillis()
+        val header = linkedMapOf<String, Any>(
+            "osver" to "16.2",
+            "deviceId" to (cookies["deviceId"] ?: syntheticEapiDeviceId),
+            "os" to "iPhone OS",
+            "appver" to "9.0.90",
+            "versioncode" to "140",
+            "mobilename" to (cookies["mobilename"] ?: ""),
+            "buildver" to (now / 1000L).toString(),
+            "resolution" to "1170x2532",
+            "__csrf" to (cookies["__csrf"] ?: ""),
+            "channel" to "distribution",
+            "requestId" to "${now}_${SecureRandom().nextInt(9000) + 1000}"
+        )
+        cookies["MUSIC_U"]?.takeIf { it.isNotBlank() }?.let { header["MUSIC_U"] = it }
+        return header
+    }
+
     /**
      * EAPI 登录在部分账号/设备上会返回空 msg 的失败码，回退到 WEAPI 再试一次。
      */
@@ -802,14 +832,19 @@ class NeteaseClient {
         startSongId: Long = seedSongId,
         count: Int = 30
     ): String {
-        val params = mutableMapOf(
-            "songId" to seedSongId.toString(),
+        val params = mutableMapOf<String, Any>(
+            "songId" to seedSongId,
             "type" to "fromPlayOne",
-            "startMusicId" to startSongId.toString(),
-            "count" to count.coerceAtLeast(1).toString()
+            "startMusicId" to startSongId,
+            "count" to count.coerceAtLeast(1)
         )
         if (playlistId != null && playlistId > 0L) {
-            params["playlistId"] = playlistId.toString()
+            params["playlistId"] = playlistId
+        }
+        // 心动模式是账号级推荐, 必须携带登录态 EAPI 头部, 否则服务端返回 code=500。
+        if (hasLogin()) {
+            params["header"] = neteaseAuthenticatedEapiHeader(getNeteaseRequestCookies())
+            params["e_r"] = false
         }
         return callEApi("/playmode/intelligence/list", params, usePersistedCookies = true)
     }
