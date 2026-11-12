@@ -179,6 +179,7 @@ import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.component.song.rememberShowSongArtist
 import com.lyra.player.ui.util.shouldAllowCollapsingTopAppBar
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
 import com.lyra.player.data.model.sameIdentityAs
@@ -346,6 +347,9 @@ fun HomeScreen(
             .firstOrNull { FavoritesPlaylist.isSystemPlaylist(it, context) }
             ?.songs
             .orEmpty()
+    }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
     }
     val showSongArtist = rememberShowSongArtist()
     val localPlaylistUsageLookup = remember(localPlaylists, context) {
@@ -2862,6 +2866,9 @@ private fun ResponsiveSongPagerList(
 
     val pageCount = ceil(songs.size / perPage.toFloat()).toInt().coerceAtLeast(1)
     val pagerState = rememberPagerState(pageCount = { pageCount })
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
+    }
 
     HorizontalPager(
         state = pagerState,
@@ -2889,7 +2896,7 @@ private fun ResponsiveSongPagerList(
                                 index = absoluteIndex + 1,
                                 song = song,
                                 onClick = { onSongClick(songs, absoluteIndex) },
-                                isFavorite = favoriteSongs.any { it.sameIdentityAs(song) },
+                                isFavorite = favoriteSongIndex.contains(song),
                                 onFavoriteToggle = onFavoriteToggle,
                                 onShowSnackbar = onShowSnackbar,
                                 offlineMode = offlineMode

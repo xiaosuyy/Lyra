@@ -48,6 +48,7 @@ import com.lyra.player.core.api.lyrics.normalizeLyricMatchText
 import com.lyra.player.core.api.lyrics.scoreLyricMatchTitle
 import com.lyra.player.core.api.netease.NeteaseClient
 import com.lyra.player.core.api.search.MusicPlatform
+import com.lyra.player.core.api.search.QQMusicSearchApi
 import com.lyra.player.core.api.youtube.YouTubeMusicClient
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.customsource.customSourceIdForSong
@@ -1162,6 +1163,27 @@ internal object PlayerLyricsProvider {
         }
     }
 
+    private fun isTencentChannelSong(song: SongItem): Boolean {
+        return song.channelId?.trim()?.equals("tencent", ignoreCase = true) == true
+    }
+
+    /** 返回 null 表示不适用或拉取失败, 由调用方回退到在线歌词解析。 */
+    private suspend fun loadTencentNativeLyricEntries(
+        song: SongItem,
+        qqMusicSearchApi: QQMusicSearchApi,
+        translated: Boolean
+    ): List<LyricEntry>? {
+        if (!isTencentChannelSong(song)) return null
+        val songMid = song.audioId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val (lyric, translatedLyric) = qqMusicSearchApi.getNativeLyric(songMid)
+        val rawLyric = (if (translated) translatedLyric else lyric) ?: return null
+        return parseLocalLyricOverride(
+            rawLyric = rawLyric,
+            durationMs = song.durationMs,
+            logPrefix = if (translated) "QQ翻译歌词解析失败" else "QQ歌词解析失败"
+        )
+    }
+
     private fun parseSafeLyricEntries(
         rawLyric: String,
         durationMs: Long,
@@ -1287,6 +1309,7 @@ internal object PlayerLyricsProvider {
         neteaseLyricsCache: LruCache<Long, NeteaseLyricsCacheEntry>,
         editableLyricsMatcher: EditableLyricsMatcher,
         ytMusicLyricsCache: LruCache<String, YouTubeMusicLyricsCacheEntry>,
+        qqMusicSearchApi: QQMusicSearchApi,
         biliSourceTag: String
     ): List<LyricEntry> {
         return withContext(Dispatchers.IO) {
@@ -1360,6 +1383,22 @@ internal object PlayerLyricsProvider {
 
             if (!shouldLoadRemoteLyrics(song)) {
                 return@withContext emptyList()
+            }
+            // QQ 渠道歌曲直接取官方翻译, 不再拿渠道合成 ID 去请求网易云
+            if (isTencentChannelSong(song)) {
+                loadTencentNativeLyricEntries(
+                    song = song,
+                    qqMusicSearchApi = qqMusicSearchApi,
+                    translated = true
+                )?.takeIf { it.isNotEmpty() }?.let { return@withContext it }
+            }
+            if (customSourceIdForSong(song) != null) {
+                return@withContext resolveOnlineLyrics(
+                    song = song,
+                    application = application,
+                    editableLyricsMatcher = editableLyricsMatcher,
+                    biliSourceTag = biliSourceTag
+                )?.translatedLyrics.orEmpty()
             }
             if (isYouTubeMusicTrack) {
                 val storedLyric = resolveStoredLyricText(
@@ -1504,6 +1543,7 @@ internal object PlayerLyricsProvider {
         amllTtmlClient: AmllTtmlClient,
         amllLyricsEnabled: Boolean,
         ytMusicLyricsCache: LruCache<String, YouTubeMusicLyricsCacheEntry>,
+        qqMusicSearchApi: QQMusicSearchApi,
         biliSourceTag: String
     ): List<LyricEntry> {
         return withContext(Dispatchers.IO) {
@@ -1579,6 +1619,14 @@ internal object PlayerLyricsProvider {
                     editableLyricsMatcher = editableLyricsMatcher,
                     biliSourceTag = biliSourceTag
                 )?.lyrics.orEmpty()
+            }
+            // QQ 渠道歌曲优先走官方歌词接口, 搜索匹配在没有结果时会空白很久
+            if (isTencentChannelSong(song)) {
+                loadTencentNativeLyricEntries(
+                    song = song,
+                    qqMusicSearchApi = qqMusicSearchApi,
+                    translated = false
+                )?.takeIf { it.isNotEmpty() }?.let { return@withContext it }
             }
             // 酷我 / 酷狗 / 咪咕 这类自定义渠道歌曲没有平台歌词, 直接走在线歌词解析
             if (customSourceIdForSong(song) != null) {

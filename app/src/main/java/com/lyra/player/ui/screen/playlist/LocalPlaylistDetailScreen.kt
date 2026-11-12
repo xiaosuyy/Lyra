@@ -184,6 +184,7 @@ import com.lyra.player.data.local.playlist.sync.NeteaseLikeSyncResult
 import com.lyra.player.data.local.playlist.sync.NeteaseRemotePlaylist
 import com.lyra.player.data.local.playlist.system.SystemLocalPlaylists
 import com.lyra.player.data.local.media.displayAlbum
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayCoverUrl
 import com.lyra.player.data.model.displayName
@@ -522,6 +523,9 @@ fun LocalPlaylistDetailScreen(
             val allPlaylists by repo.playlists.collectAsState()
             val favoriteSongs = remember(allPlaylists, context) {
                 FavoritesPlaylist.firstOrNull(allPlaylists, context)?.songs.orEmpty()
+            }
+            val favoriteSongIndex = remember(favoriteSongs) {
+                FavoriteSongEquivalenceIndex(favoriteSongs)
             }
             val scope = rememberCoroutineScope()
             var syncInProgress by remember { mutableStateOf(false) }
@@ -2011,9 +2015,7 @@ fun LocalPlaylistDetailScreen(
                                     )
                                     val isSelectedSong =
                                         selectionMode && selectedKeysState.value.contains(song.stableKey())
-                                    val isFavoriteSong = favoriteSongs.any {
-                                        it.sameIdentityAs(song)
-                                    }
+                                    val isFavoriteSong = favoriteSongIndex.contains(song)
                                     val rowContainerColor = if (isSelectedSong) {
                                         playlistModernListPrimaryContentColor().copy(alpha = 0.10f)
                                     } else {

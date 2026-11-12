@@ -198,8 +198,10 @@ import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.launchLocalPlaylistMutation
 import com.lyra.player.data.local.media.displayAlbum
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
+import com.lyra.player.data.model.sameFavoriteSongAs
 import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.data.model.NeteaseArtistSummary
@@ -553,11 +555,10 @@ fun ExploreScreen(
     val localPlaylistsReady by repo.initializationReadyFlow.collectAsStateWithLifecycle(
         initialValue = false
     )
-    val favoriteSongKeys = remember(allLocalPlaylists, context) {
-        FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)
-            ?.songs
-            .orEmpty()
-            .mapTo(mutableSetOf()) { it.stableKey() }
+    val favoriteSongIndex = remember(allLocalPlaylists, context) {
+        FavoriteSongEquivalenceIndex(
+            FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
+        )
     }
     val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
     val favorites by favoriteRepo.favorites.collectAsStateWithLifecycle()
@@ -1253,7 +1254,7 @@ fun ExploreScreen(
                                             val songListIndex = ui.searchResults.indexOfFirst {
                                                 it.stableKey() == song.stableKey()
                                             }.takeIf { it >= 0 } ?: index
-                                            val isFavoriteSong = favoriteSongKeys.contains(song.stableKey())
+                                            val isFavoriteSong = favoriteSongIndex.contains(song)
                                             SongRow(
                                                 song = song,
                                                 isFavorite = isFavoriteSong,
@@ -1302,7 +1303,7 @@ fun ExploreScreen(
                                                             val isFavoriteAtAction = FavoritesPlaylist
                                                                 .firstOrNull(repo.playlists.value, context)
                                                                 ?.songs
-                                                                ?.any { it.sameIdentityAs(song) } == true
+                                                                ?.any { it.sameFavoriteSongAs(song) } == true
                                                             if (isFavoriteAtAction) {
                                                                 repo.removeFromFavorites(song)
                                                             } else {
@@ -1656,7 +1657,7 @@ fun ExploreScreen(
                         ) { index, song ->
                             SongRow(
                                 song = song,
-                                isFavorite = favoriteSongKeys.contains(song.stableKey()),
+                                isFavorite = favoriteSongIndex.contains(song),
                                 favoriteActionEnabled = localPlaylistsReady,
                                 offlineMode = offlineMode,
                                 snackbarHostState = snackbarHostState,
@@ -1686,7 +1687,7 @@ fun ExploreScreen(
                                             val isFavoriteAtAction = FavoritesPlaylist
                                                 .firstOrNull(repo.playlists.value, context)
                                                 ?.songs
-                                                ?.any { it.sameIdentityAs(song) } == true
+                                                ?.any { it.sameFavoriteSongAs(song) } == true
                                             if (isFavoriteAtAction) {
                                                 repo.removeFromFavorites(song)
                                             } else {

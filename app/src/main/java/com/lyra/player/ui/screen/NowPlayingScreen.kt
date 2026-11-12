@@ -279,9 +279,11 @@ import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.launchLocalPlaylistMutation
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
 import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayCoverUrl
 import com.lyra.player.data.model.displayName
+import com.lyra.player.data.model.sameFavoriteSongAs
 import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.data.model.BiliUploaderSummary
@@ -1172,6 +1174,9 @@ private fun NowPlayingQueuePage(
     val favoriteSongs = remember(allLocalPlaylists, context) {
         FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
     }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
+    }
     val screenScope = rememberCoroutineScope()
     val currentItem = displayedQueueItems.getOrNull(currentIndexInDisplay)
     val currentDisplaySong = currentItem?.song ?: currentSong
@@ -1270,7 +1275,7 @@ private fun NowPlayingQueuePage(
                         entry = entry,
                         isCurrent = false,
                         offlineMode = offlineMode,
-                        isFavoriteSong = favoriteSongs.any { it.sameIdentityAs(entry.song) },
+                        isFavoriteSong = favoriteSongIndex.contains(entry.song),
                         onPlay = { PlayerManager.playFromQueue(entry.queueIndex) },
                         onPlayNext = { PlayerManager.addToQueueNext(entry.song) },
                         onAddToEnd = { PlayerManager.addToQueueEnd(entry.song) },
@@ -1303,7 +1308,7 @@ private fun NowPlayingQueuePage(
                         entry = entry,
                         isCurrent = false,
                         offlineMode = offlineMode,
-                        isFavoriteSong = favoriteSongs.any { it.sameIdentityAs(entry.song) },
+                        isFavoriteSong = favoriteSongIndex.contains(entry.song),
                         onPlay = { PlayerManager.playFromQueue(entry.queueIndex) },
                         onPlayNext = { PlayerManager.addToQueueNext(entry.song) },
                         onAddToEnd = { PlayerManager.addToQueueEnd(entry.song) },
@@ -1715,6 +1720,9 @@ internal fun NowPlayingQueueSheet(
     val favoriteSongs = remember(allLocalPlaylists, context) {
         FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
     }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectionMode by remember { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -2053,8 +2061,8 @@ internal fun NowPlayingQueueSheet(
                         contentType = { _, _ -> "queue_song" }
                     ) { index, entry ->
                         ReorderableItem(state = reorderState, key = entry.key) { isDragging ->
-                            val isFavoriteSong = remember(favoriteSongs, entry.song) {
-                                favoriteSongs.any { it.sameIdentityAs(entry.song) }
+                            val isFavoriteSong = remember(favoriteSongIndex, entry.song) {
+                                favoriteSongIndex.contains(entry.song)
                             }
                             val rowScale by animateFloatAsState(
                                 targetValue = if (isDragging) {
@@ -2558,7 +2566,7 @@ fun NowPlayingScreen(
         playlists
             .firstOrNull { FavoritesPlaylist.isSystemPlaylist(it, context) }
             ?.songs
-            ?.any { it.sameIdentityAs(song) } == true
+            ?.any { it.sameFavoriteSongAs(song) } == true
     }
     LaunchedEffect(isFavoriteComputed) {
         if (favOverride == isFavoriteComputed) {

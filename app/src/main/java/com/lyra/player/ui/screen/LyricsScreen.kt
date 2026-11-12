@@ -145,6 +145,7 @@ import com.lyra.player.data.model.displayCoverUrl
 import com.lyra.player.data.model.displayName
 import com.lyra.player.data.local.media.isLocalSong
 import com.lyra.player.data.model.isSyncableRemoteSong
+import com.lyra.player.data.model.sameFavoriteSongAs
 import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.ui.component.lyrics.AdvancedLyricsView
@@ -540,7 +541,7 @@ fun LyricsScreen(
                     false
                 } else {
                     val fav = playlists.firstOrNull { FavoritesPlaylist.isSystemPlaylist(it, context) }
-                    fav?.songs?.any { it.sameIdentityAs(song) } == true
+                    fav?.songs?.any { it.sameFavoriteSongAs(song) } == true
                 }
             }
             var favOverride by remember(currentSong) { mutableStateOf<Boolean?>(null) }

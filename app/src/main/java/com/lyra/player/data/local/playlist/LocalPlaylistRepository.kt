@@ -61,9 +61,11 @@ import com.lyra.player.data.local.playlist.sync.parseNeteaseRemotePlaylists
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
 import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
 import com.lyra.player.data.local.playlist.system.SystemLocalPlaylists
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.SongIdentity
 import com.lyra.player.data.model.identity
 import com.lyra.player.data.model.isSyncableRemoteSong
+import com.lyra.player.data.model.sameFavoriteSongAs
 import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.toSyncableRemoteSongOrNull
 import com.lyra.player.data.settings.rebaseLyricUserOffsetMs
@@ -1053,17 +1055,25 @@ class LocalPlaylistRepository private constructor(
     private fun filterNewSongs(
         existingSongs: List<SongItem>,
         candidates: List<SongItem>,
-        includeLocalMetadataFallback: Boolean = false
+        includeLocalMetadataFallback: Boolean = false,
+        rejectFavoriteEquivalents: Boolean = false
     ): List<SongItem> {
         val accepted = SongDuplicateIndex(includeLocalMetadataFallback).apply {
             existingSongs.forEach(::add)
         }
+        val favoriteIndex = if (rejectFavoriteEquivalents) {
+            FavoriteSongEquivalenceIndex(existingSongs)
+        } else {
+            null
+        }
         return candidates.filter { candidate ->
-            if (accepted.contains(candidate)) {
-                false
-            } else {
-                accepted.add(candidate)
-                true
+            when {
+                accepted.contains(candidate) -> false
+                favoriteIndex?.contains(candidate) == true -> false
+                else -> {
+                    accepted.add(candidate)
+                    true
+                }
             }
         }
     }
@@ -1181,7 +1191,7 @@ class LocalPlaylistRepository private constructor(
                         existingSongs = favorites.songs,
                         candidate = hydratedSong,
                         includeLocalMetadataFallback = true
-                    )
+                    ) || favorites.songs.any { it.sameFavoriteSongAs(hydratedSong) }
                 ) {
                     return@commitPlaylistMutation
                 }
@@ -1212,8 +1222,8 @@ class LocalPlaylistRepository private constructor(
                 if (index == -1) return@commitPlaylistMutation
 
                 val favorites = list[index]
-                val removedSongs = favorites.songs.filter { it.sameIdentityAs(song) }
-                val updatedSongs = favorites.songs.filterNot { it.sameIdentityAs(song) }.toMutableList()
+                val removedSongs = favorites.songs.filter { it.sameFavoriteSongAs(song) }
+                val updatedSongs = favorites.songs.filterNot { it.sameFavoriteSongAs(song) }.toMutableList()
                 if (updatedSongs.size == favorites.songs.size) return@commitPlaylistMutation
 
                 val deletedAt = System.currentTimeMillis()
@@ -1673,7 +1683,8 @@ class LocalPlaylistRepository private constructor(
             val newSongs = filterNewSongs(
                 existingSongs = playlist.songs,
                 candidates = songs,
-                includeLocalMetadataFallback = includeLocalMetadataFallback
+                includeLocalMetadataFallback = includeLocalMetadataFallback,
+                rejectFavoriteEquivalents = FavoritesPlaylist.isSystemPlaylist(playlist, context)
             )
             if (newSongs.isEmpty()) {
                 playlist

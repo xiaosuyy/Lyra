@@ -186,6 +186,7 @@ import com.lyra.player.data.local.playlist.model.LocalPlaylist
 import com.lyra.player.data.local.playlist.model.buildLocalArtistSummaries
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.system.SystemLocalPlaylists
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
@@ -697,6 +698,9 @@ private fun LibrarySongsContent(
     val favoriteSongs = remember(allLocalPlaylists, context) {
         FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
     }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
+    }
     val scope = rememberCoroutineScope()
     val sortPreferences = remember(context) { LibrarySortPreferences.getInstance(context) }
     val sortMode by sortPreferences.sortMode.collectAsStateWithLifecycle()
@@ -759,10 +763,10 @@ private fun LibrarySongsContent(
                         swipeKey = itemKey,
                         expandedKey = expandedKey,
                         onExpandedChange = { expandedKey = it },
-                        isFavorite = favoriteSongs.any { it.sameIdentityAs(song) },
+                        isFavorite = favoriteSongIndex.contains(song),
                         onToggleFavorite = {
                             scope.launch {
-                                if (favoriteSongs.any { it.sameIdentityAs(song) }) {
+                                if (favoriteSongIndex.contains(song)) {
                                     playlistRepo.removeFromFavorites(song)
                                 } else {
                                     playlistRepo.addToFavorites(song)
@@ -806,10 +810,10 @@ private fun LibrarySongsContent(
                             swipeKey = itemKey,
                             expandedKey = expandedKey,
                             onExpandedChange = { expandedKey = it },
-                            isFavorite = favoriteSongs.any { it.sameIdentityAs(song) },
+                            isFavorite = favoriteSongIndex.contains(song),
                             onToggleFavorite = {
                                 scope.launch {
-                                    if (favoriteSongs.any { it.sameIdentityAs(song) }) {
+                                    if (favoriteSongIndex.contains(song)) {
                                         playlistRepo.removeFromFavorites(song)
                                     } else {
                                         playlistRepo.addToFavorites(song)
@@ -872,6 +876,9 @@ private fun LibraryRecentContent(
     val allLocalPlaylists by playlistRepo.playlists.collectAsStateWithLifecycle()
     val favoriteSongs = remember(allLocalPlaylists, context) {
         FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
+    }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
     }
     val scope = rememberCoroutineScope()
     val history by historyRepo.historyFlow.collectAsStateWithLifecycle()
@@ -946,10 +953,10 @@ private fun LibraryRecentContent(
                     swipeKey = itemKey,
                     expandedKey = expandedKey,
                     onExpandedChange = { expandedKey = it },
-                    isFavorite = favoriteSongs.any { it.sameIdentityAs(song) },
+                    isFavorite = favoriteSongIndex.contains(song),
                     onToggleFavorite = {
                         scope.launch {
-                            if (favoriteSongs.any { it.sameIdentityAs(song) }) {
+                            if (favoriteSongIndex.contains(song)) {
                                 playlistRepo.removeFromFavorites(song)
                             } else {
                                 playlistRepo.addToFavorites(song)

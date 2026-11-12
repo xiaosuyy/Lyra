@@ -139,6 +139,7 @@ import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.launchLocalPlaylistMutation
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
 import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
 import com.lyra.player.data.model.sameIdentityAs
@@ -410,6 +411,9 @@ fun DetailScreen(
     val allPlaylists by repo.playlists.collectAsState()
     val favoriteSongs = remember(allPlaylists, context) {
         FavoritesPlaylist.firstOrNull(allPlaylists, context)?.songs.orEmpty()
+    }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
     }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -937,9 +941,7 @@ fun DetailScreen(
                                             coverUrl = displayCoverUrl,
                                             offlineMode = offlineMode
                                         ) {
-                                            val isFavoriteSong = favoriteSongs.any {
-                                                it.sameIdentityAs(item)
-                                            }
+                                            val isFavoriteSong = favoriteSongIndex.contains(item)
                                             Column {
                                                 SongRow(
                                                     song = item,

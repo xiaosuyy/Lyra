@@ -109,6 +109,7 @@ import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.data.playlist.favorite.FavoritePlaylistRepository
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
 import com.lyra.player.data.model.sameIdentityAs
@@ -234,6 +235,9 @@ fun YouTubeMusicPlaylistDetailScreen(
     val allPlaylists by repo.playlists.collectAsState()
     val favoriteSongs = remember(allPlaylists, context) {
         FavoritesPlaylist.firstOrNull(allPlaylists, context)?.songs.orEmpty()
+    }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
     }
     val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
     val favorites by favoriteRepo.favorites.collectAsState()
@@ -792,7 +796,7 @@ fun YouTubeMusicPlaylistDetailScreen(
                                 key = { _, song -> song.stableKey() }
                             ) { index, song ->
                                 val isCurrent = currentSong?.sameIdentityAs(song) == true
-                                val isFavoriteSong = favoriteSongs.any { it.sameIdentityAs(song) }
+                                val isFavoriteSong = favoriteSongIndex.contains(song)
                                 PlaylistModernListItemSurface(
                                     coverUrl = resolvedPlaylist.coverUrl,
                                     offlineMode = offlineMode

@@ -113,6 +113,7 @@ import com.lyra.player.core.player.usb.transport.usbRuntimeMetrics
 import com.lyra.player.core.startup.safemode.SafeModeManager
 import com.lyra.player.data.local.media.LocalSongSupport
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayCoverUrl
@@ -744,7 +745,7 @@ class AudioPlayerService : Service() {
     private val pendingPlayerActions = ArrayDeque<() -> Unit>()
     private var latestStartId = 0
     private var keepPlayerRuntimeAfterServiceStop = false
-    private var favoriteSongKeys: Set<String> = emptySet()
+    private var favoriteSongIndex: FavoriteSongEquivalenceIndex = FavoriteSongEquivalenceIndex(emptyList())
     private val idleShutdownCoordinator = PlaybackServiceIdleShutdownCoordinator(
         scope = serviceScope,
         delayMs = PlaybackServiceIdleShutdownPreference.delayMs(
@@ -801,22 +802,19 @@ class AudioPlayerService : Service() {
     }
 
     private fun refreshFavoriteSongKeys(): Boolean {
-        val previousFavoriteSongKeys = favoriteSongKeys
-        val updatedFavoriteSongKeys = if (PlayerManager.localPlaylistsReady) {
+        val previousIndex = favoriteSongIndex
+        val favoriteSongs = if (PlayerManager.localPlaylistsReady) {
             PlayerManager.playlistsFlow.value
                 .firstOrNull { FavoritesPlaylist.isSystemPlaylist(it, this) }
                 ?.songs
-                ?.mapTo(mutableSetOf()) { it.stableKey() }
                 .orEmpty()
         } else {
-            emptySet()
+            emptyList()
         }
-        favoriteSongKeys = updatedFavoriteSongKeys
-        return hasCurrentSongFavoriteStateChanged(
-            currentSongKey = playbackSurfaceSong()?.stableKey(),
-            previousFavoriteSongKeys = previousFavoriteSongKeys,
-            updatedFavoriteSongKeys = updatedFavoriteSongKeys,
-        )
+        val updatedIndex = FavoriteSongEquivalenceIndex(favoriteSongs)
+        favoriteSongIndex = updatedIndex
+        val currentSong = playbackSurfaceSong() ?: return false
+        return previousIndex.contains(currentSong) != updatedIndex.contains(currentSong)
     }
 
     private fun refreshIdleShutdown(reason: String) {
@@ -2134,7 +2132,7 @@ class AudioPlayerService : Service() {
 
     private fun isFavoriteSong(song: SongItem?): Boolean {
         if (song == null) return false
-        return song.stableKey() in favoriteSongKeys
+        return favoriteSongIndex.contains(song)
     }
 
     private fun requiresInteractiveFavoriteConfirmation(song: SongItem?): Boolean {
@@ -2795,7 +2793,7 @@ class AudioPlayerService : Service() {
         } finally {
             clearActiveServiceReference()
             playerRuntimeReady = false
-            favoriteSongKeys = emptySet()
+            favoriteSongIndex = FavoriteSongEquivalenceIndex(emptyList())
             currentMediaArtwork = null
             currentNotificationLargeIcon = null
             shutdownUsbRuntime("service_destroy")

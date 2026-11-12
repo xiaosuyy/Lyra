@@ -945,6 +945,7 @@ internal suspend fun PlayerManager.getTranslatedLyricsImpl(song: SongItem): List
         neteaseLyricsCache = neteaseLyricsCache,
         editableLyricsMatcher = AppContainer.editableLyricsMatcher,
         ytMusicLyricsCache = ytMusicLyricsCache,
+        qqMusicSearchApi = qqMusicSearchApi,
         biliSourceTag = BILI_SOURCE_TAG
     )
 }
@@ -971,6 +972,7 @@ internal suspend fun PlayerManager.getLyricsImpl(song: SongItem): List<LyricEntr
         amllTtmlClient = amllTtmlClient,
         amllLyricsEnabled = amllLyricsEnabled,
         ytMusicLyricsCache = ytMusicLyricsCache,
+        qqMusicSearchApi = qqMusicSearchApi,
         biliSourceTag = BILI_SOURCE_TAG
     )
 }

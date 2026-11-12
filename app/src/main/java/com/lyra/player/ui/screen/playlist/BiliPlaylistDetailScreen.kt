@@ -111,6 +111,7 @@ import com.lyra.player.ui.viewmodel.tab.BiliPlaylistKind
 import com.lyra.player.ui.viewmodel.tab.toFavoriteBrowseId
 import com.lyra.player.ui.viewmodel.playlist.BiliPlaylistDetailViewModel
 import com.lyra.player.ui.viewmodel.playlist.BiliVideoItem
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.ui.haptic.HapticIconButton
@@ -195,6 +196,9 @@ fun BiliPlaylistDetailScreen(
     val allLocalPlaylists by repo.playlists.collectAsState(initial = emptyList())
     val favoriteSongs = remember(allLocalPlaylists, context) {
         FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
+    }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
     }
     val playlistSource = "bili"
     val playlistId = ui.header?.mediaId ?: playlist.mediaId
@@ -743,9 +747,7 @@ fun BiliPlaylistDetailScreen(
                                     key = { _, it -> it.bvid.ifBlank { it.id.toString() } }
                                 ) { index, item ->
                                     val songItem = remember(item) { item.toSongItem() }
-                                    val isFavoriteSong = favoriteSongs.any {
-                                        it.sameIdentityAs(songItem)
-                                    }
+                                    val isFavoriteSong = favoriteSongIndex.contains(songItem)
                                     PlaylistModernListItemSurface(
                                         coverUrl = displayHeaderCoverUrl,
                                         offlineMode = offlineMode

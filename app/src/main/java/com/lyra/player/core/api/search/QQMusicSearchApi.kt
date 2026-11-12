@@ -250,6 +250,12 @@ class QQMusicSearchApi(
         }
     }
 
+    /** 直接取 QQ 官方歌词（原文 + 翻译），用于渠道歌曲绕过搜索匹配。 */
+    suspend fun getNativeLyric(songMid: String): Pair<String?, String?> {
+        if (songMid.isBlank()) return Pair(null, null)
+        return withContext(Dispatchers.IO) { fetchQQMusicLyric(songMid) }
+    }
+
     private suspend fun fetchSongData(id: String): QQMusicTrackInfo {
         val detailRequestData = JSONObject().put(
             "songinfo", JSONObject()

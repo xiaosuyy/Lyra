@@ -27,8 +27,8 @@ import android.app.Application
 import com.lyra.player.data.local.playlist.model.DISPLAY_ORDER_SONG_ORDER_VERSION
 import com.lyra.player.data.local.playlist.model.LocalPlaylist
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
-import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.SongItem
+import com.lyra.player.data.model.sameFavoriteSongAs
 import com.lyra.player.data.model.toSyncableRemoteSongOrNull
 
 internal object PlayerFavoritesController {
@@ -40,7 +40,7 @@ internal object PlayerFavoritesController {
     ): Boolean {
         return FavoritesPlaylist.firstOrNull(playlists, application)
             ?.songs
-            ?.any { it.sameIdentityAs(song) } == true
+            ?.any { it.sameFavoriteSongAs(song) } == true
     }
 
     fun optimisticUpdateFavorites(
@@ -71,12 +71,12 @@ internal object PlayerFavoritesController {
             val favorites = copiedPlaylists[favoriteIndex]
             when {
                 add && favoriteSong != null && favorites.songs.none {
-                    it.sameIdentityAs(favoriteSong)
+                    it.sameFavoriteSongAs(favoriteSong)
                 } -> {
                     favorites.songs.add(0, favoriteSong)
                 }
                 !add && song != null -> {
-                    favorites.songs.removeAll { it.sameIdentityAs(song) }
+                    favorites.songs.removeAll { it.sameFavoriteSongAs(song) }
                 }
             }
         } else if (add && favoriteSong != null) {

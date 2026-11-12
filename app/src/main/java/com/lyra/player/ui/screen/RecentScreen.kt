@@ -108,6 +108,7 @@ import com.lyra.player.data.local.media.isLocalSong
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.launchLocalPlaylistMutation
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
@@ -156,6 +157,9 @@ fun RecentScreen(
     )
     val favoriteSongs = remember(allLocalPlaylists, context) {
         FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
+    }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
     }
     val favoriteAddedText = stringResource(R.string.favorite_added)
     val favoriteRemovedText = stringResource(R.string.favorite_removed)
@@ -423,7 +427,7 @@ fun RecentScreen(
                         items = displayedSongs,
                         key = { index, s -> s.id to index }
                     ) { index, song ->
-                        val isFavoriteSong = favoriteSongs.any { it.sameIdentityAs(song) }
+                        val isFavoriteSong = favoriteSongIndex.contains(song)
                         RecentRowRich(
                             song = song,
                             downloadPresenceVersion = downloadPresenceVersion,
