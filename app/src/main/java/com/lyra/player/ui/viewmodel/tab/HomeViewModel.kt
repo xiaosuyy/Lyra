@@ -47,6 +47,9 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import com.lyra.player.R
 import com.lyra.player.core.api.netease.mergeNeteaseSessionCookies
+import com.lyra.player.core.api.qqmusic.QQMusicHomeClient
+import com.lyra.player.core.api.search.CustomChannelCoverCache
+import com.lyra.player.core.api.search.CustomChannelSong
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.api.youtube.YouTubeMusicHomeShelf
 import com.lyra.player.core.customsource.CustomSourceManager
@@ -54,8 +57,9 @@ import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.core.source.SourceManager
 import com.lyra.player.core.source.SourceManagerState
+import com.lyra.player.data.settings.HomeLayoutConfig
 import com.lyra.player.data.settings.HomeSectionId
-import com.lyra.player.ui.viewmodel.tab.home.ChannelHomeFeedProvider
+import com.lyra.player.ui.viewmodel.tab.home.QQMusicHomeFeedProvider
 import com.lyra.player.ui.viewmodel.tab.home.HomeBatchContext
 import com.lyra.player.ui.viewmodel.tab.home.RecentlyShownStore
 import com.lyra.player.ui.viewmodel.tab.home.applyHomeRandomization
@@ -355,10 +359,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      * 来源解析（含不可用回落网易云）在 VM 内完成，Home UI 不再负责取数。
      */
     fun refreshChannelHomeSections(enabledSections: Set<HomeSectionId>, windowOffset: Int) {
-        // Fix-01B：相同进入条件（同一批分区 + 同一 windowOffset）不重复请求。
-        val refreshKey = enabledSections.joinToString(",") { it.name } + "|" + windowOffset
-        if (refreshKey == lastChannelRefreshKey) return
-        lastChannelRefreshKey = refreshKey
         channelHomeGroupsJob?.cancel()
         channelHomeGroupsJob = viewModelScope.launch {
             val layout = AppContainer.homeLayoutRepository.config.value
@@ -369,6 +369,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 if (!provider.supports(section)) return@mapNotNull null
                 Triple(section, sourceId, provider)
             }
+            // 相同分区 + 相同来源 + 相同 windowOffset 才视为同一次请求；
+            // 切换首页来源后必须重新取数。
+            val refreshKey = targets.joinToString(",") { (section, sourceId, _) ->
+                "${section.name}:$sourceId"
+            } + "|" + windowOffset
+            if (refreshKey == lastChannelRefreshKey) return@launch
+            lastChannelRefreshKey = refreshKey
             _channelHomeGroups.value = targets.associate { (section, sourceId, _) ->
                 section to listOf(homeLoadingFeedGroup(section, sourceId))
             }
@@ -383,6 +390,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             )
                         }.getOrElse { error ->
                             if (error is CancellationException) throw error
+                            LyraLogger.d(TAG, "channel section ${section.name}:$sourceId failed: ${error.message}")
                             listOf(homeErrorFeedGroup(section, sourceId, error.message))
                         }
                         section to groups
@@ -516,7 +524,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         lastYouTubeAuthFingerprint = buildYouTubeAuthFingerprint(youtubeAuthRepo.getAuthOnce())
 
         // 注册首页内容 Provider（幂等）。新增首页来源在此注册即可，UI 自动识别。
-        HomeFeedRegistry.register(ChannelHomeFeedProvider.tencent())
+        HomeFeedRegistry.register(QQMusicHomeFeedProvider())
 
         // 动态首页来源：随脚本声明 / YouTube 开关变化刷新
         viewModelScope.launch {
@@ -1267,6 +1275,71 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         LyraLogger.d(TAG, "heart mode: roaming songs=${collected.size}")
         return collected.values.take(HOME_NETEASE_SONG_LIMIT).toList()
+    }
+
+    // ==================== QQ 音乐首页推荐 ====================
+
+    private val qqMusicHomeClient = QQMusicHomeClient()
+
+    /** 雷达：登录后按 QQ 音乐账号口味推荐，作为首页首行卡片直接播放。 */
+    suspend fun loadQqRadarSongs(
+        mode: Int = AppContainer.homeLayoutRepository.config.value.qqRadarMode
+    ): List<SongItem> {
+        val session = AppContainer.qqMusicSessionRepo.getSessionOnce()
+        if (!session.isLoggedIn) {
+            throw IllegalStateException(
+                localizedAppContext().getString(R.string.home_qq_login_required)
+            )
+        }
+        return fetchQqHomeSongs {
+            qqMusicHomeClient.getRadarSongs(
+                session = session,
+                page = 1,
+                mode = HomeLayoutConfig.normalizeRadarMode(mode)
+            )
+        }
+    }
+
+    /** 私人漫游：基于账号的猜你喜欢，同样需要登录。 */
+    suspend fun loadQqRoamSongs(): List<SongItem> {
+        val session = AppContainer.qqMusicSessionRepo.getSessionOnce()
+        if (!session.isLoggedIn) {
+            throw IllegalStateException(
+                localizedAppContext().getString(R.string.home_qq_login_required)
+            )
+        }
+        return fetchQqHomeSongs { qqMusicHomeClient.getRadioTracks(session, pageSize = 20) }
+    }
+
+    suspend fun loadQqNewSongs(): List<SongItem> =
+        fetchQqHomeSongs { qqMusicHomeClient.getNewSongs(limit = HOME_NETEASE_SONG_LIMIT) }
+
+    suspend fun loadQqHotSongs(): List<SongItem> =
+        fetchQqHomeSongs { qqMusicHomeClient.getHotRank(limit = HOME_NETEASE_SONG_LIMIT) }
+
+    suspend fun loadQqPlaylistSongs(playlistId: String): List<SongItem> =
+        fetchQqHomeSongs { qqMusicHomeClient.getPlaylistSongs(playlistId) }
+
+    /** 排行榜歌曲：首页排行榜卡片用负数 id 编码榜单 id，这里还原。 */
+    suspend fun loadQqToplistSongs(topId: Long): List<SongItem> =
+        fetchQqHomeSongs { qqMusicHomeClient.getToplistSongs(topId) }
+
+    private suspend fun fetchQqHomeSongs(
+        fetch: suspend () -> List<CustomChannelSong>
+    ): List<SongItem> {
+        val songs = try {
+            withContext(Dispatchers.IO) { fetch() }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            LyraLogger.d(TAG, "qq home load failed: ${error.message}")
+            throw IllegalStateException(
+                localizedAppContext().getString(R.string.home_qq_load_failed)
+            )
+        }
+        val app = getApplication<Application>()
+        return CustomChannelCoverCache.ensureLocalCovers(app, songs)
+            .map { it.toSongItem(app, MusicSourceIds.TENCENT) }
     }
 
     /** 将首页来源的请求参数集中在一起，避免登录态契约在调用点分散 */

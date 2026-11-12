@@ -68,4 +68,30 @@
     <string name="home_heart_mode_no_liked_playlist">没有找到“我喜欢的音乐”歌单</string>
     <string name="home_heart_mode_empty_likes">收藏歌曲为空</string>
     <string name="home_heart_mode_empty">心动模式暂时没有推荐歌曲</string>
+
+    <!-- Home source switch / QQ Music home -->
+    <string name="settings_home_source_title">首页来源</string>
+    <string name="settings_home_source_netease">网易云音乐</string>
+    <string name="settings_home_source_qq">QQ 音乐</string>
+    <string name="settings_home_source_qq_unavailable">QQ 音乐音源尚未启用</string>
+    <string name="home_qq_for_you">为你精选</string>
+    <string name="home_qq_toplist">排行榜</string>
+    <string name="home_qq_daily_songs">每日30首</string>
+    <string name="home_qq_radar">雷达推荐</string>
+    <string name="home_qq_radar_eyebrow">为你挑选</string>
+    <string name="home_qq_radar_subtitle">根据你的收听口味持续更新</string>
+    <string name="home_qq_radar_mode_explore">探索</string>
+    <string name="home_qq_radar_mode_default">默认</string>
+    <string name="home_qq_radar_mode_familiar">熟悉</string>
+    <string name="home_qq_radar_eyebrow_explore">探索雷达</string>
+    <string name="home_qq_radar_subtitle_explore">多听些没听过的歌</string>
+    <string name="home_qq_radar_eyebrow_familiar">熟悉口味</string>
+    <string name="home_qq_radar_subtitle_familiar">常听歌手与相似歌曲</string>
+    <string name="home_qq_roam">私人漫游</string>
+    <string name="home_qq_new_songs">新歌首发</string>
+    <string name="home_qq_new_eyebrow">每日上新</string>
+    <string name="home_qq_new_subtitle">新歌抢先听</string>
+    <string name="home_qq_recommend_playlists">推荐歌单</string>
+    <string name="home_qq_login_required">请先登录 QQ 音乐</string>
+    <string name="home_qq_load_failed">QQ 音乐推荐暂时不可用</string>
 </resources>

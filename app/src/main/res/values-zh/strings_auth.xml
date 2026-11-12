@@ -150,4 +150,16 @@
     <string name="login_paste_bili_cookie_hint">粘贴 Cookie（例如：SESSDATA=…; bili_jct=…）</string>
     <string name="login_paste_youtube_cookie_hint">粘贴 Cookie 或浏览器请求头（需包含 Cookie）</string>
     <string name="settings_cookie_input_hint">请输入 Cookie</string>
+    <string name="account_entry_tap_to_login">点击登录</string>
+    <string name="qq_login_entry_title">登录 QQ 音乐账号</string>
+    <string name="qq_login_logged_in">已登录 QQ 音乐</string>
+    <string name="qq_login_screen_title">登录 QQ 音乐</string>
+    <string name="qq_login_screen_desc">使用 QQ 或微信登录，登录后可在账号卡片中查看你的 QQ 音乐资料。</string>
+    <string name="qq_login_web_button">使用 QQ / 微信登录</string>
+    <string name="qq_login_web_hint">将打开 QQ 音乐官方网页，扫码或账号密码登录完成后会自动返回。</string>
+    <string name="qq_login_privacy_note">登录信息仅保存在本应用内，用于读取你的账号资料。</string>
+    <string name="qq_login_cookie_incomplete">未读取到完整的 QQ 音乐登录信息，请重试</string>
+    <string name="qq_login_failed">登录失败：%s</string>
+    <string name="qq_login_logout">退出 QQ 音乐账号</string>
+    <string name="qq_web_login">QQ 音乐登录</string>
 </resources>

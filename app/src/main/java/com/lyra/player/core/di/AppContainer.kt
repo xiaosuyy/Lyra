@@ -41,6 +41,8 @@ import com.lyra.player.core.api.lyrics.EditableLyricsMatcher
 import com.lyra.player.core.api.lyrics.KugouLyricsClient
 import com.lyra.player.core.api.lyrics.LrcLibClient
 import com.lyra.player.core.api.netease.NeteaseClient
+import com.lyra.player.core.api.qqmusic.QQMusicAccountClient
+import com.lyra.player.core.api.qqmusic.QQMusicFavoriteClient
 import com.lyra.player.core.api.search.CloudMusicSearchApi
 import com.lyra.player.core.api.search.QQMusicSearchApi
 import com.lyra.player.core.api.youtube.YouTubeMusicClient
@@ -51,6 +53,7 @@ import com.lyra.player.core.player.download.AudioDownloadManager
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.auth.bili.BiliCookieRepository
 import com.lyra.player.data.auth.netease.NeteaseCookieRepository
+import com.lyra.player.data.auth.qqmusic.QQMusicSessionRepository
 import com.lyra.player.data.auth.web.ForegroundWebLoginGuard
 import com.lyra.player.data.auth.youtube.YouTubeAuthAutoRefreshManager
 import com.lyra.player.data.auth.youtube.YouTubeAuthRepository
@@ -231,6 +234,9 @@ object AppContainer {
     val neteaseCookieRepo by lazy { NeteaseCookieRepository(application) }
     val biliCookieRepo by lazy { BiliCookieRepository(application) }
     val youtubeAuthRepo by lazy { YouTubeAuthRepository(application) }
+    val qqMusicSessionRepo by lazy { QQMusicSessionRepository(application) }
+    val qqMusicAccountClient by lazy { QQMusicAccountClient(sharedOkHttpClient) }
+    internal val qqMusicFavoriteClient by lazy { QQMusicFavoriteClient(sharedOkHttpClient) }
     internal val youtubeAuthAutoRefreshManager by lazy {
         YouTubeAuthAutoRefreshManager(
             context = application,

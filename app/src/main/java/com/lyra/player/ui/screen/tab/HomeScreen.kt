@@ -26,10 +26,22 @@ package com.lyra.player.ui.screen.tab
 import android.app.Application
 import android.content.ClipData
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -42,6 +54,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,6 +75,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -94,6 +108,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -104,11 +119,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
@@ -145,6 +162,7 @@ import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.download.toPlaybackSongItem
 import com.lyra.player.core.player.HeartModeRuntime
 import com.lyra.player.core.player.PlayerManager
+import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.data.playlist.favorite.FavoritePlaylistRepository
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.model.LocalPlaylist
@@ -188,12 +206,14 @@ import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.core.api.youtube.YouTubeMusicHomeShelf
 import com.lyra.player.core.api.youtube.YouTubeMusicHomeItem
 import com.lyra.player.core.api.youtube.YouTubeMusicParser
+import com.lyra.player.data.settings.HomeLayoutConfig
 import com.lyra.player.data.settings.HomeSectionId
 import com.lyra.player.ui.screen.tab.home.HomeHero
 import com.lyra.player.ui.theme.designsystem.LyraSectionHeader
 import com.lyra.player.ui.viewmodel.tab.home.HomeFeedGroup
 import com.lyra.player.ui.viewmodel.tab.home.HomeFeedIcon
 import com.lyra.player.ui.viewmodel.tab.home.HomeFeedPresentation
+import com.lyra.player.ui.viewmodel.tab.home.resolveEffectiveHomeSourceId
 import com.lyra.player.ui.haptic.HapticIconButton
 import com.lyra.player.util.media.fastScrollableImageRequest
 import com.lyra.player.util.format.formatPlayCount
@@ -233,7 +253,11 @@ private data class MeloxHomeQuickAction(
     val colors: List<Color>,
     val songs: List<SongItem>,
     val requiresLogin: Boolean = false,
-    val playlist: PlaylistSummary? = null
+    val playlist: PlaylistSummary? = null,
+    /** 可选雷达模式的接口 Mode 值（空 = 该卡片不支持模式切换）。 */
+    val radarModes: List<Int> = emptyList(),
+    /** 当前雷达模式（接口 Mode 值）。 */
+    val radarMode: Int = HomeLayoutConfig.RADAR_MODE_DEFAULT
 )
 
 internal fun shouldShowHomeContinueSection(
@@ -422,6 +446,16 @@ fun HomeScreen(
     var homeRefreshGeneration by remember { mutableStateOf(0) }
     var isRefreshing by remember { mutableStateOf(false) }
     val isMeloxNeteaseHome = !isInternational && !offlineMode
+    // 首页整体推荐来源：网易云或 QQ 音乐（QQ 音源未就绪时自动回落到网易云）。
+    val homeSourceIds = remember(homeSourceOptions) {
+        homeSourceOptions.mapTo(HashSet()) { it.sourceId }
+    }
+    val isQqHome = isMeloxNeteaseHome &&
+        resolveEffectiveHomeSourceId(homeLayout.mainSourceId, homeSourceIds) ==
+        MusicSourceIds.TENCENT
+    val qqSession by AppContainer.qqMusicSessionRepo.sessionFlow.collectAsStateWithLifecycle()
+    var qqQuickLoading by remember { mutableStateOf<String?>(null) }
+    var qqPlaylistLoading by remember { mutableStateOf(false) }
     var quickActionDetail by remember { mutableStateOf<MeloxHomeQuickAction?>(null) }
     var heartModeLoading by remember { mutableStateOf(false) }
     val dailyRecommendSongs = ui.radarSongSections
@@ -441,7 +475,7 @@ fun HomeScreen(
     val roamSongs = ui.radarSongSections
         .firstOrNull { it.source == NeteaseHomeSongSource.PRIVATE_FM }
         ?.section?.items.orEmpty()
-    val meloxQuickActions = listOf(
+    val neteaseQuickActions = listOf(
         MeloxHomeQuickAction(
             key = "daily",
             title = stringResource(R.string.home_netease_daily_songs),
@@ -505,6 +539,66 @@ fun HomeScreen(
             requiresLogin = true
         )
     )
+    // QQ 音乐首页首行卡片：雷达（按账号推荐，点开即播）、热歌榜、新歌首发、私人漫游。
+    val qqRadarMode = homeLayout.qqRadarMode
+    val qqRadarEyebrowRes = when (qqRadarMode) {
+        HomeLayoutConfig.RADAR_MODE_EXPLORE -> R.string.home_qq_radar_eyebrow_explore
+        HomeLayoutConfig.RADAR_MODE_FAMILIAR -> R.string.home_qq_radar_eyebrow_familiar
+        else -> R.string.home_qq_radar_eyebrow
+    }
+    val qqRadarSubtitleRes = when (qqRadarMode) {
+        HomeLayoutConfig.RADAR_MODE_EXPLORE -> R.string.home_qq_radar_subtitle_explore
+        HomeLayoutConfig.RADAR_MODE_FAMILIAR -> R.string.home_qq_radar_subtitle_familiar
+        else -> R.string.home_qq_radar_subtitle
+    }
+    val qqQuickActions = listOf(
+        MeloxHomeQuickAction(
+            key = "qq_radar",
+            title = stringResource(R.string.home_qq_radar),
+            eyebrow = stringResource(qqRadarEyebrowRes),
+            subtitle = stringResource(qqRadarSubtitleRes),
+            icon = Icons.Outlined.Radar,
+            colors = listOf(Color(0xFF6B7BFF), Color(0xFF8C52FF)),
+            songs = emptyList(),
+            requiresLogin = true,
+            radarModes = listOf(
+                HomeLayoutConfig.RADAR_MODE_EXPLORE,
+                HomeLayoutConfig.RADAR_MODE_DEFAULT,
+                HomeLayoutConfig.RADAR_MODE_FAMILIAR
+            ),
+            radarMode = qqRadarMode
+        ),
+        MeloxHomeQuickAction(
+            key = "qq_hot",
+            title = stringResource(R.string.home_netease_hot_rank),
+            eyebrow = stringResource(R.string.home_eyebrow_hot),
+            subtitle = stringResource(R.string.home_subtitle_hot),
+            icon = Icons.Outlined.LocalFireDepartment,
+            colors = listOf(Color(0xFFFFA14A), Color(0xFFFF5A36)),
+            songs = emptyList()
+        ),
+        MeloxHomeQuickAction(
+            key = "qq_new",
+            title = stringResource(R.string.home_qq_new_songs),
+            eyebrow = stringResource(R.string.home_qq_new_eyebrow),
+            subtitle = stringResource(R.string.home_qq_new_subtitle),
+            icon = Icons.Outlined.Star,
+            colors = listOf(Color(0xFF59C173), Color(0xFF26A69A)),
+            songs = emptyList()
+        ),
+        MeloxHomeQuickAction(
+            key = "qq_roam",
+            title = stringResource(R.string.home_qq_roam),
+            eyebrow = stringResource(R.string.home_eyebrow_roam),
+            subtitle = stringResource(R.string.home_subtitle_roam),
+            icon = Icons.Outlined.Explore,
+            colors = listOf(Color(0xFF26C6DA), Color(0xFF4285F4)),
+            songs = emptyList(),
+            requiresLogin = true
+        )
+    )
+    val meloxQuickActions = if (isQqHome) qqQuickActions else neteaseQuickActions
+    val qqPlaylistEyebrow = stringResource(R.string.home_qq_recommend_playlists)
     val meloxGreeting = remember {
         when (LocalTime.now().hour) {
             in 5..11 -> R.string.home_greeting_morning
@@ -522,12 +616,88 @@ fun HomeScreen(
         if (offlineMode) return
         if (isInternational) {
             vm.refreshYtMusicHome()
-        } else {
+        } else if (!isQqHome) {
             vm.refreshNeteaseHome()
         }
         // 刷新即换批：新的 Home generation + seed（force 绕过初始化守卫）
         vm.beginHomeGeneration(force = true)
         homeRefreshGeneration += 1
+    }
+    // QQ 音乐的推荐歌单没有网易云详情页，点击后先取歌单内歌曲，再用统一详情页展示。
+    fun openPlaylist(playlist: PlaylistSummary) {
+        if (!isQqHome) {
+            onItemClick(playlist)
+            return
+        }
+        if (qqPlaylistLoading) return
+        qqPlaylistLoading = true
+        scope.launch {
+            try {
+                val songs = if (playlist.id < 0L) {
+                    vm.loadQqToplistSongs(-playlist.id)
+                } else {
+                    vm.loadQqPlaylistSongs(playlist.id.toString())
+                }
+                if (songs.isEmpty()) {
+                    showHomeSnackbar(context.getString(R.string.home_no_recommendations))
+                } else {
+                    quickActionDetail = MeloxHomeQuickAction(
+                        key = "qq_playlist_${playlist.id}",
+                        title = playlist.name,
+                        eyebrow = if (playlist.id < 0L) {
+                            context.getString(R.string.home_qq_toplist)
+                        } else {
+                            qqPlaylistEyebrow
+                        },
+                        subtitle = "",
+                        icon = Icons.Outlined.MusicNote,
+                        colors = listOf(Color(0xFF5B8DEF), Color(0xFF8C52FF)),
+                        songs = songs
+                    )
+                }
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                showHomeSnackbar(
+                    error.message ?: context.getString(R.string.home_qq_load_failed)
+                )
+            } finally {
+                qqPlaylistLoading = false
+            }
+        }
+    }
+    fun openQqQuickAction(action: MeloxHomeQuickAction) {
+        if (action.requiresLogin && !qqSession.isLoggedIn) {
+            showHomeSnackbar(context.getString(R.string.home_qq_login_required))
+            return
+        }
+        if (qqQuickLoading != null) return
+        qqQuickLoading = action.key
+        scope.launch {
+            try {
+                val songs = when (action.key) {
+                    "qq_radar" -> vm.loadQqRadarSongs(homeLayout.qqRadarMode)
+                    "qq_roam" -> vm.loadQqRoamSongs()
+                    "qq_hot" -> vm.loadQqHotSongs()
+                    else -> vm.loadQqNewSongs()
+                }
+                when {
+                    songs.isEmpty() -> showHomeSnackbar(
+                        context.getString(R.string.home_no_recommendations)
+                    )
+                    action.key == "qq_radar" -> onSongClick(songs, 0)
+                    else -> quickActionDetail = action.copy(songs = songs)
+                }
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                showHomeSnackbar(
+                    error.message ?: context.getString(R.string.home_qq_load_failed)
+                )
+            } finally {
+                qqQuickLoading = null
+            }
+        }
     }
     // Fix-01B：是否换批由 ViewModel 跨 Tab 存活的状态决定（首次进入换批；普通返回不换批）。
     LaunchedEffect(Unit) {
@@ -541,7 +711,13 @@ fun HomeScreen(
         }
     }
     // Fix-01B：渠道请求去重由 ViewModel 负责；此处仅按现有条件调用。
-    LaunchedEffect(homeLayout.sources, homeSourceOptions, enabledOnlineSections, homeRefreshGeneration) {
+    LaunchedEffect(
+        homeLayout.sources,
+        homeLayout.mainSourceId,
+        homeSourceOptions,
+        enabledOnlineSections,
+        homeRefreshGeneration
+    ) {
         // 数据加载全部在 ViewModel 内完成；UI 只消费统一分组。
         vm.refreshChannelHomeSections(
             enabledSections = enabledOnlineSections,
@@ -740,9 +916,10 @@ fun HomeScreen(
                                                 PlaylistCard(
                                                     playlist = playlist,
                                                     isFavorite = favoriteKeys.contains("netease:${playlist.id}"),
-                                                    onClick = { onItemClick(playlist) },
+                                                    onClick = { openPlaylist(playlist) },
                                                     onShowSnackbar = showHomeSnackbar,
-                                                    offlineMode = offlineMode
+                                                    offlineMode = offlineMode,
+                                                    allowFavorite = !isQqHome
                                                 )
                                             }
                                         }
@@ -838,10 +1015,11 @@ fun HomeScreen(
                                         PlaylistCard(
                                             playlist = playlist,
                                             isFavorite = favoriteKeys.contains("netease:${playlist.id}"),
-                                            onClick = { onItemClick(playlist) },
+                                            onClick = { openPlaylist(playlist) },
                                             onShowSnackbar = showHomeSnackbar,
                                             offlineMode = offlineMode,
-                                            large = true
+                                            large = true,
+                                            allowFavorite = !isQqHome
                                         )
                                     }
                                 }
@@ -923,11 +1101,16 @@ fun HomeScreen(
                             actions = meloxQuickActions,
                             contentPadding = 0.dp,
                             loadingKey = when {
+                                isQqHome -> qqQuickLoading
                                 heartModeLoading -> "heart"
                                 else -> null
                             },
+                            onRadarModeChange = { mode ->
+                                AppContainer.homeLayoutRepository.setQqRadarMode(mode)
+                            },
                             onAction = { action ->
                                 when {
+                                    isQqHome -> openQqQuickAction(action)
                                     action.key == "heart" -> {
                                         when {
                                             !ui.hasLogin -> showHomeSnackbar(
@@ -979,66 +1162,89 @@ fun HomeScreen(
                         )
                     }
 
-                    val recommendedGroups = homeFeedGroups[HomeSectionId.RECOMMENDED].orEmpty()
-                    val featuredRecommended = recommendedGroups.firstOrNull {
-                        it.presentation == HomeFeedPresentation.PLAYLIST_GRID &&
-                            it.playlists.items.isNotEmpty()
-                    } ?: recommendedGroups.firstOrNull()
-                    if (showOnlineFeeds && showRecommendedCard) {
-                        if (featuredRecommended != null) {
-                            addMeloxPlaylistSection(
-                                group = featuredRecommended,
-                                titleRes = R.string.home_netease_daily_songs
-                            )
+                    if (isQqHome) {
+                        // QQ 音乐推荐页节奏：每日30首 → 为你精选 → 排行榜 → 推荐歌单 → 新歌首发。
+                        // 雷达已由首行卡片承担，不再重复出分区。
+                        if (showOnlineFeeds) {
+                            val qqTrending = homeFeedGroups[HomeSectionId.TRENDING].orEmpty()
+                            if (showNeteaseTrending) {
+                                qqTrending
+                                    .filter { it.key.endsWith(":DAILY") }
+                                    .forEach { addMeloxSongSection(it) }
+                            }
+                            if (showRecommendedCard) {
+                                homeFeedGroups[HomeSectionId.RECOMMENDED]
+                                    .orEmpty()
+                                    .forEach { addMeloxPlaylistSection(it) }
+                            }
+                            if (showNeteaseTrending) {
+                                qqTrending
+                                    .filterNot { it.key.endsWith(":DAILY") }
+                                    .forEach { addMeloxSongSection(it) }
+                            }
                         }
-                    }
-
-                    if (showOnlineFeeds && showNeteaseTrending) {
-                        val trendingGroups = homeFeedGroups[HomeSectionId.TRENDING].orEmpty()
-                        trendingGroups
-                            .firstOrNull { it.key.contains("PERSONALIZED_NEW_SONGS") }
-                            ?.let { group ->
-                                addMeloxSongSection(group, titleRes = R.string.recommend_for_you)
-                            }
-                        if (allRecentTrendingSongs.isNotEmpty()) {
-                            item(
-                                key = registerGridItemKey("home:melox:all_recent_trending:header"),
-                                span = { GridItemSpan(maxLineSpan) }
-                            ) {
-                                MeloxSectionTitle(
-                                    title = stringResource(R.string.home_all_recent_trending),
-                                    trailing = null,
-                                    modifier = Modifier
-                                        .animateItem()
-                                )
-                            }
-                            item(
-                                key = registerGridItemKey("home:melox:all_recent_trending:content"),
-                                span = { GridItemSpan(maxLineSpan) }
-                            ) {
-                                MeloxSongCarousel(
-                                    songs = allRecentTrendingSongs,
-                                    isTabletLayout = isTabletLayout,
-                                    offlineMode = offlineMode,
-                                    onSongClick = onSongClick,
-                                    modifier = Modifier.animateItem()
+                    } else {
+                        val recommendedGroups = homeFeedGroups[HomeSectionId.RECOMMENDED].orEmpty()
+                        val featuredRecommended = recommendedGroups.firstOrNull {
+                            it.presentation == HomeFeedPresentation.PLAYLIST_GRID &&
+                                it.playlists.items.isNotEmpty()
+                        } ?: recommendedGroups.firstOrNull()
+                        if (showOnlineFeeds && showRecommendedCard) {
+                            if (featuredRecommended != null) {
+                                addMeloxPlaylistSection(
+                                    group = featuredRecommended,
+                                    titleRes = R.string.home_netease_daily_songs
                                 )
                             }
                         }
-                    }
 
-                    if (showOnlineFeeds && showRecommendedCard) {
-                        recommendedGroups
-                            .filter { it.key != featuredRecommended?.key }
-                            .forEach { addMeloxPlaylistSection(it) }
-                    }
+                        if (showOnlineFeeds && showNeteaseTrending) {
+                            val trendingGroups = homeFeedGroups[HomeSectionId.TRENDING].orEmpty()
+                            trendingGroups
+                                .firstOrNull { it.key.contains("PERSONALIZED_NEW_SONGS") }
+                                ?.let { group ->
+                                    addMeloxSongSection(group, titleRes = R.string.recommend_for_you)
+                                }
+                            if (allRecentTrendingSongs.isNotEmpty()) {
+                                item(
+                                    key = registerGridItemKey("home:melox:all_recent_trending:header"),
+                                    span = { GridItemSpan(maxLineSpan) }
+                                ) {
+                                    MeloxSectionTitle(
+                                        title = stringResource(R.string.home_all_recent_trending),
+                                        trailing = null,
+                                        modifier = Modifier
+                                            .animateItem()
+                                    )
+                                }
+                                item(
+                                    key = registerGridItemKey("home:melox:all_recent_trending:content"),
+                                    span = { GridItemSpan(maxLineSpan) }
+                                ) {
+                                    MeloxSongCarousel(
+                                        songs = allRecentTrendingSongs,
+                                        isTabletLayout = isTabletLayout,
+                                        offlineMode = offlineMode,
+                                        onSongClick = onSongClick,
+                                        modifier = Modifier.animateItem()
+                                    )
+                                }
+                            }
+                        }
 
-                    if (showOnlineFeeds && showNeteaseRadar) {
-                        homeFeedGroups[HomeSectionId.RADAR].orEmpty().forEach { group ->
-                            if (group.presentation == HomeFeedPresentation.SONG_LIST) {
-                                addMeloxSongSection(group)
-                            } else {
-                                addMeloxPlaylistSection(group)
+                        if (showOnlineFeeds && showRecommendedCard) {
+                            recommendedGroups
+                                .filter { it.key != featuredRecommended?.key }
+                                .forEach { addMeloxPlaylistSection(it) }
+                        }
+
+                        if (showOnlineFeeds && showNeteaseRadar) {
+                            homeFeedGroups[HomeSectionId.RADAR].orEmpty().forEach { group ->
+                                if (group.presentation == HomeFeedPresentation.SONG_LIST) {
+                                    addMeloxSongSection(group)
+                                } else {
+                                    addMeloxPlaylistSection(group)
+                                }
                             }
                         }
                     }
@@ -1198,6 +1404,7 @@ private fun MeloxQuickActionRow(
     actions: List<MeloxHomeQuickAction>,
     contentPadding: Dp,
     loadingKey: String? = null,
+    onRadarModeChange: (Int) -> Unit = {},
     onAction: (MeloxHomeQuickAction) -> Unit
 ) {
     LazyRow(
@@ -1247,14 +1454,10 @@ private fun MeloxQuickActionRow(
                         tint = Color.White.copy(alpha = 0.24f),
                         modifier = Modifier.size(72.dp)
                     )
-                    Text(
-                        text = action.title,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(18.dp),
-                        color = Color.White,
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Bold
+                    MeloxQuickActionCaption(
+                        action = action,
+                        onRadarModeChange = onRadarModeChange,
+                        modifier = Modifier.align(Alignment.BottomStart)
                     )
                     if (loadingKey == action.key) {
                         Box(
@@ -1269,6 +1472,200 @@ private fun MeloxQuickActionRow(
                                 strokeWidth = 2.5.dp
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 卡片底部标题区。
+ *
+ * 雷达卡片标题带箭头：点标题展开三种模式的分段选择器（按下横滑也能切换），
+ * 点卡片其余区域仍按当前模式直接播放。
+ */
+@Composable
+private fun MeloxQuickActionCaption(
+    action: MeloxHomeQuickAction,
+    onRadarModeChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (action.radarModes.isEmpty()) {
+        Text(
+            text = action.title,
+            modifier = modifier.padding(18.dp),
+            color = Color.White,
+            fontSize = 25.sp,
+            fontWeight = FontWeight.Bold
+        )
+        return
+    }
+
+    var modesExpanded by rememberSaveable(action.key) { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (modesExpanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "radarModeChevron"
+    )
+    val selectedIndex = action.radarModes
+        .indexOf(action.radarMode)
+        .coerceAtLeast(0)
+    val modeLabels = action.radarModes.map { mode ->
+        stringResource(
+            when (mode) {
+                HomeLayoutConfig.RADAR_MODE_EXPLORE -> R.string.home_qq_radar_mode_explore
+                HomeLayoutConfig.RADAR_MODE_FAMILIAR -> R.string.home_qq_radar_mode_familiar
+                else -> R.string.home_qq_radar_mode_default
+            }
+        )
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 14.dp, bottom = 14.dp)
+    ) {
+        AnimatedVisibility(
+            visible = modesExpanded,
+            enter = fadeIn(tween(durationMillis = 160)) +
+                expandVertically(
+                    animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                    expandFrom = Alignment.Bottom
+                ),
+            exit = fadeOut(tween(durationMillis = 120)) +
+                shrinkVertically(
+                    animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                    shrinkTowards = Alignment.Bottom
+                )
+        ) {
+            MeloxRadarModeSelector(
+                labels = modeLabels,
+                selectedIndex = selectedIndex,
+                onSelect = { index ->
+                    onRadarModeChange(action.radarModes[index])
+                    modesExpanded = false
+                },
+                modifier = Modifier.padding(bottom = 10.dp)
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { modesExpanded = !modesExpanded }
+        ) {
+            Text(
+                text = action.title,
+                color = Color.White,
+                fontSize = 25.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Icon(
+                imageVector = Icons.Filled.ExpandMore,
+                contentDescription = stringResource(
+                    if (modesExpanded) R.string.action_collapse else R.string.action_expand
+                ),
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .padding(start = 2.dp)
+                    .size(22.dp)
+                    .rotate(chevronRotation)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MeloxRadarModeSelector(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val count = labels.size
+    if (count == 0) return
+    var previewIndex by remember { mutableIntStateOf(-1) }
+    val activeIndex = (if (previewIndex in 0 until count) previewIndex else selectedIndex)
+        .coerceIn(0, count - 1)
+    LaunchedEffect(selectedIndex) {
+        previewIndex = -1
+    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(Color.White.copy(alpha = 0.18f))
+            .padding(3.dp)
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val segmentWidth = maxWidth / count
+            val indicatorOffset by animateDpAsState(
+                targetValue = segmentWidth * activeIndex,
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                label = "radarModeIndicator"
+            )
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(segmentWidth)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White.copy(alpha = 0.94f))
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(count) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            down.consume()
+                            val width = size.width.toFloat().coerceAtLeast(1f)
+                            fun indexAt(x: Float): Int =
+                                ((x / width) * count).toInt().coerceIn(0, count - 1)
+
+                            previewIndex = indexAt(down.position.x)
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                change.consume()
+                                if (!change.pressed) break
+                                val next = indexAt(change.position.x)
+                                if (next != previewIndex) previewIndex = next
+                            }
+                            if (previewIndex in 0 until count) onSelect(previewIndex)
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                labels.forEachIndexed { index, label ->
+                    val labelColor by animateColorAsState(
+                        targetValue = if (index == activeIndex) {
+                            Color(0xFF2B2B3D)
+                        } else {
+                            Color.White.copy(alpha = 0.9f)
+                        },
+                        animationSpec = tween(durationMillis = 200),
+                        label = "radarModeLabel$index"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = labelColor,
+                            fontSize = 12.sp,
+                            fontWeight = if (index == activeIndex) {
+                                FontWeight.SemiBold
+                            } else {
+                                FontWeight.Medium
+                            },
+                            maxLines = 1
+                        )
                     }
                 }
             }
@@ -1726,7 +2123,8 @@ fun PlaylistCard(
     onClick: () -> Unit,
     onShowSnackbar: (String) -> Unit = {},
     offlineMode: Boolean = false,
-    large: Boolean = false
+    large: Boolean = false,
+    allowFavorite: Boolean = true
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1742,7 +2140,7 @@ fun PlaylistCard(
             .then(if (large) Modifier.fillMaxHeight() else Modifier)
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = { showMenu = true }
+                onLongClick = if (allowFavorite) ({ showMenu = true }) else null
             )
             .padding(if (large) 8.dp else 0.dp)
     ) {
@@ -1815,50 +2213,52 @@ fun PlaylistCard(
             )
         }
 
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false }
-        ) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        if (isFavorite) {
-                            stringResource(R.string.home_unfavorite_playlist)
-                        } else {
-                            stringResource(R.string.home_favorite_playlist)
-                        }
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = if (isFavorite) {
-                            Icons.Filled.Favorite
-                        } else {
-                            Icons.Outlined.FavoriteBorder
-                        },
-                        contentDescription = null
-                    )
-                },
-                onClick = {
-                    showMenu = false
-                    scope.launch {
-                        if (isFavorite) {
-                            favoriteRepo.removeFavorite(playlist.id, "netease")
-                            onShowSnackbar(unfavoritedText)
-                        } else {
-                            favoriteRepo.addFavorite(
-                                id = playlist.id,
-                                name = playlist.name,
-                                coverUrl = playlist.picUrl,
-                                trackCount = playlist.trackCount,
-                                source = "netease",
-                                songs = emptyList()
-                            )
-                            onShowSnackbar(favoriteSuccessText)
+        if (allowFavorite) {
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (isFavorite) {
+                                stringResource(R.string.home_unfavorite_playlist)
+                            } else {
+                                stringResource(R.string.home_favorite_playlist)
+                            }
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (isFavorite) {
+                                Icons.Filled.Favorite
+                            } else {
+                                Icons.Outlined.FavoriteBorder
+                            },
+                            contentDescription = null
+                        )
+                    },
+                    onClick = {
+                        showMenu = false
+                        scope.launch {
+                            if (isFavorite) {
+                                favoriteRepo.removeFavorite(playlist.id, "netease")
+                                onShowSnackbar(unfavoritedText)
+                            } else {
+                                favoriteRepo.addFavorite(
+                                    id = playlist.id,
+                                    name = playlist.name,
+                                    coverUrl = playlist.picUrl,
+                                    trackCount = playlist.trackCount,
+                                    source = "netease",
+                                    songs = emptyList()
+                                )
+                                onShowSnackbar(favoriteSuccessText)
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }

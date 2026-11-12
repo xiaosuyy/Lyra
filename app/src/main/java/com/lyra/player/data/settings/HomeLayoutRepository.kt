@@ -28,9 +28,20 @@ enum class HomeSectionId(val titleResId: Int) {
  */
 data class HomeLayoutConfig(
     val order: List<HomeSectionId> = DEFAULT_HOME_ORDER,
-    val sources: Map<HomeSectionId, String> = defaultHomeSources()
+    val sources: Map<HomeSectionId, String> = defaultHomeSources(),
+    /** 首页整体推荐来源（网易云 / QQ 音乐），决定首页排版所用的平台。 */
+    val mainSourceId: String = MusicSourceIds.NETEASE,
+    /** QQ 雷达模式（接口 Mode 值）：1 = 熟悉，2 = 默认，3 = 探索。 */
+    val qqRadarMode: Int = RADAR_MODE_DEFAULT
 ) {
     companion object {
+        const val RADAR_MODE_FAMILIAR = 1
+        const val RADAR_MODE_DEFAULT = 2
+        const val RADAR_MODE_EXPLORE = 3
+
+        fun normalizeRadarMode(mode: Int): Int =
+            if (mode in RADAR_MODE_FAMILIAR..RADAR_MODE_EXPLORE) mode else RADAR_MODE_DEFAULT
+
         val DEFAULT_HOME_ORDER: List<HomeSectionId> = listOf(
             HomeSectionId.CONTINUE,
             HomeSectionId.RADAR,
@@ -78,10 +89,51 @@ class HomeLayoutRepository(context: Context) {
         _config.value = _config.value.copy(sources = sources)
     }
 
+    /** 切换首页整体来源：所有在线分区统一跟随，并单独记录主来源供排版判断。 */
+    fun setMainSource(sourceId: String) {
+        val normalized = sourceId.trim().ifBlank { MusicSourceIds.NETEASE }
+        val sources = _config.value.sources.toMutableMap()
+        HomeSectionId.entries
+            .filter { it != HomeSectionId.CONTINUE }
+            .forEach { sources[it] = normalized }
+        prefs.edit {
+            putString(KEY_MAIN_SOURCE, normalized)
+            putString(KEY_SOURCES, encodeSources(sources))
+        }
+        _config.value = _config.value.copy(mainSourceId = normalized, sources = sources)
+    }
+
+    /** 记录 QQ 雷达卡片选择的模式，卡片播放与雷达分区都按此取数。 */
+    fun setQqRadarMode(mode: Int) {
+        val normalized = HomeLayoutConfig.normalizeRadarMode(mode)
+        if (normalized == _config.value.qqRadarMode) return
+        prefs.edit { putInt(KEY_QQ_RADAR_MODE, normalized) }
+        _config.value = _config.value.copy(qqRadarMode = normalized)
+    }
+
     private fun readConfig(): HomeLayoutConfig {
         val order = decodeOrder(prefs.getString(KEY_ORDER, null))
         val sources = decodeSources(prefs.getString(KEY_SOURCES, null))
-        return HomeLayoutConfig(order = order, sources = sources)
+        val mainSourceId = prefs.getString(KEY_MAIN_SOURCE, null)
+            ?.let(::migrateLegacySourceId)
+            ?: deriveMainSource(sources)
+        val qqRadarMode = HomeLayoutConfig.normalizeRadarMode(
+            prefs.getInt(KEY_QQ_RADAR_MODE, HomeLayoutConfig.RADAR_MODE_DEFAULT)
+        )
+        return HomeLayoutConfig(
+            order = order,
+            sources = sources,
+            mainSourceId = mainSourceId,
+            qqRadarMode = qqRadarMode
+        )
+    }
+
+    private fun deriveMainSource(sources: Map<HomeSectionId, String>): String {
+        val onlineSources = HomeSectionId.entries
+            .filter { it != HomeSectionId.CONTINUE }
+            .mapNotNull { sources[it] }
+            .distinct()
+        return onlineSources.singleOrNull() ?: MusicSourceIds.NETEASE
     }
 
     private fun encodeOrder(order: List<HomeSectionId>): String =
@@ -131,5 +183,7 @@ class HomeLayoutRepository(context: Context) {
         const val PREFS_NAME = "home_layout_preferences"
         const val KEY_ORDER = "section_order"
         const val KEY_SOURCES = "section_sources"
+        const val KEY_MAIN_SOURCE = "main_source"
+        const val KEY_QQ_RADAR_MODE = "qq_radar_mode"
     }
 }

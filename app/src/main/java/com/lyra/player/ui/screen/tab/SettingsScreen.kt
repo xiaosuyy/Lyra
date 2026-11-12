@@ -37,6 +37,7 @@ import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +56,8 @@ import com.lyra.player.ui.melox.theme.MeloxType
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.AltRoute
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.Brightness4
@@ -93,6 +96,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -120,9 +125,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import com.lyra.player.R
+import com.lyra.player.core.customsource.CustomSourceManager
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.download.ManagedDownloadStorage
+import com.lyra.player.core.source.MusicSourceCatalog
+import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.data.auth.common.SavedCookieAuthState
 import com.lyra.player.data.auth.youtube.YouTubeAuthState
 import com.lyra.player.data.settings.AdvancedBlurQuality
@@ -161,9 +169,10 @@ import com.lyra.player.ui.effect.glass.AdvancedGlassSurface
 import com.lyra.player.ui.effect.glass.LocalAdvancedGlassController
 import com.lyra.player.ui.effect.glass.isolatedAdvancedGlassHorizontalTransition
 import com.lyra.player.ui.screen.tab.settings.about.SettingsAboutContent
+import com.lyra.player.ui.screen.tab.settings.auth.AccountStackedCards
 import com.lyra.player.ui.screen.tab.settings.auth.LoginSuccessDialog
-import com.lyra.player.ui.screen.tab.settings.auth.NeteaseAccountEntryCard
 import com.lyra.player.ui.screen.tab.settings.auth.NeteaseLoginScreen
+import com.lyra.player.ui.screen.tab.settings.auth.QQMusicLoginScreen
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsBiliAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.auth.SettingsYouTubeAuthDialogs
 import com.lyra.player.ui.screen.tab.settings.component.LazyAnimatedVisibility
@@ -218,6 +227,7 @@ import com.lyra.player.ui.viewmodel.ConfigTransferViewModel
 import com.lyra.player.ui.viewmodel.auth.BiliAuthEvent
 import com.lyra.player.ui.viewmodel.auth.BiliAuthViewModel
 import com.lyra.player.ui.viewmodel.auth.NeteaseLoginViewModel
+import com.lyra.player.ui.viewmodel.auth.QQMusicLoginViewModel
 import com.lyra.player.ui.viewmodel.auth.YouTubeAuthEvent
 import com.lyra.player.ui.viewmodel.auth.YouTubeAuthViewModel
 import kotlin.math.absoluteValue
@@ -658,6 +668,17 @@ fun SettingsScreen(
     val neteaseLoginVm: NeteaseLoginViewModel = viewModel()
     val neteaseLoginUiState by neteaseLoginVm.uiState.collectAsStateWithLifecycleCompat()
     var showNeteaseLogin by rememberSaveable { mutableStateOf(false) }
+    val qqMusicLoginVm: QQMusicLoginViewModel = viewModel()
+    val qqMusicLoginUiState by qqMusicLoginVm.uiState.collectAsStateWithLifecycleCompat()
+    var showQqMusicLogin by rememberSaveable { mutableStateOf(false) }
+    var accountFrontIsQq by rememberSaveable { mutableStateOf(false) }
+    val homeLayoutConfig by AppContainer.homeLayoutRepository.config
+        .collectAsStateWithLifecycleCompat()
+    val declaredHomeSourceIds by CustomSourceManager.declaredSourceIds.collectAsState()
+    val qqHomeSourceReady = remember(declaredHomeSourceIds) {
+        MusicSourceCatalog.channelSources(declaredHomeSourceIds)
+            .any { it.id == MusicSourceIds.TENCENT && it.isReady }
+    }
     
     // 备份与恢复
     val backupRestoreVm: BackupRestoreViewModel = viewModel()
@@ -1155,16 +1176,23 @@ fun SettingsScreen(
                 onQueryChange = { settingsSearchQuery = it }
             )
         }
-        item(key = "settings_netease_account") {
+        item(key = "settings_account_cards") {
             Column(modifier = Modifier.animateItem()) {
                 MiuixSettingsSectionLabel(
                     text = stringResource(R.string.settings_group_account)
                 )
-                NeteaseAccountEntryCard(
-                    uiState = neteaseLoginUiState,
-                    onClick = {
+                AccountStackedCards(
+                    neteaseState = neteaseLoginUiState,
+                    qqState = qqMusicLoginUiState,
+                    frontIsQq = accountFrontIsQq,
+                    onFrontChange = { accountFrontIsQq = it },
+                    onOpenNetease = {
                         neteaseLoginVm.clearError()
                         showNeteaseLogin = true
+                    },
+                    onOpenQq = {
+                        qqMusicLoginVm.clearError()
+                        showQqMusicLogin = true
                     }
                 )
             }
@@ -1369,6 +1397,11 @@ fun SettingsScreen(
                                 scope = scope,
                                 defaultStartDestinationLabel = defaultStartDestinationLabel,
                                 onOpenDefaultStartDestination = { showDefaultStartDestinationDialog = true },
+                                homeSourceId = homeLayoutConfig.mainSourceId,
+                                qqHomeSourceAvailable = qqHomeSourceReady,
+                                onSelectHomeSource = {
+                                    AppContainer.homeLayoutRepository.setMainSource(it)
+                                },
                                 backgroundImageUri = backgroundImageUri,
                                 onPickBackgroundImage = {
                                     photoPickerLauncher.launch(
@@ -1881,6 +1914,20 @@ fun SettingsScreen(
             )
         }
     }
+    if (showQqMusicLogin) {
+        Dialog(
+            onDismissRequest = { showQqMusicLogin = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            QQMusicLoginScreen(
+                vm = qqMusicLoginVm,
+                onBack = { showQqMusicLogin = false }
+            )
+        }
+    }
     SettingsBiliAuthDialogs(
         showSheet = showBiliSheet,
         initialTab = biliSheetInitialTab,
@@ -2327,6 +2374,9 @@ private fun SettingsPersonalizationPageContent(
     scope: kotlinx.coroutines.CoroutineScope,
     defaultStartDestinationLabel: String,
     onOpenDefaultStartDestination: () -> Unit,
+    homeSourceId: String,
+    qqHomeSourceAvailable: Boolean,
+    onSelectHomeSource: (String) -> Unit,
     backgroundImageUri: String?,
     onPickBackgroundImage: () -> Unit,
     onClearBackgroundImage: () -> Unit,
@@ -2390,6 +2440,12 @@ private fun SettingsPersonalizationPageContent(
                 highlightPulse = highlightPulse,
                 onHighlightFinished = onHighlightFinished,
                 onClick = onOpenDefaultStartDestination
+            )
+
+            HomeRecommendationSourceSetting(
+                mainSourceId = homeSourceId,
+                qqAvailable = qqHomeSourceAvailable,
+                onSelect = onSelectHomeSource
             )
 
             PersonalizationSwitchItem(
@@ -2976,5 +3032,127 @@ private fun SettingsLoginExpandedContent(
             modifier = Modifier.settingsItemClickable { },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
+    }
+}
+
+@Composable
+private fun HomeRecommendationSourceSetting(
+    mainSourceId: String,
+    qqAvailable: Boolean,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        CustomSourceManager.ensureLoaded(context.applicationContext)
+    }
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val isQq = mainSourceId == MusicSourceIds.TENCENT
+    val currentLabel = stringResource(
+        if (isQq) R.string.settings_home_source_qq else R.string.settings_home_source_netease
+    )
+    Column(modifier = modifier) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_home_source_title)) },
+            leadingContent = {
+                Icon(
+                    imageVector = Icons.Outlined.Home,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            trailingContent = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = currentLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(
+                        imageVector = Icons.Filled.ExpandMore,
+                        contentDescription = stringResource(
+                            if (expanded) R.string.action_collapse else R.string.action_expand
+                        ),
+                        modifier = Modifier
+                            .size(20.dp)
+                            .rotate(if (expanded) 180f else 0f),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            modifier = Modifier.settingsItemClickable { expanded = !expanded },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+        LazyAnimatedVisibility(visible = expanded) {
+            Column(modifier = Modifier.padding(bottom = 6.dp)) {
+                HomeSourceOptionRow(
+                    label = stringResource(R.string.settings_home_source_netease),
+                    selected = !isQq,
+                    enabled = true,
+                    onClick = {
+                        expanded = false
+                        if (isQq) onSelect(MusicSourceIds.NETEASE)
+                    }
+                )
+                HomeSourceOptionRow(
+                    label = stringResource(R.string.settings_home_source_qq),
+                    selected = isQq,
+                    enabled = qqAvailable,
+                    onClick = {
+                        expanded = false
+                        if (!isQq) onSelect(MusicSourceIds.TENCENT)
+                    }
+                )
+                if (!qqAvailable) {
+                    Text(
+                        text = stringResource(R.string.settings_home_source_qq_unavailable),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 56.dp, end = 16.dp, bottom = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSourceOptionRow(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(start = 48.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (enabled) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            }
+        )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }

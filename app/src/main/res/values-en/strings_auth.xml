@@ -150,4 +150,16 @@
     <string name="login_paste_bili_cookie_hint">Paste Cookie (e.g.: SESSDATA=…; bili_jct=…)</string>
     <string name="login_paste_youtube_cookie_hint">Paste Cookie or browser request headers (must include Cookie)</string>
     <string name="settings_cookie_input_hint">Please enter Cookie</string>
+    <string name="account_entry_tap_to_login">Tap to sign in</string>
+    <string name="qq_login_entry_title">Sign in to QQ Music</string>
+    <string name="qq_login_logged_in">Signed in to QQ Music</string>
+    <string name="qq_login_screen_title">Sign in to QQ Music</string>
+    <string name="qq_login_screen_desc">Sign in with QQ or WeChat to see your QQ Music profile on the account card.</string>
+    <string name="qq_login_web_button">Sign in with QQ / WeChat</string>
+    <string name="qq_login_web_hint">Opens the official QQ Music page. After you scan the code or sign in, the app returns automatically.</string>
+    <string name="qq_login_privacy_note">Sign-in information is stored only in this app to read your profile.</string>
+    <string name="qq_login_cookie_incomplete">Incomplete QQ Music sign-in information, please try again</string>
+    <string name="qq_login_failed">Sign-in failed: %s</string>
+    <string name="qq_login_logout">Sign out of QQ Music</string>
+    <string name="qq_web_login">QQ Music Sign-in</string>
 </resources>

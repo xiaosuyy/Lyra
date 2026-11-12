@@ -68,4 +68,30 @@
     <string name="home_heart_mode_no_liked_playlist">Couldn\'t find "My Favorite Music"</string>
     <string name="home_heart_mode_empty_likes">No liked songs yet</string>
     <string name="home_heart_mode_empty">Heart Mode has no recommendations right now</string>
+
+    <!-- Home source switch / QQ Music home -->
+    <string name="settings_home_source_title">Home source</string>
+    <string name="settings_home_source_netease">Netease Cloud Music</string>
+    <string name="settings_home_source_qq">QQ Music</string>
+    <string name="settings_home_source_qq_unavailable">QQ Music source is not enabled</string>
+    <string name="home_qq_for_you">Made for you</string>
+    <string name="home_qq_toplist">Charts</string>
+    <string name="home_qq_daily_songs">Daily 30</string>
+    <string name="home_qq_radar">Radar</string>
+    <string name="home_qq_radar_eyebrow">Picked for you</string>
+    <string name="home_qq_radar_subtitle">Keeps updating with your listening taste</string>
+    <string name="home_qq_radar_mode_explore">Explore</string>
+    <string name="home_qq_radar_mode_default">Default</string>
+    <string name="home_qq_radar_mode_familiar">Familiar</string>
+    <string name="home_qq_radar_eyebrow_explore">Explore radar</string>
+    <string name="home_qq_radar_subtitle_explore">Branch out to tracks you haven\'t heard</string>
+    <string name="home_qq_radar_eyebrow_familiar">Familiar taste</string>
+    <string name="home_qq_radar_subtitle_familiar">Artists you replay and similar picks</string>
+    <string name="home_qq_roam">Personal roam</string>
+    <string name="home_qq_new_songs">New releases</string>
+    <string name="home_qq_new_eyebrow">Fresh daily</string>
+    <string name="home_qq_new_subtitle">Be the first to hear new songs</string>
+    <string name="home_qq_recommend_playlists">Recommended playlists</string>
+    <string name="home_qq_login_required">Please sign in to QQ Music first</string>
+    <string name="home_qq_load_failed">QQ Music recommendations are unavailable right now</string>
 </resources>
