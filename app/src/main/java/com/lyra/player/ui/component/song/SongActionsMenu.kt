@@ -77,7 +77,8 @@ internal data class SongActionMenuItem(
 internal fun SongActionsMenu(
     expanded: Boolean,
     actions: List<SongActionMenuItem>,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    opaque: Boolean = false
 ) {
     val transitionState = remember { MutableTransitionState(false) }
     transitionState.targetState = expanded
@@ -146,7 +147,11 @@ internal fun SongActionsMenu(
                     .width(menuWidth)
                     .heightIn(max = 360.dp),
                 shape = shape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.84f),
+                color = if (opaque) {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.84f)
+                },
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,

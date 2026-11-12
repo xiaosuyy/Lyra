@@ -37,11 +37,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.lyra.player.R
 import com.lyra.player.core.di.AppContainer
+import com.lyra.player.core.api.search.CustomChannelSong
 import com.lyra.player.core.download.DownloadedSong
 import com.lyra.player.core.download.GlobalDownloadManager
+import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.data.local.audioimport.LocalAudioImportManager
 import com.lyra.player.data.local.audioimport.LocalAudioImportResult
+import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
 import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
 import com.lyra.player.data.local.playlist.model.LocalPlaylist
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
@@ -56,6 +60,10 @@ import com.lyra.player.data.model.SongItem
 import com.lyra.player.data.model.identity
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.core.logging.LyraLogger
+import com.lyra.player.ui.viewmodel.tab.parseNeteaseHomeSongs
+import com.lyra.player.ui.viewmodel.tab.parseNeteaseLikedPlaylistId
+import com.lyra.player.ui.viewmodel.tab.toSongItem
+import org.json.JSONObject
 import java.util.Locale
 
 data class LocalPlaylistDetailUiState(
@@ -88,6 +96,23 @@ data class LocalScanPreviewState(
     val hideDuplicateMetadataSongs: Boolean = false,
     val duplicateMetadataKeys: Set<String> = emptySet(),
     val selectedKeys: Set<String> = emptySet()
+)
+
+/** 我喜欢的音乐里可参与导入 / 同步的已登录账号。 */
+data class FavoritesChannelAccountInfo(
+    val channelId: String,
+    val displayName: String,
+    val avatarUrl: String?
+)
+
+data class FavoritesChannelActionResult(
+    val channelId: String,
+    val added: Int = 0,
+    val skippedExisting: Int = 0,
+    val skippedUnsupported: Int = 0,
+    val failed: Int = 0,
+    val message: String? = null,
+    val error: String? = null
 )
 
 internal fun scannedSongKeysAlreadyInLocalPlaylists(
@@ -194,6 +219,7 @@ data class LocalMetadataProcessingState(
 class LocalPlaylistDetailViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         const val TAG = "LocalPlaylistScanVM"
+        const val MAX_IMPORT_SONGS = 5_000
     }
 
     private val app = application
@@ -587,6 +613,252 @@ class LocalPlaylistDetailViewModel(application: Application) : AndroidViewModel(
             )
             onResult(result)
         }
+    }
+
+    fun loadFavoritesLinkedAccounts(onResult: (List<FavoritesChannelAccountInfo>) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val accounts = buildList {
+                val netease = AppContainer.neteaseClient
+                if (runCatching { netease.hasLogin() }.getOrDefault(false)) {
+                    val profile = runCatching {
+                        JSONObject(netease.getCurrentUserAccount()).optJSONObject("profile")
+                    }.getOrNull()
+                    val nickname = profile?.optString("nickname")?.trim().orEmpty()
+                    val avatar = profile?.optString("avatarUrl")
+                        .orEmpty()
+                        .ifBlank { profile?.optString("avatarImgUrl").orEmpty() }
+                        .trim()
+                    add(
+                        FavoritesChannelAccountInfo(
+                            channelId = MusicSourceIds.NETEASE,
+                            displayName = nickname.ifBlank {
+                                app.getString(R.string.settings_home_source_netease)
+                            },
+                            avatarUrl = avatar.takeIf { it.isNotBlank() }
+                        )
+                    )
+                }
+                val qqSession = AppContainer.qqMusicSessionRepo.getSessionOnce()
+                if (qqSession.isLoggedIn) {
+                    val profile = runCatching {
+                        AppContainer.qqMusicAccountClient.fetchProfile(
+                            cookie = qqSession.cookie,
+                            uin = qqSession.uin,
+                            musicKey = qqSession.musicKey
+                        )
+                    }.getOrNull()
+                    add(
+                        FavoritesChannelAccountInfo(
+                            channelId = MusicSourceIds.TENCENT,
+                            displayName = profile?.nickname?.takeIf { it.isNotBlank() }
+                                ?: app.getString(R.string.library_tab_qqmusic),
+                            avatarUrl = profile?.avatarUrl
+                        )
+                    )
+                }
+            }
+            withContext(Dispatchers.Main) { onResult(accounts) }
+        }
+    }
+
+    fun importFavoritesFromChannels(
+        channelIds: Set<String>,
+        onResult: (List<FavoritesChannelActionResult>) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val results = channelIds.map { channelId ->
+                runCatching {
+                    when (channelId) {
+                        MusicSourceIds.NETEASE -> importNeteaseLikedSongs()
+                        MusicSourceIds.TENCENT -> importQQMusicLikedSongs()
+                        else -> FavoritesChannelActionResult(
+                            channelId = channelId,
+                            error = "unsupported channel"
+                        )
+                    }
+                }.getOrElse { error ->
+                    LyraLogger.e(TAG, "import favorites from $channelId failed", error)
+                    FavoritesChannelActionResult(
+                        channelId = channelId,
+                        error = error.message ?: error::class.java.simpleName
+                    )
+                }
+            }
+            withContext(Dispatchers.Main) { onResult(results) }
+        }
+    }
+
+    fun pushFavoritesToChannels(
+        channelIds: Set<String>,
+        songs: List<SongItem>,
+        onResult: (List<FavoritesChannelActionResult>) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val results = channelIds.map { channelId ->
+                runCatching {
+                    when (channelId) {
+                        MusicSourceIds.NETEASE -> pushFavoritesToNetease(songs)
+                        MusicSourceIds.TENCENT -> pushFavoritesToQQMusic(songs)
+                        else -> FavoritesChannelActionResult(
+                            channelId = channelId,
+                            error = "unsupported channel"
+                        )
+                    }
+                }.getOrElse { error ->
+                    LyraLogger.e(TAG, "push favorites to $channelId failed", error)
+                    FavoritesChannelActionResult(
+                        channelId = channelId,
+                        error = error.message ?: error::class.java.simpleName
+                    )
+                }
+            }
+            withContext(Dispatchers.Main) { onResult(results) }
+        }
+    }
+
+    private suspend fun importNeteaseLikedSongs(): FavoritesChannelActionResult {
+        val client = AppContainer.neteaseClient
+        if (!client.hasLogin()) {
+            return FavoritesChannelActionResult(
+                channelId = MusicSourceIds.NETEASE,
+                error = getApplication<Application>().getString(R.string.playback_login_required)
+            )
+        }
+        var raw = client.getLikedPlaylistId(0)
+        var likedPlaylistId = parseNeteaseLikedPlaylistId(raw)
+        if (likedPlaylistId == null && JSONObject(raw).optInt("code", -1) == 301) {
+            runCatching { client.ensureWeapiSession() }
+            raw = client.getLikedPlaylistId(0)
+            likedPlaylistId = parseNeteaseLikedPlaylistId(raw)
+        }
+        if (likedPlaylistId == null) {
+            return FavoritesChannelActionResult(
+                channelId = MusicSourceIds.NETEASE,
+                error = "无法读取网易云「我喜欢的音乐」"
+            )
+        }
+        val songs = parseNeteaseHomeSongs(client.getPlaylistDetail(likedPlaylistId))
+        if (songs.isEmpty()) {
+            return FavoritesChannelActionResult(channelId = MusicSourceIds.NETEASE)
+        }
+        val added = repo.addSongsToPlaylistWithResult(
+            playlistId = FavoritesPlaylist.SYSTEM_ID,
+            songs = songs
+        ).addedCount
+        return FavoritesChannelActionResult(
+            channelId = MusicSourceIds.NETEASE,
+            added = added,
+            skippedExisting = (songs.size - added).coerceAtLeast(0)
+        )
+    }
+
+    private suspend fun importQQMusicLikedSongs(): FavoritesChannelActionResult {
+        val session = AppContainer.qqMusicSessionRepo.getSessionOnce()
+        if (!session.isLoggedIn) {
+            return FavoritesChannelActionResult(
+                channelId = MusicSourceIds.TENCENT,
+                error = getApplication<Application>().getString(R.string.playback_login_required)
+            )
+        }
+        val client = AppContainer.qqMusicFavoriteClient
+        val allSongs = ArrayList<CustomChannelSong>()
+        var begin = 0
+        var total = Int.MAX_VALUE
+        while (begin < total && allSongs.size < MAX_IMPORT_SONGS) {
+            val page = client.fetchLikedSongs(session, songBegin = begin)
+            if (page.songs.isEmpty()) break
+            allSongs += page.songs
+            begin += page.songs.size
+            total = page.total
+        }
+        if (allSongs.isEmpty()) {
+            return FavoritesChannelActionResult(channelId = MusicSourceIds.TENCENT)
+        }
+        val app = getApplication<Application>()
+        val songItems = allSongs.map { it.toSongItem(app, MusicSourceIds.TENCENT) }
+        val added = repo.addSongsToPlaylistWithResult(
+            playlistId = FavoritesPlaylist.SYSTEM_ID,
+            songs = songItems
+        ).addedCount
+        return FavoritesChannelActionResult(
+            channelId = MusicSourceIds.TENCENT,
+            added = added,
+            skippedExisting = (songItems.size - added).coerceAtLeast(0)
+        )
+    }
+
+    private suspend fun pushFavoritesToNetease(songs: List<SongItem>): FavoritesChannelActionResult {
+        val client = AppContainer.neteaseClient
+        if (!client.hasLogin()) {
+            return FavoritesChannelActionResult(
+                channelId = MusicSourceIds.NETEASE,
+                error = getApplication<Application>().getString(R.string.playback_login_required)
+            )
+        }
+        val result = repo.syncSongsToNeteaseLiked(client, songs)
+        return FavoritesChannelActionResult(
+            channelId = MusicSourceIds.NETEASE,
+            added = result.added,
+            skippedExisting = result.skippedExisting,
+            skippedUnsupported = result.skippedUnsupported,
+            failed = result.failed,
+            message = result.message
+        )
+    }
+
+    private suspend fun pushFavoritesToQQMusic(songs: List<SongItem>): FavoritesChannelActionResult {
+        val session = AppContainer.qqMusicSessionRepo.getSessionOnce()
+        if (!session.isLoggedIn) {
+            return FavoritesChannelActionResult(
+                channelId = MusicSourceIds.TENCENT,
+                error = getApplication<Application>().getString(R.string.playback_login_required)
+            )
+        }
+        val supported = songs.filter {
+            it.channelId.equals(MusicSourceIds.TENCENT, ignoreCase = true) &&
+                !it.audioId.isNullOrBlank()
+        }
+        if (supported.isEmpty()) {
+            return FavoritesChannelActionResult(channelId = MusicSourceIds.TENCENT)
+        }
+        val client = AppContainer.qqMusicFavoriteClient
+        val existingMids = runCatching { fetchAllQQMusicLikedMids(session) }
+            .onFailure { LyraLogger.w(TAG, "read QQ liked mids failed: ${it.message}") }
+            .getOrNull()
+        val pending = if (existingMids == null) {
+            supported
+        } else {
+            supported.filter { it.audioId !in existingMids }
+        }
+        val write = client.addFavorites(
+            session = session,
+            songMids = pending.mapNotNull { it.audioId }
+        )
+        return FavoritesChannelActionResult(
+            channelId = MusicSourceIds.TENCENT,
+            added = write.added,
+            skippedExisting = supported.size - pending.size,
+            skippedUnsupported = songs.size - supported.size,
+            failed = write.failed
+        )
+    }
+
+    private suspend fun fetchAllQQMusicLikedMids(
+        session: com.lyra.player.data.auth.qqmusic.QQMusicSession
+    ): Set<String> {
+        val client = AppContainer.qqMusicFavoriteClient
+        val mids = LinkedHashSet<String>()
+        var begin = 0
+        var total = Int.MAX_VALUE
+        while (begin < total && mids.size < MAX_IMPORT_SONGS) {
+            val page = client.fetchLikedSongs(session, songBegin = begin)
+            if (page.songs.isEmpty()) break
+            page.songs.mapNotNullTo(mids) { it.platformId.takeIf(String::isNotBlank) }
+            begin += page.songs.size
+            total = page.total
+        }
+        return mids
     }
 
     private fun isActiveScanSession(sessionId: Long, currentJob: Job): Boolean {

@@ -48,6 +48,16 @@
     <string name="local_playlist_sync_netease_empty">Favorites are empty. Nothing to sync.</string>
     <string name="local_playlist_sync_netease_no_supported">No songs available to sync.</string>
     <string name="local_playlist_sync_netease_all_synced">Already synced to NetEase. Nothing to update.</string>
+    <string name="local_playlist_channel_import">Import</string>
+    <string name="local_playlist_channel_sync">Sync</string>
+    <string name="local_playlist_channel_import_title">Import from which platform?</string>
+    <string name="local_playlist_channel_sync_title">Sync to which platform?</string>
+    <string name="local_playlist_channel_no_account">No account signed in. Sign in to NetEase Music or QQ Music in Settings first.</string>
+    <string name="local_playlist_channel_loading_account">Loading accounts…</string>
+    <string name="local_playlist_channel_import_result">Import finished: %1$d added, %2$d already existed</string>
+    <string name="local_playlist_channel_import_empty">The other side has no favorites to import.</string>
+    <string name="local_playlist_channel_sync_result">Sync finished: %1$d added, %2$d existing/skipped, %3$d failed</string>
+    <string name="local_playlist_channel_action_failed">Action failed: %1$s</string>
     <string name="local_playlist_sync_selected">Sync selected (%d)</string>
     <string name="local_playlist_sync_search">Search syncable songs</string>
     <string name="local_playlist_sync_empty">No songs available to sync.</string>

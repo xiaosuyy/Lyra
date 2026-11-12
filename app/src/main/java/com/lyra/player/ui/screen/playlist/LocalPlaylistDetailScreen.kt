@@ -81,9 +81,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.StarBorder
@@ -214,6 +217,9 @@ import com.lyra.player.ui.util.rememberSongDisplayCoverUrl
 import com.lyra.player.ui.viewmodel.playlist.LocalPlaylistDetailViewModel
 import com.lyra.player.ui.viewmodel.playlist.LocalPlaylistDetailUiState
 import com.lyra.player.ui.viewmodel.playlist.LocalMetadataProcessingState
+import com.lyra.player.ui.viewmodel.playlist.FavoritesChannelAccountInfo
+import com.lyra.player.ui.viewmodel.playlist.FavoritesChannelActionResult
+import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.util.media.fastScrollableImageRequest
 import com.lyra.player.ui.haptic.HapticIconButton
@@ -519,11 +525,6 @@ fun LocalPlaylistDetailScreen(
             }
             val scope = rememberCoroutineScope()
             var syncInProgress by remember { mutableStateOf(false) }
-            var showNeteaseSyncConfirm by remember { mutableStateOf(false) }
-            var showNeteaseSyncPreview by remember { mutableStateOf(false) }
-            var neteaseSyncPreviewSongs by remember { mutableStateOf<List<SongItem>>(emptyList()) }
-            var neteaseSyncPreviewQuery by rememberSaveable { mutableStateOf("") }
-            var neteaseSyncSelectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
             var showNeteaseRemotePlaylistPicker by remember { mutableStateOf(false) }
             var neteaseRemotePlaylists by remember {
                 mutableStateOf<List<NeteaseRemotePlaylist>>(emptyList())
@@ -536,6 +537,16 @@ fun LocalPlaylistDetailScreen(
             var pendingNeteaseRemoteSyncConfirm by remember {
                 mutableStateOf<PendingNeteaseRemotePlaylistSync?>(null)
             }
+            var showFavoritesMoreMenu by remember { mutableStateOf(false) }
+            var showFavoritesChannelPicker by remember { mutableStateOf(false) }
+            var favoritesPickerMode by remember {
+                mutableStateOf(FavoritesChannelPickerMode.IMPORT)
+            }
+            var favoritesLinkedAccounts by remember {
+                mutableStateOf<List<FavoritesChannelAccountInfo>>(emptyList())
+            }
+            var favoritesAccountsLoading by remember { mutableStateOf(false) }
+            var favoritesSelectedChannels by remember { mutableStateOf<Set<String>>(emptySet()) }
 
 
 
@@ -918,22 +929,65 @@ fun LocalPlaylistDetailScreen(
                 }
             }
 
-            fun syncSelectedNeteaseSongs() {
-                if (syncInProgress) return
-                val selectedSongs = neteaseSyncPreviewSongs.filter {
-                    it.stableKey() in neteaseSyncSelectedKeys
-                }
-                if (selectedSongs.isEmpty()) return
-                syncInProgress = true
-                vm.syncSongsToNeteaseLiked(selectedSongs) { result ->
-                    showNeteaseSyncPreview = false
-                    handleNeteaseSyncResult(result)
+            fun favoritesChannelLabel(channelId: String): String = when (channelId) {
+                MusicSourceIds.NETEASE ->
+                    composeResources.getString(R.string.settings_home_source_netease)
+                else -> composeResources.getString(R.string.library_tab_qqmusic)
+            }
+
+            fun openFavoritesChannelPicker(mode: FavoritesChannelPickerMode) {
+                favoritesPickerMode = mode
+                favoritesSelectedChannels = emptySet()
+                favoritesLinkedAccounts = emptyList()
+                favoritesAccountsLoading = true
+                showFavoritesChannelPicker = true
+                vm.loadFavoritesLinkedAccounts { accounts ->
+                    favoritesAccountsLoading = false
+                    favoritesLinkedAccounts = accounts
+                    favoritesSelectedChannels = accounts.map { it.channelId }.toSet()
                 }
             }
 
-            fun openNeteaseSyncPreview() {
-                val allSongs = playlist.songs
-                if (allSongs.isEmpty()) {
+            fun reportFavoritesActionResults(
+                results: List<FavoritesChannelActionResult>,
+                mode: FavoritesChannelPickerMode
+            ) {
+                syncInProgress = false
+                if (results.isEmpty()) return
+                val message = results.joinToString("；") { result ->
+                    val body = when {
+                        result.error != null -> composeResources.getString(
+                            R.string.local_playlist_channel_action_failed,
+                            result.error
+                        )
+                        mode == FavoritesChannelPickerMode.IMPORT &&
+                            result.added == 0 && result.skippedExisting == 0 ->
+                            composeResources.getString(R.string.local_playlist_channel_import_empty)
+                        mode == FavoritesChannelPickerMode.IMPORT ->
+                            composeResources.getString(
+                                R.string.local_playlist_channel_import_result,
+                                result.added,
+                                result.skippedExisting
+                            )
+                        result.message != null -> result.message
+                        else -> composeResources.getString(
+                            R.string.local_playlist_channel_sync_result,
+                            result.added,
+                            result.skippedExisting + result.skippedUnsupported,
+                            result.failed
+                        )
+                    }
+                    "${favoritesChannelLabel(result.channelId)} $body"
+                }
+                scope.launch { snackbarHostState.showNeriSnackbar(message) }
+            }
+
+            fun confirmFavoritesChannelPicker() {
+                val channels = favoritesSelectedChannels
+                if (channels.isEmpty() || syncInProgress) return
+                val mode = favoritesPickerMode
+                showFavoritesChannelPicker = false
+                if (mode == FavoritesChannelPickerMode.SYNC && playlist.songs.isEmpty()) {
                     scope.launch {
                         snackbarHostState.showNeriSnackbar(
                             composeResources.getString(R.string.local_playlist_sync_netease_empty)
@@ -941,29 +995,46 @@ fun LocalPlaylistDetailScreen(
                     }
                     return
                 }
-                if (syncInProgress) return
                 syncInProgress = true
-                scope.launch {
-                    val plan = repo.prepareNeteaseLikeSyncPlan(
-                        AppContainer.neteaseClient,
-                        allSongs
-                    )
-                    syncInProgress = false
-                    if (plan.pendingSongs.isEmpty()) {
-                        snackbarHostState.showNeriSnackbar(
-                            plan.message ?: composeResources.getString(R.string.local_playlist_sync_netease_all_synced)
-                        )
-                        return@launch
+                if (mode == FavoritesChannelPickerMode.IMPORT) {
+                    vm.importFavoritesFromChannels(channels) { results ->
+                        reportFavoritesActionResults(results, mode)
                     }
-                    neteaseSyncPreviewSongs = plan.pendingSongs
-                    neteaseSyncSelectedKeys = plan.pendingSongs.map { it.stableKey() }.toSet()
-                    neteaseSyncPreviewQuery = ""
-                    showNeteaseSyncPreview = true
+                } else {
+                    vm.pushFavoritesToChannels(channels, playlist.songs) { results ->
+                        reportFavoritesActionResults(results, mode)
+                    }
                 }
             }
 
-            fun requestNeteaseSync() {
-                showNeteaseSyncConfirm = true
+            val favoritesMoreActions = listOf(
+                SongActionMenuItem(
+                    label = composeResources.getString(R.string.local_playlist_channel_import),
+                    icon = Icons.Outlined.CloudDownload,
+                    onClick = { openFavoritesChannelPicker(FavoritesChannelPickerMode.IMPORT) }
+                ),
+                SongActionMenuItem(
+                    label = composeResources.getString(R.string.local_playlist_channel_sync),
+                    icon = Icons.Outlined.CloudUpload,
+                    onClick = { openFavoritesChannelPicker(FavoritesChannelPickerMode.SYNC) }
+                )
+            )
+            val pickerAccounts = favoritesLinkedAccounts.map { account ->
+                FavoritesChannelAccount(
+                    channelId = account.channelId,
+                    channelLabel = favoritesChannelLabel(account.channelId),
+                    displayName = account.displayName,
+                    avatarUrl = account.avatarUrl
+                )
+            }
+            fun toggleSearch() {
+                val openingSearch = !showSearch
+                if (!openingSearch) {
+                    searchQuery = ""
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                }
+                showSearch = openingSearch
             }
             val autoShowKeyboard by AppContainer.settingsRepo.autoShowKeyboardFlow.collectAsState(initial = false)
             val backgroundImageUri by AppContainer.settingsRepo.backgroundImageUriFlow.collectAsState(initial = null)
@@ -1452,28 +1523,6 @@ fun LocalPlaylistDetailScreen(
                 return@Surface
             }
 
-            if (showNeteaseSyncPreview) {
-                LocalScanPreviewScreen(
-                    isScanning = false,
-                    songs = neteaseSyncPreviewSongs,
-                    query = neteaseSyncPreviewQuery,
-                    onQueryChange = { neteaseSyncPreviewQuery = it },
-                    selectedKeys = neteaseSyncSelectedKeys,
-                    onSelectedKeysChange = { neteaseSyncSelectedKeys = it },
-                    snackbarHostState = snackbarHostState,
-                    onBack = { showNeteaseSyncPreview = false },
-                    onImport = { syncSelectedNeteaseSongs() },
-                    title = stringResource(R.string.local_playlist_sync_netease_preview_title),
-                    actionLabel = { count ->
-                        composeResources.getString(R.string.local_playlist_sync_selected, count)
-                    },
-                    searchPlaceholder = stringResource(R.string.local_playlist_sync_search),
-                    emptyText = stringResource(R.string.local_playlist_sync_empty),
-                    isBusy = syncInProgress
-                )
-                return@Surface
-            }
-
             PlaylistModernVisualColorsProvider(
                 coverUrl = headerCover,
                 offlineMode = offlineMode
@@ -1616,15 +1665,47 @@ fun LocalPlaylistDetailScreen(
                                 }
                             },
                             actions = {
-                                PlaylistModernTopBarCircleButton(onClick = {
-                                    val openingSearch = !showSearch
-                                    if (!openingSearch) {
-                                        searchQuery = ""
-                                        focusManager.clearFocus()
-                                        keyboardController?.hide()
+                                if (isFavorites) {
+                                    PlaylistModernTopBarPill {
+                                        PlaylistModernPillIconButton(onClick = { toggleSearch() }) {
+                                            Icon(
+                                                Icons.Filled.Search,
+                                                contentDescription = stringResource(R.string.cd_search_songs)
+                                            )
+                                        }
+                                        Box {
+                                            PlaylistModernPillIconButton(
+                                                onClick = { showFavoritesMoreMenu = true },
+                                                enabled = !syncInProgress
+                                            ) {
+                                                if (syncInProgress) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(16.dp),
+                                                        strokeWidth = 2.dp
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        Icons.Filled.MoreHoriz,
+                                                        contentDescription = stringResource(R.string.action_more)
+                                                    )
+                                                }
+                                            }
+                                            SongActionsMenu(
+                                                expanded = showFavoritesMoreMenu,
+                                                actions = favoritesMoreActions,
+                                                onDismissRequest = { showFavoritesMoreMenu = false },
+                                                opaque = true
+                                            )
+                                        }
                                     }
-                                    showSearch = openingSearch
-                                }) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search_songs)) }
+                                } else {
+                                    PlaylistModernTopBarCircleButton(onClick = { toggleSearch() }) {
+                                        Icon(
+                                            Icons.Filled.Search,
+                                            contentDescription = stringResource(R.string.cd_search_songs)
+                                        )
+                                    }
+                                }
                                 
                                 if (hasDownloadManagerEntry) {
                                     Spacer(Modifier.width(8.dp))
@@ -1647,25 +1728,6 @@ fun LocalPlaylistDetailScreen(
                                             Icons.Outlined.LibraryMusic,
                                             contentDescription = stringResource(R.string.download_scan_local)
                                         )
-                                    }
-                                }
-                                if (isFavorites) {
-                                    Spacer(Modifier.width(8.dp))
-                                    PlaylistModernTopBarCircleButton(
-                                        onClick = { requestNeteaseSync() },
-                                        enabled = !syncInProgress
-                                    ) {
-                                        if (syncInProgress) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(20.dp),
-                                                strokeWidth = 2.dp
-                                            )
-                                        } else {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Sync,
-                                                contentDescription = stringResource(R.string.local_playlist_sync_netease_liked)
-                                            )
-                                        }
                                     }
                                 }
                                 
@@ -2589,24 +2651,30 @@ fun LocalPlaylistDetailScreen(
                     )
                 }
 
-                if (showNeteaseSyncConfirm) {
-                    AlertDialog(
-                        onDismissRequest = { showNeteaseSyncConfirm = false },
-                        title = { Text(stringResource(R.string.local_playlist_sync_netease_confirm_title)) },
-                        text = { Text(stringResource(R.string.local_playlist_sync_netease_confirm_message)) },
-                        confirmButton = {
-                            HapticTextButton(
-                                onClick = {
-                                    showNeteaseSyncConfirm = false
-                                    openNeteaseSyncPreview()
-                                }
-                            ) { Text(stringResource(R.string.action_confirm)) }
+                if (showFavoritesChannelPicker) {
+                    FavoritesChannelPickerDialog(
+                        title = stringResource(
+                            if (favoritesPickerMode == FavoritesChannelPickerMode.IMPORT) {
+                                R.string.local_playlist_channel_import_title
+                            } else {
+                                R.string.local_playlist_channel_sync_title
+                            }
+                        ),
+                        accounts = pickerAccounts,
+                        selectedChannels = favoritesSelectedChannels,
+                        loading = favoritesAccountsLoading,
+                        confirmEnabled = !favoritesAccountsLoading &&
+                            favoritesSelectedChannels.isNotEmpty() &&
+                            !syncInProgress,
+                        onToggleChannel = { channelId ->
+                            favoritesSelectedChannels = if (channelId in favoritesSelectedChannels) {
+                                favoritesSelectedChannels - channelId
+                            } else {
+                                favoritesSelectedChannels + channelId
+                            }
                         },
-                        dismissButton = {
-                            HapticTextButton(
-                                onClick = { showNeteaseSyncConfirm = false }
-                            ) { Text(stringResource(R.string.action_cancel)) }
-                        }
+                        onConfirm = { confirmFavoritesChannelPicker() },
+                        onDismissRequest = { showFavoritesChannelPicker = false }
                     )
                 }
 

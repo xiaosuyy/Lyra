@@ -48,6 +48,16 @@
     <string name="local_playlist_sync_netease_empty">收藏为空，无需同步</string>
     <string name="local_playlist_sync_netease_no_supported">没有可同步的歌曲</string>
     <string name="local_playlist_sync_netease_all_synced">已同步到网易云，无需重复同步</string>
+    <string name="local_playlist_channel_import">导入</string>
+    <string name="local_playlist_channel_sync">同步</string>
+    <string name="local_playlist_channel_import_title">从哪个平台导入？</string>
+    <string name="local_playlist_channel_sync_title">同步到哪个平台？</string>
+    <string name="local_playlist_channel_no_account">还没有登录账号，请先在设置中登录网易云音乐或 QQ 音乐</string>
+    <string name="local_playlist_channel_loading_account">正在读取账号…</string>
+    <string name="local_playlist_channel_import_result">导入完成：新增 %1$d 首，已存在 %2$d 首</string>
+    <string name="local_playlist_channel_import_empty">对方收藏为空，没有可导入的歌曲</string>
+    <string name="local_playlist_channel_sync_result">同步完成：新增 %1$d，已存在/跳过 %2$d，失败 %3$d</string>
+    <string name="local_playlist_channel_action_failed">操作失败：%1$s</string>
     <string name="local_playlist_sync_selected">同步选中 (%d)</string>
     <string name="local_playlist_sync_search">搜索可同步歌曲</string>
     <string name="local_playlist_sync_empty">没有可同步的歌曲</string>
