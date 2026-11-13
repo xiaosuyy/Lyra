@@ -2153,7 +2153,7 @@ object PlayerManager {
     ): String {
         val quality = preferredQuality.trim().lowercase().ifBlank { "exhigh" }
         return if (useFallbackNamespace) {
-            "netease-$songId-$quality-fallback-v1"
+            "netease-$songId-$quality-fallback-v2"
         } else {
             "netease-$songId-$quality"
         }

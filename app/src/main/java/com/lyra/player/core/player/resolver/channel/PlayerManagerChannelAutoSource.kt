@@ -29,8 +29,6 @@ private const val CHANNEL_NETEASE_TIMEOUT_MS = 6_000L
 private const val CHANNEL_NETEASE_SEARCH_TIMEOUT_MS = 4_000L
 private const val CHANNEL_NETEASE_SEARCH_LIMIT = 20
 private const val CHANNEL_TOTAL_TIMEOUT_MS = 14_000L
-private const val CHANNEL_PRIMARY_GRACE_MS = 5_000L
-private const val CHANNEL_FALLBACK_GRACE_MS = 5_000L
 
 private data class NeteaseSongCandidate(
     val id: Long,
@@ -65,7 +63,9 @@ internal suspend fun PlayerManager.getChannelSongAudioUrl(
 
     val startedAt = SystemClock.elapsedRealtime()
     val result = withTimeoutOrNull(CHANNEL_TOTAL_TIMEOUT_MS) {
-        preferPrimaryChannelAudioSource(
+        // 原平台与备用同曲并行竞速，谁先拿到可用直链就用谁；
+        // 备用同曲在返回前做一次轻量音频身份校验，避免换到另一段录音。
+        raceChannelAudioSources(
             script = {
                 getCustomSourceAudioUrl(
                     song = song,
@@ -75,7 +75,7 @@ internal suspend fun PlayerManager.getChannelSongAudioUrl(
                     timeoutMs = CHANNEL_CUSTOM_SOURCE_TIMEOUT_MS
                 )
             },
-            fallback = {
+            matched = {
                 raceChannelAudioSources(
                     script = {
                         tryResolveAutoCrossPlatformSource(song, sideEffects) ?: SongUrlResult.Failure
@@ -95,62 +95,6 @@ internal suspend fun PlayerManager.getChannelSongAudioUrl(
             "success=${result is SongUrlResult.Success}, 耗时=${SystemClock.elapsedRealtime() - startedAt}ms"
     )
     result
-}
-
-/**
- * 原平台音源优先：备用同曲只提前预热，原平台脚本成功时一律丢弃。
- *
- * 之前让两边抢跑，接替音源几乎总能先返回；但界面、歌词仍是原平台版本，
- * 实际播放的却是另一平台的录音，听感就成了「不是同一首歌」。
- * 原平台脚本长时间没有回音时按宽限期放行备用，避免一次取链卡十几秒。
- */
-internal suspend fun preferPrimaryChannelAudioSource(
-    script: suspend () -> SongUrlResult,
-    fallback: suspend () -> SongUrlResult,
-    primaryGraceMs: Long = CHANNEL_PRIMARY_GRACE_MS
-): SongUrlResult = coroutineScope {
-    val scriptTask = async { resolveChannelSourceSafely(script) }
-    val fallbackTask = async { resolveChannelSourceSafely(fallback) }
-    try {
-        val scriptResult = withTimeoutOrNull(primaryGraceMs) { scriptTask.await() }
-        if (scriptResult is SongUrlResult.Success) {
-            return@coroutineScope scriptResult
-        }
-        val fallbackResult = if (scriptResult == null) {
-            withTimeoutOrNull(CHANNEL_FALLBACK_GRACE_MS) { fallbackTask.await() }
-        } else {
-            fallbackTask.await()
-        }
-        when {
-            fallbackResult is SongUrlResult.Success -> {
-                LyraLogger.w(
-                    TAG,
-                    if (scriptResult == null) {
-                        "渠道歌曲原平台超时，改用备用同曲"
-                    } else {
-                        "渠道歌曲原平台取链失败，改用备用同曲"
-                    }
-                )
-                fallbackResult
-            }
-            scriptResult != null -> scriptResult
-            else -> scriptTask.await()
-        }
-    } finally {
-        scriptTask.cancel()
-        fallbackTask.cancel()
-    }
-}
-
-private suspend fun resolveChannelSourceSafely(
-    source: suspend () -> SongUrlResult
-): SongUrlResult = try {
-    source()
-} catch (error: CancellationException) {
-    throw error
-} catch (error: Exception) {
-    LyraLogger.w(TAG, "渠道歌曲取链异常: ${error.message}")
-    SongUrlResult.Failure
 }
 
 internal suspend fun raceChannelAudioSources(

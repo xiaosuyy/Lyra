@@ -21,6 +21,7 @@ import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.player.model.SongUrlResult
 import com.lyra.player.core.player.policy.refresh.RefreshResolverSideEffects
+import com.lyra.player.core.player.resolver.verifyRemoteAudioIdentity
 import com.lyra.player.core.player.url.getCustomSourceAudioUrl
 import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.data.model.SongItem
@@ -166,7 +167,7 @@ internal suspend fun PlayerManager.tryResolveAutoCrossPlatformSource(
             matches.forEach { match ->
                 launch {
                     val result = runCatching {
-                        resolveCrossPlatformMatch(match, sideEffects)
+                        resolveCrossPlatformMatch(match, song, sideEffects)
                     }.getOrElse { error ->
                         if (error is CancellationException) throw error
                         LyraLogger.w(
@@ -198,6 +199,7 @@ internal suspend fun PlayerManager.tryResolveAutoCrossPlatformSource(
 
 private suspend fun PlayerManager.resolveCrossPlatformMatch(
     match: CrossPlatformSourceMatch,
+    originalSong: SongItem,
     sideEffects: RefreshResolverSideEffects
 ): SongUrlResult? {
     val scriptSourceId = customSourceIdForChannelId(match.sourceId) ?: return null
@@ -209,6 +211,11 @@ private suspend fun PlayerManager.resolveCrossPlatformMatch(
         maxQualityAttempts = CROSS_PLATFORM_QUALITY_ATTEMPTS,
         timeoutMs = CROSS_PLATFORM_CANDIDATE_TIMEOUT_MS
     )
+    if (result is SongUrlResult.Success &&
+        !verifyRemoteAudioIdentity(AppContainer.sharedOkHttpClient, result.url, originalSong)
+    ) {
+        return null
+    }
     return if (result is SongUrlResult.Success) {
         result.copy(
             durationMs = match.candidate.durationMs.takeIf { it > 0L } ?: result.durationMs,
