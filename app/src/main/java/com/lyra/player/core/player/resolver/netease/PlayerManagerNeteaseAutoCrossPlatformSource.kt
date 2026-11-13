@@ -41,13 +41,11 @@ private val crossPlatformSourceIds = listOf(
     MusicSourceIds.TENCENT
 )
 
-/** 明显不是同一首歌的版本标记，命中直接排除 */
-private val crossPlatformRejectedMarkers = listOf(
-    "伴奏", "纯音乐", "instrumental", "karaoke", "翻唱", "cover", "dj版"
-)
-
 private val crossPlatformNonTextRegex = Regex("[^\\p{L}\\p{N}]+")
 private val crossPlatformWhitespaceRegex = Regex("\\s+")
+private val crossPlatformArtistSplitRegex =
+    Regex("[/、,，&＆;；]|\\b(?:feat|ft|with)\\b\\.?", RegexOption.IGNORE_CASE)
+private val crossPlatformArtistAliasRegex = Regex("[（(\\[【][^)）\\]】]*[)）\\]】]")
 
 internal data class CrossPlatformSourceMatch(
     val sourceId: String,
@@ -253,7 +251,10 @@ private fun buildCrossPlatformSong(match: CrossPlatformSourceMatch): SongItem {
 }
 
 /**
- * 打分规则：歌名必须命中，歌手必须命中，时长误差在容差内；三项全对才返回正分。
+ * 打分规则：歌名必须完全一致，歌手必须有一位命中，时长误差在容差内；三项全对才返回正分。
+ *
+ * 歌名不再用包含匹配：「100」会命中「100种生活」、「晴天」会命中「晴天 (Live)」，
+ * 换源后播出来的就不是同一首歌了。
  *
  * 返回 -1 表示这条候选不可用。
  */
@@ -265,20 +266,12 @@ internal fun scoreNeteaseAutoCrossPlatformCandidate(
 ): Int {
     val targetTitle = compactCrossPlatformText(song.originalName ?: song.name)
     val candidateTitle = compactCrossPlatformText(candidateName)
-    if (targetTitle.length < 2 || !candidateTitle.contains(targetTitle)) return -1
+    if (targetTitle.length < 2 || candidateTitle != targetTitle) return -1
 
-    val normalizedCandidateTitle = candidateTitle.lowercase()
-    if (crossPlatformRejectedMarkers.any { normalizedCandidateTitle.contains(it) }) return -1
-
-    val targetArtist = compactCrossPlatformText(song.originalArtist ?: song.artist)
-    if (targetArtist.isBlank()) return -1
-    val normalizedCandidateArtist = compactCrossPlatformText(candidateArtist)
-    if (normalizedCandidateArtist.isBlank()) return -1
-    if (!normalizedCandidateArtist.contains(targetArtist) &&
-        !targetArtist.contains(normalizedCandidateArtist)
-    ) {
-        return -1
-    }
+    val targetArtists = crossPlatformArtistTokens(song.originalArtist ?: song.artist)
+    val candidateArtists = crossPlatformArtistTokens(candidateArtist)
+    if (targetArtists.isEmpty() || candidateArtists.isEmpty()) return -1
+    if (targetArtists.none { it in candidateArtists }) return -1
 
     var durationScore = 10
     if (song.durationMs > 0L) {
@@ -292,8 +285,7 @@ internal fun scoreNeteaseAutoCrossPlatformCandidate(
         }
     }
 
-    val exactTitleBonus = if (candidateTitle == targetTitle) 20 else 0
-    return 100 + exactTitleBonus + durationScore
+    return 120 + durationScore
 }
 
 private fun normalizeCrossPlatformText(value: String): String {
@@ -304,4 +296,12 @@ private fun normalizeCrossPlatformText(value: String): String {
 
 private fun compactCrossPlatformText(value: String): String {
     return normalizeCrossPlatformText(value).replace(" ", "")
+}
+
+/** 多歌手按 / 、 & feat. 等切分后逐位比较，避免「周杰」命中「周杰伦」这类包含匹配 */
+private fun crossPlatformArtistTokens(value: String): List<String> {
+    val withoutAlias = crossPlatformArtistAliasRegex.replace(value, " ")
+    return withoutAlias.split(crossPlatformArtistSplitRegex)
+        .map { compactCrossPlatformText(it) }
+        .filter { it.isNotBlank() }
 }

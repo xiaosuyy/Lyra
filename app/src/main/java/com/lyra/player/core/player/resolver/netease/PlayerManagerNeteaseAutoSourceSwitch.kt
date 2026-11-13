@@ -250,15 +250,17 @@ private fun selectNeteaseAutoBiliPage(
     videoInfo: BiliClient.VideoBasicInfo
 ): BiliAutoSourcePageMatch? {
     val candidateScore = scoreNeteaseAutoBiliCandidate(song, candidate)
+    if (candidateScore < 0) return null
     return videoInfo.pages
         .filter { it.cid > 0L }
-        .map { page ->
+        .mapNotNull { page ->
             val pageScore = scoreNeteaseAutoBiliText(
                 song = song,
                 title = "${page.part} ${videoInfo.title}",
                 author = videoInfo.ownerName,
                 durationSec = page.durationSec
             )
+            if (pageScore < 0) return@mapNotNull null
             BiliAutoSourcePageMatch(
                 page = page,
                 score = candidateScore + pageScore
@@ -292,6 +294,14 @@ internal fun scoreNeteaseAutoBiliText(
     val titleHit = containsAutoSourceText(normalizedTitle, songTitle)
     val artistHit = containsAutoSourceText(normalizedTitle, songArtist) ||
         containsAutoSourceText(normalizedAuthor, songArtist)
+    // 歌手没命中时只有「标题完全一致 + 时长几乎一致」才放行，
+    // 否则同名不同曲的稿件会被当成同一首歌播放
+    if (songArtist.isNotBlank() && !artistHit) {
+        val exactTitle = normalizedTitle.replace(" ", "") == compactAutoSourceText(songTitle)
+        val durationMatches = song.durationMs > 0L && durationSec > 0 &&
+            (durationSec * 1000L - song.durationMs).absoluteValue <= 8_000L
+        if (!exactTitle || !durationMatches) return -1
+    }
 
     var score = 0
     if (titleHit) {

@@ -68,12 +68,60 @@ class PlayerManagerNeteaseAutoCrossPlatformSourceTest {
     }
 
     @Test
+    fun score_rejectsLongerTitleContainingTarget() {
+        val score = scoreNeteaseAutoCrossPlatformCandidate(
+            song = neteaseSong(),
+            candidateName = "父亲写的散文诗 (Live)",
+            candidateArtist = "许飞",
+            candidateDurationMs = 228_000L
+        )
+
+        assertEquals(-1, score)
+    }
+
+    @Test
+    fun score_rejectsPartialArtistName() {
+        val score = scoreNeteaseAutoCrossPlatformCandidate(
+            song = neteaseSong(),
+            candidateName = "父亲写的散文诗",
+            candidateArtist = "许",
+            candidateDurationMs = 228_000L
+        )
+
+        assertEquals(-1, score)
+    }
+
+    @Test
+    fun score_rejectsShortTitleMatchingLongerCandidate() {
+        val score = scoreNeteaseAutoCrossPlatformCandidate(
+            song = neteaseSong().copy(name = "100"),
+            candidateName = "100种生活",
+            candidateArtist = "许飞",
+            candidateDurationMs = 228_000L
+        )
+
+        assertEquals(-1, score)
+    }
+
+    @Test
     fun score_acceptsCandidateArtistWithExtraNames() {
         val score = scoreNeteaseAutoCrossPlatformCandidate(
             song = neteaseSong(),
             candidateName = "父亲写的散文诗",
             candidateArtist = "许飞 / 李健",
             candidateDurationMs = 229_000L
+        )
+
+        assertTrue(score > 0)
+    }
+
+    @Test
+    fun score_acceptsArtistAliasInParentheses() {
+        val score = scoreNeteaseAutoCrossPlatformCandidate(
+            song = neteaseSong(),
+            candidateName = "父亲写的散文诗",
+            candidateArtist = "许飞 (Xu Fei)",
+            candidateDurationMs = 228_000L
         )
 
         assertTrue(score > 0)
