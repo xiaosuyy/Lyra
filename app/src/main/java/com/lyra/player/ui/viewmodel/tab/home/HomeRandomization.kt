@@ -105,6 +105,7 @@ private fun HomeFeedGroup.randomizedBatch(
     baseSeed: Long,
     batchSize: Int
 ): HomeFeedGroup {
+    if (!batchRandomize) return this
     val random = Random(homeBatchSeed(baseSeed, context.generation, key))
     val randomizedSongs = if (songs.items.isNotEmpty()) {
         songs.copy(

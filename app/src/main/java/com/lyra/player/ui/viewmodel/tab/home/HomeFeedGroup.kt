@@ -54,6 +54,8 @@ internal data class HomeFeedGroup(
     val sourceId: String? = null,
     /** 刷新时是否整体轮换一屏（网易云分区的现有行为）。 */
     val rotateWithRefresh: Boolean = false,
+    /** 是否参与首页换批随机；排行榜等固定顺序内容设为 false。 */
+    val batchRandomize: Boolean = true,
     val songs: HomeSectionState<SongItem> = HomeSectionState(),
     val playlists: HomeSectionState<PlaylistSummary> = HomeSectionState()
 )

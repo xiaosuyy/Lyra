@@ -123,14 +123,20 @@ internal class QQMusicHomeFeedProvider(
     private suspend fun loadToplists(limit: Int): HomeFeedGroup? {
         val toplists = withContext(Dispatchers.IO) { client.getToplists() }
         if (toplists.isEmpty()) return null
+        val ordered = toplists.sortedBy { toplist ->
+            TOPLIST_PRIORITY.indexOf(toplist.name).let { rank ->
+                if (rank >= 0) rank else TOPLIST_PRIORITY.size
+            }
+        }
         return HomeFeedGroup(
             key = "qq:$sourceId:${HomeSectionId.RECOMMENDED.name}:TOPLIST",
             titleResId = R.string.home_qq_toplist,
             icon = HomeFeedIcon.EXPLORE,
             presentation = HomeFeedPresentation.PLAYLIST_GRID,
             sourceId = sourceId,
+            batchRandomize = false,
             playlists = HomeSectionState(
-                items = toplists.map { toplist ->
+                items = ordered.map { toplist ->
                     PlaylistSummary(
                         id = -toplist.id,
                         name = toplist.name,
@@ -179,5 +185,13 @@ internal class QQMusicHomeFeedProvider(
 
     private companion object {
         const val RECOMMEND_PLAYLIST_PAGE_CYCLE = 6
+
+        /** 首页排行榜展示顺序：热门综合榜在前，其余按服务端顺序补齐。 */
+        val TOPLIST_PRIORITY = listOf(
+            "热歌榜", "新歌榜", "飙升榜", "欧美榜", "国风热歌榜", "分享热度榜",
+            "流行指数榜", "内地榜", "香港地区榜", "台湾地区榜",
+            "美国公告牌榜", "韩国榜", "日本榜", "英国UK榜",
+            "说唱榜", "电音榜", "网络歌曲榜", "抖音热歌榜"
+        )
     }
 }

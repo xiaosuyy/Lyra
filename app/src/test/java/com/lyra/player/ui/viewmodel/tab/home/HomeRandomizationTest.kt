@@ -2,6 +2,8 @@ package com.lyra.player.ui.viewmodel.tab.home
 
 import kotlin.random.Random
 import com.lyra.player.data.settings.HomeSectionId
+import com.lyra.player.ui.viewmodel.tab.HomeSectionState
+import com.lyra.player.ui.viewmodel.tab.PlaylistSummary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -122,5 +124,37 @@ class HomeRandomizationTest {
         assertEquals(5, store.size())
         assertTrue("id10" in store.snapshot())
         assertFalse("id1" in store.snapshot())
+    }
+
+    @Test
+    fun fixedOrderGroupsSkipBatchRandomization() {
+        fun allPlaylists(): HomeSectionState<PlaylistSummary> = HomeSectionState(
+            items = (1L..10L).map { id ->
+                PlaylistSummary(
+                    id = id,
+                    name = "playlist$id",
+                    picUrl = "",
+                    playCount = 0L,
+                    trackCount = 0
+                )
+            }
+        )
+        val toplist = HomeFeedGroup(
+            key = "qq:tencent:RECOMMENDED:TOPLIST",
+            titleResId = 0,
+            icon = HomeFeedIcon.EXPLORE,
+            presentation = HomeFeedPresentation.PLAYLIST_GRID,
+            batchRandomize = false,
+            playlists = allPlaylists()
+        )
+        val rotating = toplist.copy(key = "qq:tencent:RECOMMENDED", batchRandomize = true)
+        val groups = applyHomeRandomization(
+            merged = mapOf(HomeSectionId.RECOMMENDED to listOf(toplist, rotating)),
+            context = HomeBatchContext(generation = 1),
+            baseSeed = 42L
+        ).getValue(HomeSectionId.RECOMMENDED)
+
+        assertEquals((1L..10L).toList(), groups[0].playlists.items.map { it.id })
+        assertEquals(3, groups[1].playlists.items.size)
     }
 }

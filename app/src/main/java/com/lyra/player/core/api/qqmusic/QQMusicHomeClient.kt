@@ -10,8 +10,10 @@ import com.lyra.player.util.network.awaitResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -130,16 +132,32 @@ internal class QQMusicHomeClient(
     }
 
     /** 排行榜列表（匿名可用，用于首页排行榜卡片）。 */
-    suspend fun getToplists(limit: Int = 8): List<QQMusicToplist> {
-        val raw = musicu(
-            session = QQMusicSession(),
-            module = "music.musicToplist.Toplist",
-            method = "GetAll",
-            param = JSONObject()
-                .put("offset", 0)
-                .put("num", 40)
-                .put("tag", 0)
-        )
+    suspend fun getToplists(limit: Int = 50): List<QQMusicToplist> {
+        // Web 端 GetAll 只下发 4 组 35 个榜单，缺少新歌榜/分享热度榜等；
+        // Android 端 comm 才能拿到完整榜单（含欧美榜、国风热歌榜），Web 作为兜底。
+        val raw = runCatching {
+            musicu(
+                session = QQMusicSession(),
+                module = "music.musicToplist.Toplist",
+                method = "GetAll",
+                param = JSONObject()
+                    .put("offset", 0)
+                    .put("num", 60)
+                    .put("tag", 0),
+                commStyle = MusicuCommStyle.ANDROID
+            )
+        }.getOrElse { error ->
+            LyraLogger.d("LYRA-QQHome", "toplist android GetAll failed: ${error.message}")
+            musicu(
+                session = QQMusicSession(),
+                module = "music.musicToplist.Toplist",
+                method = "GetAll",
+                param = JSONObject()
+                    .put("offset", 0)
+                    .put("num", 60)
+                    .put("tag", 0)
+            )
+        }
         val groups = raw.optJSONObject("req_0")
             ?.optJSONObject("data")
             ?.optJSONArray("group")
@@ -294,21 +312,36 @@ internal class QQMusicHomeClient(
         session: QQMusicSession,
         module: String,
         method: String,
-        param: JSONObject
+        param: JSONObject,
+        commStyle: MusicuCommStyle = MusicuCommStyle.WEB
     ): JSONObject = withContext(Dispatchers.IO) {
         val loggedIn = session.cookie.isNotBlank()
         val comm = JSONObject()
-            .put("ct", 24)
-            .put("cv", 4747474)
-            .put("format", "json")
-            .put("inCharset", "utf-8")
-            .put("outCharset", "utf-8")
-            .put("notice", 0)
-            .put("platform", "yqq.json")
-            .put("need_new_code", 1)
-            .put("uin", session.uin.ifBlank { "0" })
-            .put("g_tk", hash33(session.musicKey))
-            .put("g_tk_new_20200303", hash33(session.musicKey))
+        when (commStyle) {
+            MusicuCommStyle.WEB -> {
+                comm.put("ct", 24)
+                    .put("cv", 4747474)
+                    .put("format", "json")
+                    .put("inCharset", "utf-8")
+                    .put("outCharset", "utf-8")
+                    .put("notice", 0)
+                    .put("platform", "yqq.json")
+                    .put("need_new_code", 1)
+                    .put("uin", session.uin.ifBlank { "0" })
+                    .put("g_tk", hash33(session.musicKey))
+                    .put("g_tk_new_20200303", hash33(session.musicKey))
+            }
+            MusicuCommStyle.ANDROID -> {
+                comm.put("ct", ANDROID_CLIENT_TYPE)
+                    .put("cv", ANDROID_CLIENT_VERSION)
+                    .put("v", ANDROID_CLIENT_VERSION)
+                    .put("chid", "10003505")
+                    .put("qq", session.uin.ifBlank { "0" })
+                    .put("authst", session.musicKey)
+                    .put("tmeAppID", "qqmusic")
+                    .put("tmeLoginType", if (session.musicKey.startsWith("W_X")) 1 else 2)
+            }
+        }
         val payload = JSONObject()
             .put("comm", comm)
             .put(
@@ -318,17 +351,26 @@ internal class QQMusicHomeClient(
                     .put("method", method)
                     .put("param", param)
             )
-        val url = "https://u.y.qq.com/cgi-bin/musicu.fcg".toHttpUrlOrNull()
-            ?.newBuilder()
-            ?.addQueryParameter("format", "json")
-            ?.addQueryParameter("data", payload.toString())
-            ?.build()
-            ?: throw IOException("QQ音乐推荐请求地址无效")
-        val request = Request.Builder()
-            .url(url)
-            .header("Referer", "https://y.qq.com/")
-            .apply { if (loggedIn) header("Cookie", session.cookie) }
-            .build()
+        val request = if (commStyle == MusicuCommStyle.ANDROID) {
+            Request.Builder()
+                .url("https://u.y.qq.com/cgi-bin/musicu.fcg")
+                .header("User-Agent", "QQMusic $ANDROID_CLIENT_VERSION(android 15)")
+                .apply { if (loggedIn) header("Cookie", session.cookie) }
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+        } else {
+            val url = "https://u.y.qq.com/cgi-bin/musicu.fcg".toHttpUrlOrNull()
+                ?.newBuilder()
+                ?.addQueryParameter("format", "json")
+                ?.addQueryParameter("data", payload.toString())
+                ?.build()
+                ?: throw IOException("QQ音乐推荐请求地址无效")
+            Request.Builder()
+                .url(url)
+                .header("Referer", "https://y.qq.com/")
+                .apply { if (loggedIn) header("Cookie", session.cookie) }
+                .build()
+        }
         val raw = httpClient.newCall(request).awaitResponse { response ->
             if (!response.isSuccessful) {
                 throw IOException("QQ音乐推荐请求失败: ${response.code}")
@@ -366,6 +408,8 @@ internal class QQMusicHomeClient(
         return hash and 0x7FFF_FFFFL
     }
 
+    private enum class MusicuCommStyle { WEB, ANDROID }
+
     private companion object {
         const val TENCENT_HOT_TOPLIST_ID = 26
         const val DAILY_SUBTYPE = 510
@@ -375,5 +419,9 @@ internal class QQMusicHomeClient(
         const val RADAR_MODE_FAMILIAR = 1
         const val RADAR_MODE_DEFAULT = 2
         const val RADAR_MODE_EXPLORE = 3
+
+        const val ANDROID_CLIENT_TYPE = 11
+        const val ANDROID_CLIENT_VERSION = 14_090_008
+        val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
