@@ -24,6 +24,7 @@ package com.lyra.player.ui.viewmodel.tab
  */
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -71,6 +72,7 @@ import com.lyra.player.ui.viewmodel.tab.home.NeteaseHomeFeedGroups
 import com.lyra.player.ui.viewmodel.tab.home.homeErrorFeedGroup
 import com.lyra.player.ui.viewmodel.tab.home.homeLoadingFeedGroup
 import com.lyra.player.ui.viewmodel.tab.home.resolveEffectiveHomeSourceId
+import com.lyra.player.data.auth.qqmusic.QQMusicSession
 import com.lyra.player.data.auth.youtube.YouTubeAuthBundle
 import com.lyra.player.data.auth.youtube.buildRefreshObserverFingerprint
 import com.lyra.player.data.model.SongItem
@@ -81,6 +83,7 @@ import com.lyra.player.util.platform.LanguageManager
 import com.lyra.player.core.logging.LyraLogger
 import org.json.JSONObject
 import java.io.IOException
+import java.time.LocalDate
 
 private const val TAG = "LYRA-HomeVM"
 private const val HOME_NETEASE_SONG_LIMIT = 30
@@ -94,6 +97,9 @@ private const val HOME_SECTION_LOAD_PARALLELISM_PER_GROUP = 2
 
 /** 渠道分区每次展示的歌曲数量（刷新时按这个步长往后挪一屏）。 */
 private const val HOME_CHANNEL_WINDOW_SIZE = 12
+
+/** 首页内容自动刷新间隔：重新可见时超过该时长才静默刷新，避免频繁切页就换内容。 */
+private const val HOME_AUTO_REFRESH_INTERVAL_MS = 15 * 60 * 1000L
 
 private fun shouldFallbackRecommend(code: Int): Boolean = code == 301 || code == 50000005
 
@@ -281,6 +287,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var homeGenerationInitialized = false
     /** Fix-01B：渠道分区请求去重键（相同进入条件不重复请求）。 */
     private var lastChannelRefreshKey: String? = null
+    /** 首页内容最近一次刷新时间，用于重新可见时的静默刷新判断。 */
+    private var lastHomeContentRefreshAt = SystemClock.elapsedRealtime()
+    private var lastHomeContentRefreshDate = LocalDate.now()
 
     /**
      * 统一首页分组：网易云（既有数据适配）+ 渠道 Provider，按分区来源合并。
@@ -398,8 +407,51 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }.awaitAll()
             }
             _channelHomeGroups.value = loaded.toMap()
+            if (targets.isNotEmpty()) markHomeContentRefreshed()
         }
     }
+
+    /**
+     * 首页重新可见时调用：内容超过刷新间隔或已跨天时返回 true。
+     *
+     * 返回 true 时立即重置计时，避免进入首页和 ON_RESUME 同时触发两次刷新。
+     */
+    internal fun consumeHomeAutoRefreshRequest(): Boolean {
+        if (offlineMode) return false
+        val dateChanged = LocalDate.now() != lastHomeContentRefreshDate
+        val intervalElapsed =
+            SystemClock.elapsedRealtime() - lastHomeContentRefreshAt >= HOME_AUTO_REFRESH_INTERVAL_MS
+        if (!dateChanged && !intervalElapsed) return false
+        markHomeContentRefreshed()
+        return true
+    }
+
+    private fun markHomeContentRefreshed() {
+        lastHomeContentRefreshAt = SystemClock.elapsedRealtime()
+        lastHomeContentRefreshDate = LocalDate.now()
+    }
+
+    /** QQ 账号变化后重新拉取由 QQ 提供的首页分区，并重置去重键。 */
+    private fun onQqSessionChanged() {
+        if (offlineMode) return
+        lastChannelRefreshKey = null
+        val layout = AppContainer.homeLayoutRepository.config.value
+        val availableIds = homeSourceOptions.value.mapTo(HashSet()) { it.sourceId }
+        val sections = HomeSectionId.entries.filterTo(mutableSetOf()) { section ->
+            resolveEffectiveHomeSourceId(layout.sources[section], availableIds) ==
+                MusicSourceIds.TENCENT
+        }
+        if (sections.isEmpty()) return
+        LyraLogger.d(TAG, "qq session changed, reload sections: ${sections.joinToString()}")
+        beginHomeGeneration(force = true)
+        refreshChannelHomeSections(
+            enabledSections = sections,
+            windowOffset = _homeBatchContext.value.generation * HOME_CHANNEL_WINDOW_SIZE
+        )
+    }
+
+    private fun qqSessionFingerprint(session: QQMusicSession): String =
+        "${session.isLoggedIn}:${session.uin}:${session.musicKey.hashCode()}"
 
     private fun localizedAppContext() = LanguageManager.applyLanguage(getApplication())
 
@@ -592,6 +644,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        // QQ 音乐登录 / 退出 / 切换账号后，首页需要重新取每日 30 首与推荐。
+        viewModelScope.launch {
+            var lastQqFingerprint: String? = null
+            AppContainer.qqMusicSessionRepo.sessionFlow.collect { session ->
+                val fingerprint = qqSessionFingerprint(session)
+                if (lastQqFingerprint != null && fingerprint != lastQqFingerprint) {
+                    LyraLogger.d(TAG, "qq session changed: loggedIn=${session.isLoggedIn}")
+                    onQqSessionChanged()
+                }
+                lastQqFingerprint = fingerprint
+            }
+        }
+
         // 登录后自动刷新首页推荐歌单
         viewModelScope.launch {
             var isFirstCookieEmission = true
@@ -633,6 +698,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 ) {
                     homeRecommendationsBootstrapped = true
+                    if (loginChanged || accountContextChanged) {
+                        beginHomeGeneration(force = true)
+                    }
                     refreshNeteaseHome()
                 }
             }
@@ -683,6 +751,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshNeteaseHome() {
         if (offlineMode) return
+        markHomeContentRefreshed()
 
         refreshRecommend()
         loadHomeRecommendations(force = true)
@@ -905,6 +974,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         ytMusicHomeRefreshPending = false
+        markHomeContentRefreshed()
         val requestGeneration = ++ytMusicHomeLoadGeneration
         val requestAuthFingerprint = buildYouTubeAuthFingerprint(youtubeAuthRepo.getAuthOnce())
         LyraLogger.d(TAG, "refreshYtMusicHome start")

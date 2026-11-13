@@ -60,7 +60,7 @@ internal class QQMusicHomeFeedProvider(
     /** 每日 30 首（登录）+ 新歌首发。 */
     private suspend fun loadTrending(windowOffset: Int, limit: Int): List<HomeFeedGroup> {
         val groups = ArrayList<HomeFeedGroup>(2)
-        loadDailySongs(windowOffset, limit)?.let(groups::add)
+        loadDailySongs(limit)?.let(groups::add)
         loadNewSongs(windowOffset, limit)?.let(groups::add)
         return groups
     }
@@ -74,19 +74,22 @@ internal class QQMusicHomeFeedProvider(
         return groups
     }
 
-    private suspend fun loadDailySongs(windowOffset: Int, limit: Int): HomeFeedGroup? {
+    private suspend fun loadDailySongs(limit: Int): HomeFeedGroup? {
         val session = AppContainer.qqMusicSessionRepo.getSessionOnce()
         if (!session.isLoggedIn) return null
-        val songs = withContext(Dispatchers.IO) { client.getDailySongs(session, limit) }
-        val rotated = rotate(songs, windowOffset).take(limit)
-        if (rotated.isEmpty()) return null
+        val songs = withContext(Dispatchers.IO) {
+            client.getDailySongs(session, maxOf(limit, DAILY_SONG_LIMIT))
+        }
+        if (songs.isEmpty()) return null
         return HomeFeedGroup(
             key = "qq:$sourceId:${HomeSectionId.TRENDING.name}:DAILY",
             titleResId = R.string.home_qq_daily_songs,
             icon = HomeFeedIcon.STAR,
             presentation = HomeFeedPresentation.SONG_LIST,
             sourceId = sourceId,
-            songs = HomeSectionState(items = rotated.toSongItems())
+            // 每日 30 首是固定歌单，不参与换批随机，否则只会露出 3 首。
+            batchRandomize = false,
+            songs = HomeSectionState(items = songs.toSongItems())
         )
     }
 
@@ -185,6 +188,7 @@ internal class QQMusicHomeFeedProvider(
 
     private companion object {
         const val RECOMMEND_PLAYLIST_PAGE_CYCLE = 6
+        const val DAILY_SONG_LIMIT = 30
 
         /** 首页排行榜展示顺序：热门综合榜在前，其余按服务端顺序补齐。 */
         val TOPLIST_PRIORITY = listOf(

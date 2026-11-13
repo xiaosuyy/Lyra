@@ -105,6 +105,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -113,6 +114,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -144,11 +146,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import com.lyra.player.ui.screen.account.AccountAvatar
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.lyra.player.ui.screen.account.AccountAvatar
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -232,6 +237,10 @@ private const val HomeContinueTabletWidthDp = 600f
 private const val HOME_CHANNEL_WINDOW_SIZE = 3
 /** 首页每个分区最多展示的数量（歌曲或歌单），刷新后轮换到下一批。 */
 private const val HOME_SECTION_DISPLAY_LIMIT = 3
+/** 普通歌曲分区最多展示的数量（3 列 × 4 屏）。 */
+private const val MELOX_SONG_SECTION_LIMIT = 12
+/** QQ 每日 30 首完整展示。 */
+private const val QQ_DAILY_SONG_LIMIT = 30
 private const val HomeScrollKeyContinueHeader = "home:continue:header"
 private const val HomeScrollKeyContinueContent = "home:continue:content"
 private const val HomeScrollKeyYtGuess = "home:ytmusic:guess"
@@ -706,6 +715,20 @@ fun HomeScreen(
     // Fix-01B：是否换批由 ViewModel 跨 Tab 存活的状态决定（首次进入换批；普通返回不换批）。
     LaunchedEffect(Unit) {
         vm.beginHomeGeneration()
+        // 长时间未进首页 / 跨天后再回来：自动刷新内容。
+        if (vm.consumeHomeAutoRefreshRequest()) triggerHomeRefresh()
+    }
+    // 应用从后台回到前台且首页内容已过期时自动刷新。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val autoRefreshOnResume by rememberUpdatedState {
+        if (vm.consumeHomeAutoRefreshRequest()) triggerHomeRefresh()
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) autoRefreshOnResume()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val enabledOnlineSections = remember(showNeteaseTrending, showNeteaseRadar, showRecommendedCard) {
         buildSet {
@@ -1040,7 +1063,8 @@ fun HomeScreen(
 
                 fun LazyGridScope.addMeloxSongSection(
                     group: HomeFeedGroup,
-                    titleRes: Int = group.titleResId
+                    titleRes: Int = group.titleResId,
+                    maxSongs: Int = MELOX_SONG_SECTION_LIMIT
                 ) {
                     val sectionKey = "home:melox:${group.key}"
                     val songs = group.songs.items
@@ -1064,7 +1088,7 @@ fun HomeScreen(
                     ) {
                         when {
                             songs.isNotEmpty() -> MeloxSongCarousel(
-                                songs = songs.take(12),
+                                songs = songs.take(maxSongs),
                                 isTabletLayout = isTabletLayout,
                                 offlineMode = offlineMode,
                                 onSongClick = onSongClick,
@@ -1174,7 +1198,7 @@ fun HomeScreen(
                             if (showNeteaseTrending) {
                                 qqTrending
                                     .filter { it.key.endsWith(":DAILY") }
-                                    .forEach { addMeloxSongSection(it) }
+                                    .forEach { addMeloxSongSection(it, maxSongs = QQ_DAILY_SONG_LIMIT) }
                             }
                             if (showRecommendedCard) {
                                 homeFeedGroups[HomeSectionId.RECOMMENDED]
