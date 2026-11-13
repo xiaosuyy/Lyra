@@ -129,6 +129,7 @@
     <string name="nowplaying_favorited">Favorited</string>
     <string name="nowplaying_favorite">Favorite</string>
     <string name="nowplaying_more_options">More Options</string>
+    <string name="nowplaying_quick_sleep_timer">Sleep Timer</string>
     <string name="nowplaying_netease_cloud">NetEase Cloud</string>
     <string name="nowplaying_bilibili">Bilibili</string>
     <string name="nowplaying_bluetooth_device">Bluetooth Device</string>

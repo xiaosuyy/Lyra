@@ -81,13 +81,6 @@ fun PlaybackSourceBadge(
 }
 
 @Composable
-fun SleepTimerDialog(
-    onDismiss: () -> Unit
-) {
-    com.lyra.player.ui.component.playback.SleepTimerDialog(onDismiss = onDismiss)
-}
-
-@Composable
 fun WaveformSlider(
     value: Float,
     onValueChange: (Float) -> Unit,

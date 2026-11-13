@@ -1,116 +1,86 @@
 package com.lyra.player.ui.screen
 
-import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
-import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FormatSize
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Tune
-import com.lyra.player.ui.component.overlay.DensityScaledAlertDialog as AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import com.lyra.player.R
-import com.lyra.player.ui.feedback.showNeriSnackbar
-import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.DownloadStatus
 import com.lyra.player.core.download.DownloadTask
 import com.lyra.player.core.download.GlobalDownloadManager
 import com.lyra.player.core.download.isDownloadTaskCancellable
-import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.player.download.AudioDownloadManager
 import com.lyra.player.core.player.model.PlaybackAudioInfo
-import com.lyra.player.data.local.media.LocalMediaSupport
-import com.lyra.player.data.local.media.isLocalSong
 import com.lyra.player.data.model.SongItem
-import com.lyra.player.data.model.displayArtist
-import com.lyra.player.data.model.displayName
 import com.lyra.player.data.model.stableKey
-import com.lyra.player.data.stats.TrackStat
 import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
-import com.lyra.player.ui.haptic.HapticTextButton
 import com.lyra.player.ui.melox.components.MeloxIosGroupedList
 import com.lyra.player.ui.melox.components.MeloxIosListIcon
 import com.lyra.player.ui.melox.components.MeloxIosListRow
+import com.lyra.player.ui.melox.theme.MeloxShapes
+import com.lyra.player.ui.melox.theme.MeloxType
 import com.lyra.player.ui.viewmodel.NowPlayingViewModel
-import com.lyra.player.ui.viewmodel.album.isNeteaseAlbumNavigationSource
-import com.lyra.player.ui.viewmodel.album.neteaseAlbumDisplayName
-import com.lyra.player.ui.viewmodel.album.resolveNeteaseAlbum
-import com.lyra.player.ui.viewmodel.tab.AlbumSummary
-import com.lyra.player.util.media.buildRemoteSongShareUrl
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
 internal fun MoreOptionsMainContent(
     viewModel: NowPlayingViewModel,
     originalSong: SongItem,
-    queue: List<SongItem>,
     isLocalSong: Boolean,
     lyricFontScale: Float,
     translationFontScale: Float,
     currentPlaybackAudioInfo: PlaybackAudioInfo?,
     isDismissing: Boolean,
-    snackbarHostState: SnackbarHostState,
     onOpenSearch: () -> Unit,
     onOpenEditInfo: () -> Unit,
+    onOpenSleepTimer: () -> Unit,
     onOpenAddToPlaylist: () -> Unit,
     onOpenPlaybackSound: () -> Unit,
     onOpenLyricBehavior: () -> Unit,
     onOpenFontSize: () -> Unit,
     onOpenBiliVideoSkip: () -> Unit,
     onShowSongDetails: () -> Unit,
-    onShowQualitySwitch: () -> Unit,
-    onEnterAlbum: (AlbumSummary) -> Unit,
-    onDismissSheet: (() -> Unit) -> Unit
+    onShowQualitySwitch: () -> Unit
 ) {
     val scrollState = rememberScrollState()
     Column(
@@ -120,6 +90,14 @@ internal fun MoreOptionsMainContent(
             .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        QuickActions(
+            viewModel = viewModel,
+            song = originalSong,
+            isLocalSong = isLocalSong,
+            onOpenSleepTimer = onOpenSleepTimer,
+            onOpenAddToPlaylist = onOpenAddToPlaylist,
+            onShowSongDetails = onShowSongDetails
+        )
         MetadataAndPlaybackActions(
             audioInfo = currentPlaybackAudioInfo,
             isDismissing = isDismissing,
@@ -128,28 +106,11 @@ internal fun MoreOptionsMainContent(
             onOpenPlaybackSound = onOpenPlaybackSound,
             onShowQualitySwitch = onShowQualitySwitch
         )
-        DownloadOrDetailsAction(
-            viewModel = viewModel,
-            song = originalSong,
-            isLocalSong = isLocalSong,
-            onShowSongDetails = onShowSongDetails
-        )
-        MeloxIosGroupedList {
-            MeloxIosListRow(
-                title = stringResource(R.string.playlist_add_to),
-                leading = { MeloxIosListIcon(Icons.AutoMirrored.Outlined.PlaylistAdd) },
-                showTopSeparator = false,
-                onClick = onOpenAddToPlaylist
-            )
-        }
-        LyricsAndAlbumActions(
-            song = originalSong,
+        LyricsActions(
             lyricFontScale = lyricFontScale,
             translationFontScale = translationFontScale,
             onOpenLyricBehavior = onOpenLyricBehavior,
-            onOpenFontSize = onOpenFontSize,
-            onEnterAlbum = onEnterAlbum,
-            snackbarHostState = snackbarHostState
+            onOpenFontSize = onOpenFontSize
         )
         if (PlayerManager.isBiliTrack(originalSong)) {
             MeloxIosGroupedList {
@@ -161,13 +122,6 @@ internal fun MoreOptionsMainContent(
                 )
             }
         }
-        ShareSongAction(
-            song = originalSong,
-            queue = queue,
-            snackbarHostState = snackbarHostState,
-            onDismissSheet = onDismissSheet
-        )
-        PlaybackStatsAction(originalSong)
     }
 }
 
@@ -209,30 +163,27 @@ private fun MetadataAndPlaybackActions(
     }
 }
 
+private data class QuickAction(
+    val labelRes: Int,
+    val icon: ImageVector,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit
+)
+
 @Composable
-private fun DownloadOrDetailsAction(
+private fun QuickActions(
     viewModel: NowPlayingViewModel,
     song: SongItem,
     isLocalSong: Boolean,
+    onOpenSleepTimer: () -> Unit,
+    onOpenAddToPlaylist: () -> Unit,
     onShowSongDetails: () -> Unit
 ) {
-    if (isLocalSong) {
-        MeloxIosGroupedList {
-            MeloxIosListRow(
-                title = stringResource(R.string.local_song_open_details),
-                leading = { MeloxIosListIcon(Icons.Outlined.Info) },
-                showTopSeparator = false,
-                onClick = onShowSongDetails
-            )
-        }
-        return
-    }
-
     val context = LocalContext.current
     val downloadPresenceVersion by GlobalDownloadManager.downloadPresenceVersion
         .collectAsStateWithLifecycle()
     val hasLocalDownload = remember(downloadPresenceVersion, song) {
-        hasCachedLocalDownload(song)
+        !isLocalSong && hasCachedLocalDownload(song)
     }
     val downloadSongKey = remember(song) { song.stableKey() }
     val currentTaskFlow = remember(downloadSongKey) {
@@ -241,48 +192,144 @@ private fun DownloadOrDetailsAction(
             .distinctUntilChanged()
     }
     val currentTask by currentTaskFlow.collectAsStateWithLifecycle(initialValue = null)
-    if (shouldHideDownloadActionForSong(hasLocalDownload, currentTask)) return
 
-    val canCancel = remember(currentTask) { isDownloadTaskCancellable(currentTask) }
-    val status = currentTask?.status
-    val canClick = (
-        status != DownloadStatus.QUEUED &&
-            status != DownloadStatus.DOWNLOADING &&
-            status != DownloadStatus.WAITING_NETWORK
-        ) || canCancel
-    MeloxIosGroupedList {
-        MeloxIosListRow(
-            title = stringResource(downloadActionLabel(currentTask)),
-            leading = { MeloxIosListIcon(Icons.Outlined.Download) },
-            showTopSeparator = false,
-            onClick = if (canClick) {
-                {
-                    when (currentTask?.status) {
-                        DownloadStatus.QUEUED,
-                        DownloadStatus.WAITING_NETWORK,
-                        DownloadStatus.DOWNLOADING -> viewModel.cancelDownload(downloadSongKey)
-                        DownloadStatus.CANCELLED -> viewModel.resumeDownload(context, downloadSongKey)
-                        DownloadStatus.FAILED -> viewModel.retryDownload(context, song)
-                        else -> viewModel.downloadSong(context, song)
-                    }
-                }
-            } else null
+    val downloadAction = when {
+        isLocalSong -> QuickAction(
+            labelRes = R.string.local_song_open_details,
+            icon = Icons.Outlined.Info,
+            onClick = onShowSongDetails
         )
-        if (currentTask != null) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        currentTask.isActiveDownload() -> QuickAction(
+            labelRes = R.string.download_cancel_download,
+            icon = Icons.Outlined.Close,
+            enabled = isDownloadTaskCancellable(currentTask),
+            onClick = { viewModel.cancelDownload(downloadSongKey) }
+        )
+        currentTask?.status == DownloadStatus.FAILED -> QuickAction(
+            labelRes = R.string.download_retry,
+            icon = Icons.Outlined.Refresh,
+            onClick = { viewModel.retryDownload(context, song) }
+        )
+        hasLocalDownload -> QuickAction(
+            labelRes = R.string.downloaded,
+            icon = Icons.Outlined.CheckCircle,
+            enabled = false,
+            onClick = {}
+        )
+        else -> QuickAction(
+            labelRes = R.string.action_download,
+            icon = Icons.Outlined.Download,
+            onClick = {
+                when (currentTask?.status) {
+                    DownloadStatus.CANCELLED -> viewModel.resumeDownload(context, downloadSongKey)
+                    else -> viewModel.downloadSong(context, song)
+                }
+            }
+        )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            QuickActionTile(
+                action = QuickAction(
+                    labelRes = R.string.nowplaying_quick_sleep_timer,
+                    icon = Icons.Outlined.Timer,
+                    onClick = onOpenSleepTimer
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            QuickActionTile(
+                action = downloadAction,
+                modifier = Modifier.weight(1f)
+            )
+            QuickActionTile(
+                action = QuickAction(
+                    labelRes = R.string.playlist_add_to,
+                    icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
+                    onClick = onOpenAddToPlaylist
+                ),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (hasVisibleDownloadProgress(currentTask)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.045f),
+                        MeloxShapes.card
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
                 DownloadProgressContent(currentTask)
             }
         }
     }
 }
 
-private fun downloadActionLabel(task: DownloadTask?): Int {
-    return when (task?.status) {
-        DownloadStatus.QUEUED,
-        DownloadStatus.DOWNLOADING,
-        DownloadStatus.WAITING_NETWORK -> R.string.download_cancel_download
-        DownloadStatus.FAILED -> R.string.action_retry
-        else -> R.string.download_to_local
+private fun DownloadTask?.isActiveDownload(): Boolean {
+    return this?.status == DownloadStatus.QUEUED ||
+        this?.status == DownloadStatus.DOWNLOADING ||
+        this?.status == DownloadStatus.WAITING_NETWORK
+}
+
+private fun hasVisibleDownloadProgress(task: DownloadTask?): Boolean {
+    return task != null && (
+        task.progress != null ||
+            task.status == DownloadStatus.FAILED ||
+            task.status == DownloadStatus.WAITING_NETWORK
+        )
+}
+
+@Composable
+private fun QuickActionTile(
+    action: QuickAction,
+    modifier: Modifier = Modifier
+) {
+    val contentColor = if (action.enabled) {
+        MaterialTheme.colorScheme.onBackground
+    } else {
+        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+    }
+    Column(
+        modifier = modifier
+            .height(84.dp)
+            .background(
+                MaterialTheme.colorScheme.onBackground.copy(alpha = 0.045f),
+                MeloxShapes.card
+            )
+            .then(
+                if (action.enabled) {
+                    Modifier.clickable(
+                        interactionSource = null,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = action.onClick
+                    )
+                } else {
+                    Modifier
+                }
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = action.icon,
+            contentDescription = null,
+            modifier = Modifier.size(26.dp),
+            tint = if (action.enabled) MaterialTheme.colorScheme.primary else contentColor
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = stringResource(action.labelRes),
+            style = MeloxType.caption,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -326,14 +373,11 @@ private fun DownloadProgressContent(task: DownloadTask?) {
 }
 
 @Composable
-private fun LyricsAndAlbumActions(
-    song: SongItem,
+private fun LyricsActions(
     lyricFontScale: Float,
     translationFontScale: Float,
     onOpenLyricBehavior: () -> Unit,
-    onOpenFontSize: () -> Unit,
-    onEnterAlbum: (AlbumSummary) -> Unit,
-    snackbarHostState: SnackbarHostState
+    onOpenFontSize: () -> Unit
 ) {
     MeloxIosGroupedList {
         MeloxIosListRow(
@@ -351,184 +395,6 @@ private fun LyricsAndAlbumActions(
                 (translationFontScale * 100).roundToInt()
             ),
             onClick = onOpenFontSize
-        )
-    }
-    if (!isNeteaseAlbumNavigationSource(song)) return
-
-    val albumName = neteaseAlbumDisplayName(song)
-    val context = LocalContext.current
-    val composeResources = LocalResources.current
-    var albumResolveRequest by remember(song) { mutableIntStateOf(0) }
-    var resolvingAlbum by remember(song) { mutableStateOf(false) }
-
-    LaunchedEffect(song, albumResolveRequest) {
-        if (albumResolveRequest == 0) return@LaunchedEffect
-        val album = try {
-            resolveNeteaseAlbum(song)
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            LyraLogger.e("MoreOptionsMainContent", "解析网易云专辑失败", error)
-            null
-        }
-        resolvingAlbum = false
-        if (album != null) {
-            onEnterAlbum(album)
-        } else {
-            snackbarHostState.showNeriSnackbar(composeResources.getString(R.string.music_get_detail_failed))
-        }
-    }
-
-    MeloxIosGroupedList {
-        MeloxIosListRow(
-            title = stringResource(R.string.music_view_album, albumName),
-            leading = {
-                if (resolvingAlbum) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    MeloxIosListIcon(Icons.Outlined.LibraryMusic)
-                }
-            },
-            showTopSeparator = false,
-            onClick = if (resolvingAlbum) null else {
-                {
-                    resolvingAlbum = true
-                    albumResolveRequest++
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun ShareSongAction(
-    song: SongItem,
-    queue: List<SongItem>,
-    snackbarHostState: SnackbarHostState,
-    onDismissSheet: (() -> Unit) -> Unit
-) {
-    val context = LocalContext.current
-    val composeResources = LocalResources.current
-    val coroutineScope = rememberCoroutineScope()
-    MeloxIosGroupedList {
-        MeloxIosListRow(
-            title = stringResource(R.string.action_share),
-            leading = { MeloxIosListIcon(Icons.Outlined.Share) },
-            showTopSeparator = false,
-            onClick = {
-            if (song.isLocalSong()) {
-                coroutineScope.launch {
-                    val shared = runCatching {
-                        LocalMediaSupport.shareSongFile(context, song)
-                    }.getOrDefault(false)
-                    if (shared) {
-                        onDismissSheet {}
-                    } else {
-                        snackbarHostState.showNeriSnackbar(
-                            composeResources.getString(R.string.local_song_share_failed)
-                        )
-                    }
-                }
-                return@MeloxIosListRow
-            }
-
-            val shareUrl = buildRemoteSongShareUrl(song, queue)
-            val shareText = if (shareUrl.isNullOrBlank()) {
-                "${song.displayName()} - ${song.displayArtist()}"
-            } else {
-                composeResources.getString(
-                    R.string.nowplaying_share_song,
-                    song.displayName(),
-                    song.displayArtist(),
-                    shareUrl,
-                )
-            }
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                putExtra(Intent.EXTRA_TEXT, shareText)
-                type = "text/plain"
-            }
-            val shareIntent = Intent.createChooser(sendIntent, null)
-            onDismissSheet { context.startActivity(shareIntent) }
-            }
-        )
-    }
-}
-
-@Composable
-private fun PlaybackStatsAction(song: SongItem) {
-    val songKey = remember(song) { song.stableKey() }
-    val trackStat by produceState<TrackStat?>(initialValue = null, songKey) {
-        value = withContext(Dispatchers.IO) {
-            AppContainer.playbackStatsRepo.getStatForTrack(songKey)
-        }
-    }
-    val resolvedTrackStat = trackStat ?: return
-    var showDialog by remember { mutableStateOf(false) }
-    MeloxIosGroupedList {
-        MeloxIosListRow(
-            title = stringResource(R.string.stats_title),
-            leading = { MeloxIosListIcon(Icons.Outlined.BarChart) },
-            showTopSeparator = false,
-            onClick = { showDialog = true }
-        )
-    }
-    if (!showDialog) return
-
-    val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()) }
-    val firstPlayedText = remember(resolvedTrackStat.firstPlayedAt) {
-        dateFormat.format(Date(resolvedTrackStat.firstPlayedAt))
-    }
-    val totalListenText = remember(resolvedTrackStat.totalListenMs) {
-        val totalSeconds = resolvedTrackStat.totalListenMs / 1000
-        val hours = totalSeconds / 3600
-        val minutes = (totalSeconds % 3600) / 60
-        when {
-            hours > 0 -> "${hours}h ${minutes}m"
-            minutes > 0 -> "${minutes}m"
-            else -> "${totalSeconds}s"
-        }
-    }
-    AlertDialog(
-        onDismissRequest = { showDialog = false },
-        icon = { Icon(Icons.Outlined.BarChart, null) },
-        title = { Text(stringResource(R.string.stats_title)) },
-        shape = RoundedCornerShape(28.dp),
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatsCard(R.string.stats_song_first_played, firstPlayedText)
-                StatsCard(R.string.stats_song_total_listen, totalListenText)
-                StatsCard(
-                    labelRes = R.string.stats_song_play_count_label,
-                    value = pluralStringResource(
-                        R.plurals.stats_play_count_value,
-                        resolvedTrackStat.playCount,
-                        resolvedTrackStat.playCount
-                    )
-                )
-            }
-        },
-        confirmButton = {
-            HapticTextButton(onClick = { showDialog = false }) {
-                Text(stringResource(R.string.action_close))
-            }
-        }
-    )
-}
-
-@Composable
-private fun StatsCard(labelRes: Int, value: String) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)
-        )
-    ) {
-        ListItem(
-            headlineContent = { Text(stringResource(labelRes)) },
-            supportingContent = { Text(value) }
         )
     }
 }

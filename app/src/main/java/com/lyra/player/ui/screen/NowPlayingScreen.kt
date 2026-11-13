@@ -267,6 +267,7 @@ import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.core.player.download.AudioDownloadManager
 import com.lyra.player.core.player.metadata.resolveLocalFirstLyricText
 import com.lyra.player.core.player.playback.BiliVideoSkipPlaybackController
+import com.lyra.player.core.player.timer.SleepTimerMode
 import com.lyra.player.core.player.model.PlaybackAudioInfo
 import com.lyra.player.core.player.model.PlaybackAudioSource
 import com.lyra.player.core.player.model.forSource
@@ -346,7 +347,6 @@ import com.lyra.player.ui.theme.designsystem.LocalNeriTextStyles
 import com.lyra.player.ui.theme.designsystem.LyraIconSize
 import com.lyra.player.ui.theme.designsystem.LyraRadius
 import com.lyra.player.ui.theme.designsystem.LyraSpacing
-import com.lyra.player.ui.component.playback.SleepTimerDialog
 import com.lyra.player.ui.component.playback.WaveformSlider
 import com.lyra.player.ui.component.playback.resolvePlaybackWaiting
 import com.lyra.player.ui.component.sheet.bottomSheetDragBlocker
@@ -374,7 +374,6 @@ import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsTextField
 import com.lyra.player.ui.viewmodel.NowPlayingViewModel
 import com.lyra.player.data.model.NeteaseArtistSummary
 import com.lyra.player.data.model.SongItem
-import com.lyra.player.ui.viewmodel.tab.AlbumSummary
 import com.lyra.player.ui.haptic.HapticFeedbackEffect
 import com.lyra.player.ui.haptic.HapticFilledIconButton
 import com.lyra.player.ui.haptic.HapticFloatingActionButton
@@ -2443,7 +2442,6 @@ fun NowPlayingScreen(
     sheetAlpha: MutableFloatState? = null,
     showLyricsScreen: Boolean,
     onShowLyricsScreenChange: (Boolean) -> Unit,
-    onEnterAlbum: (AlbumSummary) -> Unit,
     onEnterArtist: (NeteaseArtistSummary) -> Unit = {},
     onEnterBiliUploader: (BiliUploaderSummary) -> Unit = {},
     onEnterYouTubeCreator: (YouTubeMusicCreatorSummary) -> Unit = {},
@@ -2593,7 +2591,7 @@ fun NowPlayingScreen(
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showQueuePage by remember { mutableStateOf(false) }
-    var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var openSleepTimerPage by remember { mutableStateOf(false) }
     var showCoverPageSourceBadge by remember { mutableStateOf(false) }
     var animateCoverPageSourceBadge by remember { mutableStateOf(false) }
     var previousLyricsScreenState by remember { mutableStateOf(false) }
@@ -3516,7 +3514,6 @@ fun NowPlayingScreen(
                             lyricBlurEnabled = lyricBlurEnabled,
                             lyricBlurAmount = lyricBlurAmount,
                             lyricFontScales = lyricFontScales,
-                            onEnterAlbum = onEnterAlbum,
                             onOpenCurrentArtist = openCurrentArtist,
                             onOpenCurrentPlaybackSource = onOpenCurrentPlaybackSource,
                             onLyricFontScaleChange = onLyricFontScaleChange,
@@ -4253,7 +4250,10 @@ fun NowPlayingScreen(
                         }
 
                         HapticIconButton(
-                            onClick = { showMoreOptions = true },
+                            onClick = {
+                                openSleepTimerPage = false
+                                showMoreOptions = true
+                            },
                             modifier = Modifier
                                 .size(actionButtonSize)
                                 .background(
@@ -4278,20 +4278,21 @@ fun NowPlayingScreen(
                             MoreOptionsSheet(
                                 viewModel = nowPlayingViewModel,
                                 originalSong = currentSong!!,
-                                queue = displayedQueue,
                                 displayedLyrics = lyrics,
                                 displayedTranslatedLyrics = translatedLyrics,
                                 hasPhoneticLyrics = phoneticLyrics.isNotEmpty(),
-                                onDismiss = { showMoreOptions = false },
+                                onDismiss = {
+                                    showMoreOptions = false
+                                    openSleepTimerPage = false
+                                },
                                 onShowSongDetails = { detailSong = it },
-                                onEnterAlbum = onEnterAlbum,
-                                onNavigateUp = onNavigateUp,
                                 snackbarHostState = snackbarHostState,
                                 lyricFontScalePage = LyricFontScalePage.COVER,
                                 lyricFontScales = lyricFontScales,
                                 onLyricFontScaleChange = onLyricFontScaleChange,
                                 currentPlaybackAudioInfo = currentPlaybackAudioInfo,
                                 onShowQualitySwitch = { showQualitySwitchDialog = true },
+                                startWithSleepTimer = openSleepTimerPage,
                                 onAddSongToPlaylist = { playlist ->
                                     if (FavoritesPlaylist.isSystemPlaylist(playlist, context)) {
                                         // 加入我喜欢的音乐等同于收藏，即使此前未收藏也会同步为已收藏。
@@ -4780,7 +4781,10 @@ fun NowPlayingScreen(
                                 }
 
                                 // 定时器按钮
-                                HapticIconButton(onClick = { showSleepTimerDialog = true },
+                                HapticIconButton(onClick = {
+                                    openSleepTimerPage = true
+                                    showMoreOptions = true
+                                },
                                     modifier = toolbarActionModifier
                                     .sharedBounds(
                                         rememberSharedContentState(key = "btn_timer"),
@@ -5206,13 +5210,6 @@ fun NowPlayingScreen(
                 }
             }
 
-            // 睡眠定时器对话框
-            if (showSleepTimerDialog) {
-                SleepTimerDialog(
-                    onDismiss = { showSleepTimerDialog = false }
-                )
-            }
-
             detailSong?.let { song ->
                 LocalSongDetailsDialog(
                     song = song,
@@ -5457,6 +5454,7 @@ private fun YouTubeMusicCreatorPickerSheet(
 private enum class MoreOptionsPage {
     MAIN,
     ADD_TO_PLAYLIST,
+    SLEEP_TIMER,
     SEARCH,
     LYRIC_BEHAVIOR,
     FONT_SIZE,
@@ -5470,14 +5468,11 @@ private enum class MoreOptionsPage {
 fun MoreOptionsSheet(
     viewModel: NowPlayingViewModel,
     originalSong: SongItem,
-    queue: List<SongItem>,
     displayedLyrics: List<LyricEntry>,
     displayedTranslatedLyrics: List<LyricEntry>,
     hasPhoneticLyrics: Boolean = false,
     onDismiss: () -> Unit,
     onShowSongDetails: (SongItem) -> Unit = {},
-    onEnterAlbum: (AlbumSummary) -> Unit,
-    onNavigateUp: () -> Unit,
     snackbarHostState: SnackbarHostState,
     lyricFontScalePage: LyricFontScalePage,
     lyricFontScales: LyricFontScales,
@@ -5485,10 +5480,15 @@ fun MoreOptionsSheet(
     currentPlaybackAudioInfo: PlaybackAudioInfo? = null,
     onShowQualitySwitch: () -> Unit = {},
     onAddSongToPlaylist: (LocalPlaylist) -> Unit = {},
-    offlineMode: Boolean = false
+    offlineMode: Boolean = false,
+    startWithSleepTimer: Boolean = false
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var page by remember { mutableStateOf(MoreOptionsPage.MAIN) }
+    var page by remember(startWithSleepTimer) {
+        mutableStateOf(
+            if (startWithSleepTimer) MoreOptionsPage.SLEEP_TIMER else MoreOptionsPage.MAIN
+        )
+    }
     var isDismissing by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
@@ -5550,15 +5550,14 @@ fun MoreOptionsSheet(
                     MoreOptionsMainContent(
                         viewModel = viewModel,
                         originalSong = originalSong,
-                        queue = queue,
                         isLocalSong = isLocalSong,
                         lyricFontScale = currentLyricFontScale,
                         translationFontScale = currentTranslationFontScale,
                         currentPlaybackAudioInfo = currentPlaybackAudioInfo,
                         isDismissing = isDismissing,
-                        snackbarHostState = snackbarHostState,
                         onOpenSearch = { page = MoreOptionsPage.SEARCH },
                         onOpenEditInfo = { page = MoreOptionsPage.EDIT_INFO },
+                        onOpenSleepTimer = { page = MoreOptionsPage.SLEEP_TIMER },
                         onOpenAddToPlaylist = { page = MoreOptionsPage.ADD_TO_PLAYLIST },
                         onOpenPlaybackSound = { page = MoreOptionsPage.PLAYBACK_SOUND },
                         onOpenLyricBehavior = { page = MoreOptionsPage.LYRIC_BEHAVIOR },
@@ -5569,15 +5568,6 @@ fun MoreOptionsSheet(
                         },
                         onShowQualitySwitch = {
                             dismissSheet { onShowQualitySwitch() }
-                        },
-                        onEnterAlbum = { album ->
-                            dismissSheet {
-                                onEnterAlbum(album)
-                                onNavigateUp()
-                            }
-                        },
-                        onDismissSheet = { afterHidden ->
-                            dismissSheet(afterHidden)
                         }
                     )
                 }
@@ -5619,6 +5609,12 @@ fun MoreOptionsSheet(
                             onAddSongToPlaylist(playlist)
                             dismissSheet()
                         }
+                    )
+                }
+
+                MoreOptionsPage.SLEEP_TIMER -> {
+                    SleepTimerSheetContent(
+                        onDismiss = { page = MoreOptionsPage.MAIN }
                     )
                 }
 
@@ -6184,6 +6180,132 @@ fun LyricBehaviorSheet(
         HapticTextButton(onClick = onDismiss) {
             Text(stringResource(R.string.action_done))
         }
+    }
+}
+
+@Composable
+private fun SleepTimerSheetContent(
+    onDismiss: () -> Unit
+) {
+    val timerState by PlayerManager.sleepTimerManager.timerState.collectAsStateWithLifecycle()
+    val finishCurrentOnExpiry by AppContainer.settingsRepo
+        .sleepTimerFinishCurrentOnExpiryFlow
+        .collectAsStateWithLifecycle(initialValue = false)
+    var sliderValue by remember { mutableFloatStateOf(30f) }
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bottomSheetScrollGuard { scrollState.value == 0 }
+            .verticalScroll(scrollState)
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                stringResource(R.string.nowplaying_quick_sleep_timer),
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+        if (timerState.isActive) {
+            MeloxIosGroupedList {
+                MeloxIosListRow(
+                    title = stringResource(R.string.sleep_timer_running),
+                    subtitle = sleepTimerModeLabel(timerState.mode),
+                    detail = PlayerManager.sleepTimerManager.formatRemainingTime(),
+                    leading = { MeloxIosListIcon(Icons.Outlined.Timer) },
+                    showTopSeparator = false
+                )
+                MeloxIosListRow(
+                    title = stringResource(R.string.sleep_timer_cancel),
+                    leading = { MeloxIosListIcon(Icons.Outlined.Close) },
+                    onClick = {
+                        PlayerManager.sleepTimerManager.cancel()
+                        onDismiss()
+                    }
+                )
+            }
+        }
+        MeloxIosGroupedList {
+            Column(
+                modifier = Modifier.padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 14.dp,
+                    bottom = 6.dp
+                )
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.sleep_timer_countdown),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        pluralStringResource(
+                            R.plurals.sleep_timer_minutes,
+                            sliderValue.toInt(),
+                            sliderValue.toInt()
+                        ),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValue = (it / 5f).toInt() * 5f },
+                    valueRange = 5f..120f,
+                    steps = 22,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            MeloxIosListRow(
+                title = stringResource(R.string.sleep_timer_start_countdown),
+                leading = { MeloxIosListIcon(Icons.Outlined.PlayArrow) },
+                onClick = {
+                    PlayerManager.sleepTimerManager.startCountdown(
+                        minutes = sliderValue.toInt(),
+                        finishCurrentOnExpiry = finishCurrentOnExpiry
+                    )
+                    onDismiss()
+                }
+            )
+        }
+        MeloxIosGroupedList {
+            MeloxIosListRow(
+                title = stringResource(R.string.sleep_timer_finish_current),
+                leading = { MeloxIosListIcon(Icons.Outlined.SkipNext) },
+                showTopSeparator = false,
+                onClick = {
+                    PlayerManager.sleepTimerManager.startFinishCurrent()
+                    onDismiss()
+                }
+            )
+            MeloxIosListRow(
+                title = stringResource(R.string.sleep_timer_finish_playlist),
+                leading = { MeloxIosListIcon(Icons.AutoMirrored.Outlined.PlaylistPlay) },
+                onClick = {
+                    PlayerManager.sleepTimerManager.startFinishPlaylist()
+                    onDismiss()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun sleepTimerModeLabel(mode: SleepTimerMode): String {
+    return when (mode) {
+        SleepTimerMode.COUNTDOWN -> stringResource(R.string.sleep_timer_countdown)
+        SleepTimerMode.COUNTDOWN_FINISH_CURRENT ->
+            stringResource(R.string.sleep_timer_countdown_finish_current)
+        SleepTimerMode.FINISH_CURRENT -> stringResource(R.string.sleep_timer_finish_current)
+        SleepTimerMode.FINISH_PLAYLIST -> stringResource(R.string.sleep_timer_finish_playlist)
     }
 }
 

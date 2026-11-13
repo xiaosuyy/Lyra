@@ -170,7 +170,6 @@ import com.lyra.player.ui.component.sheet.bottomSheetScrollGuard
 import com.lyra.player.ui.feedback.LyraOverlaySnackbarHost
 import com.lyra.player.ui.feedback.showNeriSnackbar
 import com.lyra.player.ui.component.lyrics.rememberLyricSeekHapticFeedback
-import com.lyra.player.ui.viewmodel.tab.AlbumSummary
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.ui.haptic.HapticFeedbackEffect
 import com.lyra.player.ui.haptic.HapticIconButton
@@ -189,7 +188,6 @@ fun LyricsScreen(
     lyricBlurAmount: Float,
     lyricFontScales: LyricFontScales,
     onLyricFontScaleChange: (LyricFontScaleTarget, Float) -> Unit,
-    onEnterAlbum: (AlbumSummary) -> Unit,
     onExitNowPlaying: () -> Unit,
     onOpenCurrentArtist: () -> Unit = {},
     onOpenCurrentPlaybackSource: (() -> Unit)? = null,
@@ -615,20 +613,15 @@ fun LyricsScreen(
                 )
             }
             if (showMoreOptions && currentSong != null) {
-                val queue by PlayerManager.currentQueueFlow.collectAsState()
-                val displayedQueue = remember(queue) { queue }
                 val nowPlayingViewModel: com.lyra.player.ui.viewmodel.NowPlayingViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
                 MoreOptionsSheet(
                     viewModel = nowPlayingViewModel,
                     originalSong = currentSong!!,
-                    queue = displayedQueue,
                     displayedLyrics = lyrics,
                     displayedTranslatedLyrics = translatedLyrics.orEmpty(),
                     hasPhoneticLyrics = effectivePhoneticLyrics.isNotEmpty(),
                     onDismiss = { showMoreOptions = false },
                     onShowSongDetails = { detailSong = it },
-                    onEnterAlbum = onEnterAlbum,
-                    onNavigateUp = onExitNowPlaying,
                     snackbarHostState = snackbarHostState,
                     lyricFontScalePage = LyricFontScalePage.LYRICS,
                     lyricFontScales = lyricFontScales,

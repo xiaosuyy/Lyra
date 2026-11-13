@@ -693,7 +693,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         var importedSongs = 0
         remotePlaylists.forEach { remote ->
             val detail = runCatching {
-                api.fetchTencentPlaylist(remote.dissId.toString())
+                api.fetchTencentPlaylistAll(remote.dissId.toString())
             }.getOrElse { error ->
                 LyraLogger.w("LibraryViewModel", "qq playlist ${remote.dissId} load failed: ${error.message}")
                 return@forEach
@@ -765,7 +765,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
             is LibraryPlaylistLinkTarget.TencentPlaylist -> {
                 val detail = CustomChannelSearchApi(AppContainer.sharedOkHttpClient)
-                    .fetchTencentPlaylist(target.dissId)
+                    .fetchTencentPlaylistAll(target.dissId)
                     ?: throw IOException(app.getString(R.string.library_parse_playlist_empty))
                 val songs = detail.songs.map { it.toSongItem(app, MusicSourceIds.TENCENT) }
                 if (songs.isEmpty()) {

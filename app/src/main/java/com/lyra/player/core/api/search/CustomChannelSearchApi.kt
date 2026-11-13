@@ -32,6 +32,9 @@ import org.json.JSONObject
 private const val TAG = "CustomChannelSearch"
 private const val SEARCH_PAGE_SIZE = 20
 private const val PLAYLIST_SONGS_LIMIT = 50
+/** QQ 歌单导入 / 链接解析时逐页拉取，不设 50 首上限 */
+private const val TENCENT_PLAYLIST_IMPORT_PAGE_SIZE = 100
+private const val TENCENT_PLAYLIST_IMPORT_MAX_SONGS = 5000
 private const val MIGU_REFERER = "https://m.music.migu.cn/"
 private const val KUGOU_COVER_SIZE = "240"
 private const val DETAIL_PARALLELISM = 6
@@ -1039,7 +1042,52 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
 
     /** QQ 歌单详情：名称 + 歌曲（公开接口，无需登录）。 */
     suspend fun fetchTencentPlaylist(dissId: String): TencentPlaylistDetail? {
+        return fetchTencentPlaylistPage(dissId, begin = 0, count = PLAYLIST_SONGS_LIMIT)
+            ?.detail
+    }
+
+    /**
+     * QQ 歌单全量详情：按 song_begin / song_num 逐页拉取，导入与链接解析用。
+     * 首页失败返回 null，后续页失败则保留已取到的歌曲。
+     */
+    suspend fun fetchTencentPlaylistAll(dissId: String): TencentPlaylistDetail? {
         if (dissId.isBlank()) return null
+        val songs = mutableListOf<CustomChannelSong>()
+        var name = ""
+        var begin = 0
+        var pageIndex = 0
+        while (songs.size < TENCENT_PLAYLIST_IMPORT_MAX_SONGS) {
+            val page = fetchTencentPlaylistPage(dissId, begin, TENCENT_PLAYLIST_IMPORT_PAGE_SIZE)
+            if (page == null) {
+                if (pageIndex == 0) return null
+                LyraLogger.w(TAG, "QQ 歌单分页中断: dissId=$dissId begin=$begin 已取=${songs.size}")
+                break
+            }
+            if (name.isBlank()) name = page.detail.name
+            val pageSongs = page.detail.songs
+            songs += pageSongs
+            pageIndex++
+            // 空页或已取满总数说明拉完了；返回数量少于请求数也视为最后一页
+            if (pageSongs.isEmpty()) break
+            if (page.total > 0 && songs.size >= page.total) break
+            if (pageSongs.size < TENCENT_PLAYLIST_IMPORT_PAGE_SIZE) break
+            begin += pageSongs.size
+        }
+        if (pageIndex == 0) return null
+        LyraLogger.d(TAG, "QQ 歌单全量拉取: dissId=$dissId pages=$pageIndex songs=${songs.size}")
+        return TencentPlaylistDetail(name = name, songs = songs)
+    }
+
+    private class TencentPlaylistPage(
+        val detail: TencentPlaylistDetail,
+        val total: Int
+    )
+
+    private suspend fun fetchTencentPlaylistPage(
+        dissId: String,
+        begin: Int,
+        count: Int
+    ): TencentPlaylistPage? {
         val payload = JSONObject()
             .put("comm", JSONObject().put("ct", "24").put("cv", "0"))
             .put(
@@ -1055,8 +1103,8 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
                             .put("enc_host_uin", "")
                             .put("tag", 1)
                             .put("userinfo", 1)
-                            .put("song_begin", 0)
-                            .put("song_num", PLAYLIST_SONGS_LIMIT)
+                            .put("song_begin", begin)
+                            .put("song_num", count)
                     )
             )
             .toString()
@@ -1076,10 +1124,13 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
                 }
             }
             val dirInfo = data.optJSONObject("dirinfo")
-            TencentPlaylistDetail(
-                name = dirInfo?.optString("dissname")?.takeIf { it.isNotBlank() }
-                    ?: dirInfo?.optString("title").orEmpty(),
-                songs = songs
+            TencentPlaylistPage(
+                detail = TencentPlaylistDetail(
+                    name = dirInfo?.optString("dissname")?.takeIf { it.isNotBlank() }
+                        ?: dirInfo?.optString("title").orEmpty(),
+                    songs = songs
+                ),
+                total = data.optInt("total_song_num", 0)
             )
         }.onFailure {
             LyraLogger.w(TAG, "QQ 歌单歌曲解析失败: ${it.message}")

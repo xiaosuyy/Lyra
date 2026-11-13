@@ -26,6 +26,7 @@
     <string name="download_resume">Resume Download</string>
     <string name="download_completed">Completed</string>
     <string name="download_cancel_download">Cancel Download</string>
+    <string name="download_retry">Retry</string>
     <string name="download_cancelled_status">Cancelled</string>
     <string name="download_queued_status">Waiting to start</string>
     <string name="download_waiting_queue_summary">The remaining tasks are queued and waiting for a free download slot</string>

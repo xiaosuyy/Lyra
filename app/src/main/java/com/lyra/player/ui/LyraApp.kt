@@ -1479,8 +1479,6 @@ private fun LyraAppContent(
     var miniPlayerCoverBounds by remember { mutableStateOf<Rect?>(null) }
     var showNowPlayingLyrics by rememberSaveable { mutableStateOf(false) }
     var currentPlaybackSourceRoute by rememberSaveable { mutableStateOf<String?>(null) }
-    var restoreLyricsAfterAlbumBack by rememberSaveable { mutableStateOf(false) }
-    var lyricsAlbumRouteObserved by rememberSaveable { mutableStateOf(false) }
     val devModeEnabled by repo.devModeEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
     val alwaysRecordLogsEnabled by repo.alwaysRecordLogsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
     val themeSeedColor by repo.themeSeedColorFlow.collectAsStateWithLifecycle(initialValue = ThemeDefaults.DEFAULT_SEED_COLOR_HEX)
@@ -2111,8 +2109,6 @@ private fun LyraAppContent(
         index: Int,
         sourceRoute: String? = null
     ) {
-        restoreLyricsAfterAlbumBack = false
-        lyricsAlbumRouteObserved = false
         currentPlaybackSourceRoute = sourceRoute
         PlayerManager.prefetchYouTubePlayableUrlWindow(
             playlist = songs,
@@ -2137,8 +2133,6 @@ private fun LyraAppContent(
     }
 
     fun playSongPreservingQueueAndOpenNowPlaying(song: SongItem) {
-        restoreLyricsAfterAlbumBack = false
-        lyricsAlbumRouteObserved = false
         currentPlaybackSourceRoute = null
         PlayerManager.prefetchYouTubePlayableUrlWindow(
             playlist = listOf(song),
@@ -2175,8 +2169,6 @@ private fun LyraAppContent(
         index: Int,
         sourceRoute: String?
     ) {
-        restoreLyricsAfterAlbumBack = false
-        lyricsAlbumRouteObserved = false
         currentPlaybackSourceRoute = sourceRoute
         LyraLogger.d("LYRA-App", "Playing audio from Bili video: ${videos[index].title}")
         PlayerManager.playBiliVideoAsAudio(videos, index)
@@ -2190,8 +2182,6 @@ private fun LyraAppContent(
         coverUrl: String,
         sourceRoute: String?
     ) {
-        restoreLyricsAfterAlbumBack = false
-        lyricsAlbumRouteObserved = false
         currentPlaybackSourceRoute = sourceRoute
         LyraLogger.d("LYRA-App", "Playing parts from Bili video: ${videoInfo.title}")
         PlayerManager.playBiliVideoParts(videoInfo, index, coverUrl)
@@ -2635,22 +2625,6 @@ private fun LyraAppContent(
                 val json = Uri.encode(navigationGson.toJson(playlist))
                 navController.navigate("youtube_music_playlist_detail/$json") {
                     launchSingleTop = true
-                }
-            }
-            LaunchedEffect(currentRoute, restoreLyricsAfterAlbumBack) {
-                if (!restoreLyricsAfterAlbumBack) {
-                    lyricsAlbumRouteObserved = false
-                    return@LaunchedEffect
-                }
-                if (currentRoute == Destinations.NeteaseAlbumDetail.route) {
-                    lyricsAlbumRouteObserved = true
-                    return@LaunchedEffect
-                }
-                if (lyricsAlbumRouteObserved) {
-                    restoreLyricsAfterAlbumBack = false
-                    lyricsAlbumRouteObserved = false
-                    showNowPlayingLyrics = true
-                    showNowPlaying = true
                 }
             }
             val bottomBarItems = remember(showHomeTab, devModeEnabled) {
@@ -4895,14 +4869,6 @@ private fun LyraAppContent(
                                     },
                                     showLyricsScreen = showNowPlayingLyrics,
                                     onShowLyricsScreenChange = { showNowPlayingLyrics = it },
-                                    onEnterAlbum = { album ->
-                                        val shouldRestoreLyrics = showNowPlayingLyrics
-                                        navigateToNeteaseAlbum(album) {
-                                            if (shouldRestoreLyrics) {
-                                                restoreLyricsAfterAlbumBack = true
-                                            }
-                                        }
-                                    },
                                     onEnterArtist = ::navigateToNeteaseArtist,
                                     onEnterBiliUploader = ::navigateToBiliUploader,
                                     onEnterYouTubeCreator = ::navigateToYouTubeMusicCreator,
