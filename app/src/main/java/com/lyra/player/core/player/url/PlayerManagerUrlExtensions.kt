@@ -79,12 +79,6 @@ internal const val OFFLINE_CACHE_URL_PREFIX = "http://offline.cache/"
 
 /** 网易云试听片段使用的缓存 key 前缀（与 buildNeteasePreviewCacheKey 保持一致） */
 private const val NETEASE_PREVIEW_CACHE_KEY_PREFIX = "netease-preview-v1-"
-/**
- * 自定义源单次取链的最长等待时间。
- *
- * 脚本可能因为网络或风控一直不回调，如果没有上限，播放会永远停在“加载中”。
- */
-private const val CUSTOM_SOURCE_QUALITY_TIMEOUT_MS = 6_000L
 /** 自定义源整体取链超时（含音源脚本加载） */
 private const val CUSTOM_SOURCE_TOTAL_TIMEOUT_MS = 20_000L
 /** 网易云受限/试听资源兜底时最多尝试的音质数量 */
@@ -1350,6 +1344,7 @@ internal suspend fun PlayerManager.getCustomSourceAudioUrl(
         return@withContext SongUrlResult.Failure
     }
     val musicInfo = buildCustomSourceMusicInfo(sourceId, song)
+    var attemptedQualities: List<String> = emptyList()
     val resolvedUrl = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) {
         val qualities = CustomSourceManager.availableQualities(application, sourceId)
         if (qualities.isEmpty()) {
@@ -1359,36 +1354,21 @@ internal suspend fun PlayerManager.getCustomSourceAudioUrl(
             )
             return@withTimeoutOrNull null
         }
-        val attemptedQualities = qualities.take(maxQualityAttempts.coerceAtLeast(1))
-        var resolved: String? = null
-        for (quality in attemptedQualities) {
-            val qualityStartedAt = android.os.SystemClock.elapsedRealtime()
-            val url = withTimeoutOrNull(CUSTOM_SOURCE_QUALITY_TIMEOUT_MS) {
-                CustomSourceManager.resolveMusicUrl(
-                    context = application,
-                    sourceId = sourceId,
-                    quality = quality,
-                    musicInfo = musicInfo
-                )
-            }
-            if (!url.isNullOrBlank()) {
-                LyraLogger.i(
-                    "LYRA-PlayerManager",
-                    "自定义源取直链成功: source=$sourceId quality=$quality song=${song.name} " +
-                        "url=${url.take(160)}"
-                )
-                resolved = url
-                break
-            }
-            LyraLogger.w(
-                "LYRA-PlayerManager",
-                "自定义源音质尝试失败: source=$sourceId quality=$quality song=${song.name}, " +
-                    "耗时=${android.os.SystemClock.elapsedRealtime() - qualityStartedAt}ms"
-            )
-        }
-        resolved
+        attemptedQualities = qualities.take(maxQualityAttempts.coerceAtLeast(1))
+        // 脚本 × 音质并发竞速，先返回的可用直链直接采用，不再逐个等待。
+        CustomSourceManager.resolveMusicUrl(
+            context = application,
+            sourceId = sourceId,
+            qualities = attemptedQualities,
+            musicInfo = musicInfo
+        )
     }
     if (!resolvedUrl.isNullOrBlank()) {
+        LyraLogger.i(
+            "LYRA-PlayerManager",
+            "自定义源取直链成功: source=$sourceId qualities=$attemptedQualities " +
+                "song=${song.name} url=${resolvedUrl.take(160)}"
+        )
         return@withContext SongUrlResult.Success(
             url = resolvedUrl,
             durationMs = song.durationMs.takeIf { it > 0L }
@@ -1397,7 +1377,7 @@ internal suspend fun PlayerManager.getCustomSourceAudioUrl(
     LyraLogger.w(
         "LYRA-PlayerManager",
         "自定义源没有返回可用直链: source=$sourceId song=${song.name}, " +
-            "超时上限=${timeoutMs}ms, 最多音质次数=$maxQualityAttempts"
+            "超时上限=${timeoutMs}ms, 尝试音质=$attemptedQualities"
     )
     SongUrlResult.Failure
 }

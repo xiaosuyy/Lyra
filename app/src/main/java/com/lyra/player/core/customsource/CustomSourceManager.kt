@@ -18,12 +18,15 @@ import android.content.Context
 import android.net.Uri
 import android.os.SystemClock
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -290,17 +293,18 @@ internal object CustomSourceManager {
     }
 
     /**
-     * 让自定义源解析歌曲直链，优先使用声明了该音源的脚本。
+     * 让自定义源解析歌曲直链。
      *
-     * 同一音源有多个脚本时，按设置页里的启用顺序依次尝试：越靠前越先使用。
+     * 所有「已启用脚本 × 待尝试音质」的组合同时并发，谁先返回可用直链就用谁；
+     * 串行逐个等待会让最慢的脚本把播放硬生生拖住十几秒。
      */
     suspend fun resolveMusicUrl(
         context: Context,
         sourceId: String,
-        quality: String,
+        qualities: List<String>,
         musicInfo: JSONObject
     ): String? {
-        if (sourceId.isBlank()) return null
+        if (sourceId.isBlank() || qualities.isEmpty()) return null
         ensureLoaded(context)
         val orderById = _states.value.associate { it.id to it.order }
         val candidates = runtimes.entries
@@ -312,20 +316,49 @@ internal object CustomSourceManager {
             LyraLogger.w(TAG, "没有可用的音源脚本运行环境: source=$sourceId")
             return null
         }
-        for ((id, runtime) in candidates) {
-            val startedAt = android.os.SystemClock.elapsedRealtime()
-            val url = runtime.resolveMusicUrl(sourceId, quality, musicInfo)
-            if (!url.isNullOrBlank()) {
-                LyraLogger.d(TAG, "自定义源 $id 解析成功: source=$sourceId quality=$quality")
-                return url
+        return coroutineScope {
+            val tasks = candidates.flatMap { (id, runtime) ->
+                qualities.map { quality ->
+                    async {
+                        val startedAt = SystemClock.elapsedRealtime()
+                        val url = runCatching {
+                            runtime.resolveMusicUrl(sourceId, quality, musicInfo)
+                        }.getOrElse { error ->
+                            if (error is CancellationException) throw error
+                            null
+                        }
+                        val elapsed = SystemClock.elapsedRealtime() - startedAt
+                        if (url.isNullOrBlank()) {
+                            LyraLogger.i(
+                                TAG,
+                                "自定义源 $id 未解析出直链: source=$sourceId quality=$quality, " +
+                                    "耗时=${elapsed}ms"
+                            )
+                        } else {
+                            LyraLogger.d(
+                                TAG,
+                                "自定义源 $id 解析成功: source=$sourceId quality=$quality, " +
+                                    "耗时=${elapsed}ms"
+                            )
+                        }
+                        url
+                    }
+                }
             }
-            LyraLogger.i(
-                TAG,
-                "自定义源 $id 未解析出直链: source=$sourceId quality=$quality, " +
-                    "耗时=${android.os.SystemClock.elapsedRealtime() - startedAt}ms"
-            )
+            val pending = tasks.toMutableList()
+            try {
+                while (pending.isNotEmpty()) {
+                    val (completed, url) = select {
+                        pending.forEach { task -> task.onAwait { task to it } }
+                    }
+                    pending.remove(completed)
+                    if (!url.isNullOrBlank()) return@coroutineScope url
+                }
+                null
+            } finally {
+                tasks.forEach { it.cancel() }
+            }
         }
-        return null
     }
 
     /**
