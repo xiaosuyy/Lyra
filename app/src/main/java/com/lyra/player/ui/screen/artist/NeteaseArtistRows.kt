@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -24,6 +27,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,11 +45,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.lyra.player.R
+import com.lyra.player.core.player.PlayerManager
 import com.lyra.player.data.local.media.displayAlbum
+import com.lyra.player.data.local.playlist.LocalPlaylistRepository
+import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
+import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
+import com.lyra.player.data.model.stableKey
+import com.lyra.player.ui.component.song.SongActionMenuItem
+import com.lyra.player.ui.component.song.SongActionsMenu
+import com.lyra.player.ui.component.song.SwipeRevealMoreRow
 import com.lyra.player.ui.screen.playlist.PlaylistGlassMaskInk
 import com.lyra.player.ui.screen.playlist.playlistModernListErrorContentColor
 import com.lyra.player.ui.screen.playlist.playlistModernListPrimaryContentColor
@@ -50,6 +68,7 @@ import com.lyra.player.data.model.SongItem
 import com.lyra.player.ui.viewmodel.tab.AlbumSummary
 import com.lyra.player.util.format.formatDuration
 import com.lyra.player.util.media.offlineCachedImageRequest
+import kotlinx.coroutines.launch
 
 private val ArtistRowHeight = 66.dp
 private val ArtistRowCoverSize = 44.dp
@@ -123,7 +142,11 @@ internal fun ArtistFollowButton(
 internal fun ArtistSongRow(
     song: SongItem,
     onClick: () -> Unit,
-    offlineMode: Boolean = false
+    offlineMode: Boolean = false,
+    swipeExpanded: Boolean = false,
+    onSwipeExpandedChange: (Boolean) -> Unit = {},
+    onMoreClick: () -> Unit = {},
+    moreMenu: (@Composable () -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coverUrl = rememberSongDisplayCoverUrl(song)
@@ -138,28 +161,38 @@ internal fun ArtistSongRow(
             ?.let(::add)
     }.joinToString(" · ")
     Column {
-        Row(
-            modifier = Modifier
+        SwipeRevealMoreRow(
+            expanded = swipeExpanded,
+            onExpandedChange = onSwipeExpandedChange,
+            revealWidth = 60.dp,
+            slideWidth = 60.dp,
+            swipeEnabled = moreMenu != null,
+            rowModifier = Modifier
                 .fillMaxWidth()
                 .height(ArtistRowHeight)
                 .clickable(onClick = onClick)
                 .padding(horizontal = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            onMoreClick = onMoreClick,
+            moreTint = playlistModernListSecondaryContentColor(),
+            moreContentDescription = stringResource(R.string.cd_more_actions),
+            leading = {
+                AsyncImage(
+                    model = offlineCachedImageRequest(
+                        context = context,
+                        data = coverUrl,
+                        offlineMode = offlineMode
+                    ),
+                    contentDescription = song.displayName(),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(ArtistRowCoverSize)
+                        .clip(ArtistRowCoverShape)
+                        .background(playlistModernListPrimaryContentColor().copy(alpha = 0.10f))
+                )
+                Spacer(Modifier.width(12.dp))
+            },
+            moreMenu = moreMenu
         ) {
-            AsyncImage(
-                model = offlineCachedImageRequest(
-                    context = context,
-                    data = coverUrl,
-                    offlineMode = offlineMode
-                ),
-                contentDescription = song.displayName(),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(ArtistRowCoverSize)
-                    .clip(ArtistRowCoverShape)
-                    .background(playlistModernListPrimaryContentColor().copy(alpha = 0.10f))
-            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -184,6 +217,7 @@ internal fun ArtistSongRow(
                 }
             }
             if (song.durationMs > 0L) {
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text = formatDuration(song.durationMs),
                     fontSize = 13.sp,
@@ -193,6 +227,78 @@ internal fun ArtistSongRow(
         }
         ArtistInsetDivider()
     }
+}
+
+/** 带左滑「更多」菜单的歌曲行：下一首 / 队尾 / 收藏。 */
+@Composable
+internal fun ArtistSwipeSongRow(
+    song: SongItem,
+    onClick: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    offlineMode: Boolean = false
+) {
+    val context = LocalContext.current
+    val playlistRepo = remember(context) { LocalPlaylistRepository.getInstance(context) }
+    val playlists by playlistRepo.playlists.collectAsStateWithLifecycle()
+    val favoriteSongs = remember(playlists, context) {
+        FavoritesPlaylist.firstOrNull(playlists, context)?.songs.orEmpty()
+    }
+    val favoriteSongIndex = remember(favoriteSongs) {
+        FavoriteSongEquivalenceIndex(favoriteSongs)
+    }
+    val isFavorite = favoriteSongIndex.contains(song)
+    val scope = rememberCoroutineScope()
+    var showMoreMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(expanded) {
+        if (!expanded) showMoreMenu = false
+    }
+
+    ArtistSongRow(
+        song = song,
+        onClick = onClick,
+        offlineMode = offlineMode,
+        swipeExpanded = expanded,
+        onSwipeExpandedChange = onExpandedChange,
+        onMoreClick = { showMoreMenu = true },
+        moreMenu = {
+            SongActionsMenu(
+                expanded = showMoreMenu,
+                onDismissRequest = { showMoreMenu = false },
+                actions = buildList {
+                    add(
+                        SongActionMenuItem(
+                            label = stringResource(R.string.local_playlist_play_next),
+                            icon = Icons.AutoMirrored.Outlined.PlaylistPlay
+                        ) { PlayerManager.addToQueueNext(song) }
+                    )
+                    add(
+                        SongActionMenuItem(
+                            label = stringResource(R.string.playlist_add_to_end),
+                            icon = Icons.AutoMirrored.Outlined.PlaylistAdd
+                        ) { PlayerManager.addToQueueEnd(song) }
+                    )
+                    add(
+                        SongActionMenuItem(
+                            label = stringResource(
+                                if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                            ),
+                            icon = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder
+                        ) {
+                            scope.launch {
+                                if (isFavorite) {
+                                    playlistRepo.removeFromFavorites(song)
+                                } else {
+                                    playlistRepo.addToFavorites(song)
+                                }
+                            }
+                        }
+                    )
+                }
+            )
+        }
+    )
 }
 
 @Composable

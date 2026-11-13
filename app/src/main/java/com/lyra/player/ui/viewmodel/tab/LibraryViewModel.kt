@@ -43,9 +43,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.lyra.player.R
 import com.lyra.player.core.api.bili.BiliClient
+import com.lyra.player.core.api.search.CustomChannelSearchApi
 import com.lyra.player.core.api.youtube.YouTubeMusicLibraryPlaylist
 import com.lyra.player.core.di.AppContainer
 import com.lyra.player.core.download.GlobalDownloadManager
+import com.lyra.player.core.source.MusicSourceIds
 import com.lyra.player.data.auth.youtube.buildRefreshObserverFingerprint
 import com.lyra.player.data.platform.youtube.YouTubeFeatureGate
 import com.lyra.player.ui.viewmodel.tab.library.LibrarySection
@@ -77,6 +79,40 @@ data class LibraryUiState(
     val biliPlaylists: List<BiliPlaylist> = emptyList(),
     val biliError: String? = null
 )
+
+/** 已登录且可导入歌单的渠道账号。 */
+data class LibraryLinkedChannelAccount(
+    val channelId: String,
+    val displayName: String,
+    val avatarUrl: String?
+)
+
+/** 单渠道歌单导入结果。 */
+data class LibraryPlaylistImportSummary(
+    val channelId: String,
+    val importedPlaylists: Int = 0,
+    val importedSongs: Int = 0,
+    val error: String? = null
+)
+
+/** 解析歌单链接得到的目标。 */
+sealed interface LibraryPlaylistLinkTarget {
+    data class NeteasePlaylist(val id: Long) : LibraryPlaylistLinkTarget
+    data class NeteaseSong(val id: Long) : LibraryPlaylistLinkTarget
+    data class TencentPlaylist(val dissId: String) : LibraryPlaylistLinkTarget
+    data class TencentSong(val songMid: String) : LibraryPlaylistLinkTarget
+}
+
+private val LIBRARY_HTTP_URL_REGEX = Regex("""https?://[^\s]+""", RegexOption.IGNORE_CASE)
+
+/** 平台侧「我喜欢」歌单由收藏导入负责，导入歌单时跳过，避免生成重复歌单。 */
+private val LIBRARY_FAVORITES_PLAYLIST_NAMES = setOf("我喜欢的音乐", "喜欢的音乐", "我喜欢")
+
+private fun ExploreLinkTarget?.toLibraryLinkTarget(): LibraryPlaylistLinkTarget? = when (this) {
+    is ExploreLinkTarget.NeteasePlaylist -> LibraryPlaylistLinkTarget.NeteasePlaylist(id)
+    is ExploreLinkTarget.NeteaseSong -> LibraryPlaylistLinkTarget.NeteaseSong(id)
+    else -> null
+}
 
 @Suppress("unused")
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
@@ -475,6 +511,324 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun reorderLocalPlaylists(order: List<Long>) {
         launchPlaylistMutation("reorderLocalPlaylists") { localRepo.reorderPlaylists(order) }
+    }
+
+    /** 已登录、可导入歌单的渠道账号。 */
+    fun loadLinkedChannelAccounts(onResult: (List<LibraryLinkedChannelAccount>) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val accounts = buildList {
+                if (runCatching { neteaseClient.hasLogin() }.getOrDefault(false)) {
+                    val profile = runCatching {
+                        JSONObject(neteaseClient.getCurrentUserAccount()).optJSONObject("profile")
+                    }.getOrNull()
+                    val nickname = profile?.optString("nickname")?.trim().orEmpty()
+                    val avatar = profile?.optString("avatarUrl")
+                        .orEmpty()
+                        .ifBlank { profile?.optString("avatarImgUrl").orEmpty() }
+                        .trim()
+                    add(
+                        LibraryLinkedChannelAccount(
+                            channelId = MusicSourceIds.NETEASE,
+                            displayName = nickname.ifBlank {
+                                app.getString(R.string.settings_home_source_netease)
+                            },
+                            avatarUrl = avatar.takeIf { it.isNotBlank() }
+                        )
+                    )
+                }
+                val qqSession = AppContainer.qqMusicSessionRepo.getSessionOnce()
+                if (qqSession.isLoggedIn) {
+                    val profile = runCatching {
+                        AppContainer.qqMusicAccountClient.fetchProfile(
+                            cookie = qqSession.cookie,
+                            uin = qqSession.uin,
+                            musicKey = qqSession.musicKey
+                        )
+                    }.getOrNull()
+                    add(
+                        LibraryLinkedChannelAccount(
+                            channelId = MusicSourceIds.TENCENT,
+                            displayName = profile?.nickname?.takeIf { it.isNotBlank() }
+                                ?: app.getString(R.string.library_tab_qqmusic),
+                            avatarUrl = profile?.avatarUrl
+                        )
+                    )
+                }
+            }
+            withContext(Dispatchers.Main) { onResult(accounts) }
+        }
+    }
+
+    /** 把所选渠道账号里的歌单逐个导入为本地歌单。 */
+    fun importLinkedPlaylists(
+        channelIds: Set<String>,
+        onResult: (List<LibraryPlaylistImportSummary>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val results = channelIds.map { channelId ->
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        when (channelId) {
+                            MusicSourceIds.NETEASE -> importNeteasePlaylists()
+                            MusicSourceIds.TENCENT -> importQQMusicPlaylists()
+                            else -> LibraryPlaylistImportSummary(
+                                channelId = channelId,
+                                error = "unsupported channel"
+                            )
+                        }
+                    }.getOrElse { error ->
+                        LyraLogger.e("LibraryViewModel", "import playlists from $channelId failed", error)
+                        LibraryPlaylistImportSummary(
+                            channelId = channelId,
+                            error = error.message ?: error.javaClass.simpleName
+                        )
+                    }
+                }
+            }
+            onResult(results)
+        }
+    }
+
+    /** 解析歌单/歌曲链接并创建本地歌单，成功时返回新歌单名称。 */
+    fun importPlaylistFromLink(
+        link: String,
+        onResult: (Result<String>) -> Unit
+    ) {
+        viewModelScope.launch {
+            onResult(withContext(Dispatchers.IO) { runCatching { createPlaylistFromLink(link) } })
+        }
+    }
+
+    private suspend fun importNeteasePlaylists(): LibraryPlaylistImportSummary {
+        val app = getApplication<Application>()
+        if (!neteaseClient.hasLogin()) {
+            return LibraryPlaylistImportSummary(
+                channelId = MusicSourceIds.NETEASE,
+                error = app.getString(R.string.playback_login_required)
+            )
+        }
+        runCatching { neteaseClient.ensureWeapiSession() }.onFailure {
+            LyraLogger.w("LibraryViewModel", "ensureWeapiSession failed: ${it.message}")
+        }
+        val remotePlaylists = localRepo.fetchNeteaseRemotePlaylists(neteaseClient)
+            .filterNot { it.name.trim() in LIBRARY_FAVORITES_PLAYLIST_NAMES }
+        var importedPlaylists = 0
+        var importedSongs = 0
+        remotePlaylists.forEach { remote ->
+            val songs = runCatching {
+                parseNeteaseHomeSongs(neteaseClient.getPlaylistDetail(remote.id))
+            }.getOrElse { error ->
+                LyraLogger.w("LibraryViewModel", "netease playlist ${remote.id} load failed: ${error.message}")
+                return@forEach
+            }
+            if (songs.isEmpty()) return@forEach
+            val name = uniquePlaylistName(
+                remote.name.ifBlank { app.getString(R.string.library_create_playlist_default) }
+            )
+            localRepo.createPlaylistWithPreparedSongs(name, songs)
+            importedPlaylists++
+            importedSongs += songs.size
+        }
+        return LibraryPlaylistImportSummary(
+            channelId = MusicSourceIds.NETEASE,
+            importedPlaylists = importedPlaylists,
+            importedSongs = importedSongs
+        )
+    }
+
+    private suspend fun importQQMusicPlaylists(): LibraryPlaylistImportSummary {
+        val app = getApplication<Application>()
+        val session = AppContainer.qqMusicSessionRepo.getSessionOnce()
+        if (!session.isLoggedIn) {
+            return LibraryPlaylistImportSummary(
+                channelId = MusicSourceIds.TENCENT,
+                error = app.getString(R.string.playback_login_required)
+            )
+        }
+        val api = CustomChannelSearchApi(AppContainer.sharedOkHttpClient)
+        val remotePlaylists = AppContainer.qqMusicFavoriteClient.fetchUserPlaylists(session)
+            .filterNot { it.name.trim() in LIBRARY_FAVORITES_PLAYLIST_NAMES }
+        var importedPlaylists = 0
+        var importedSongs = 0
+        remotePlaylists.forEach { remote ->
+            val detail = runCatching {
+                api.fetchTencentPlaylist(remote.dissId.toString())
+            }.getOrElse { error ->
+                LyraLogger.w("LibraryViewModel", "qq playlist ${remote.dissId} load failed: ${error.message}")
+                return@forEach
+            } ?: return@forEach
+            val songs = detail.songs.map { it.toSongItem(app, MusicSourceIds.TENCENT) }
+            if (songs.isEmpty()) return@forEach
+            localRepo.createPlaylistWithPreparedSongs(
+                uniquePlaylistName(detail.name.ifBlank { remote.name }.ifBlank {
+                    app.getString(R.string.library_create_playlist_default)
+                }),
+                songs
+            )
+            importedPlaylists++
+            importedSongs += songs.size
+        }
+        return LibraryPlaylistImportSummary(
+            channelId = MusicSourceIds.TENCENT,
+            importedPlaylists = importedPlaylists,
+            importedSongs = importedSongs
+        )
+    }
+
+    private suspend fun createPlaylistFromLink(rawLink: String): String {
+        val app = getApplication<Application>()
+        val link = rawLink.trim()
+        if (link.isBlank()) {
+            throw IOException(app.getString(R.string.library_parse_playlist_link_empty))
+        }
+        var target = recognizeLibraryPlaylistLink(link)
+        if (target == null && isExpandableShortLink(link)) {
+            val expanded = runCatching {
+                expandExploreRedirectUrl(link, AppContainer.sharedOkHttpClient)
+            }.getOrNull()
+            if (expanded != null) target = recognizeLibraryPlaylistLink(expanded)
+        }
+        if (target == null) {
+            throw IOException(app.getString(R.string.library_parse_playlist_unsupported))
+        }
+
+        when (target) {
+            is LibraryPlaylistLinkTarget.NeteasePlaylist -> {
+                val raw = neteaseClient.getPlaylistDetail(target.id)
+                val songs = parseNeteaseHomeSongs(raw)
+                if (songs.isEmpty()) {
+                    throw IOException(app.getString(R.string.library_parse_playlist_empty))
+                }
+                val name = runCatching {
+                    JSONObject(raw).optJSONObject("playlist")?.optString("name").orEmpty()
+                }.getOrDefault("").ifBlank {
+                    app.getString(R.string.library_parse_playlist_default, target.id)
+                }
+                val uniqueName = uniquePlaylistName(name)
+                localRepo.createPlaylistWithPreparedSongs(uniqueName, songs)
+                return uniqueName
+            }
+
+            is LibraryPlaylistLinkTarget.NeteaseSong -> {
+                val song = parseNeteaseSongDetail(neteaseClient.getSongDetail(listOf(target.id)))
+                    ?: throw IOException(app.getString(R.string.library_parse_playlist_song_failed))
+                val uniqueName = uniquePlaylistName(song.customName ?: song.name)
+                localRepo.createPlaylistWithPreparedSongs(uniqueName, listOf(song))
+                return uniqueName
+            }
+
+            is LibraryPlaylistLinkTarget.TencentPlaylist -> {
+                val detail = CustomChannelSearchApi(AppContainer.sharedOkHttpClient)
+                    .fetchTencentPlaylist(target.dissId)
+                    ?: throw IOException(app.getString(R.string.library_parse_playlist_empty))
+                val songs = detail.songs.map { it.toSongItem(app, MusicSourceIds.TENCENT) }
+                if (songs.isEmpty()) {
+                    throw IOException(app.getString(R.string.library_parse_playlist_empty))
+                }
+                val uniqueName = uniquePlaylistName(
+                    detail.name.ifBlank {
+                        app.getString(R.string.library_parse_playlist_default, target.dissId)
+                    }
+                )
+                localRepo.createPlaylistWithPreparedSongs(uniqueName, songs)
+                return uniqueName
+            }
+
+            is LibraryPlaylistLinkTarget.TencentSong -> {
+                val song = CustomChannelSearchApi(AppContainer.sharedOkHttpClient)
+                    .fetchTencentSong(target.songMid)
+                    ?.toSongItem(app, MusicSourceIds.TENCENT)
+                    ?: throw IOException(app.getString(R.string.library_parse_playlist_song_failed))
+                val uniqueName = uniquePlaylistName(song.customName ?: song.name)
+                localRepo.createPlaylistWithPreparedSongs(uniqueName, listOf(song))
+                return uniqueName
+            }
+        }
+    }
+
+    private fun recognizeLibraryPlaylistLink(input: String): LibraryPlaylistLinkTarget? {
+        recognizeExploreLink(input).toLibraryLinkTarget()?.let { return it }
+
+        val url = extractLibraryHttpUrl(input) ?: return null
+        if (url != input.trim()) {
+            recognizeExploreLink(url).toLibraryLinkTarget()?.let { return it }
+        }
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
+        val host = uri.host?.lowercase() ?: return null
+        if (!host.endsWith("y.qq.com")) return null
+        val segments = uri.path.orEmpty()
+            .trim('/')
+            .split('/')
+            .filter { it.isNotBlank() }
+        val params = runCatching {
+            uri.rawQuery.orEmpty()
+                .split('&')
+                .mapNotNull { part ->
+                    val key = part.substringBefore('=').takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    key to part.substringAfter('=', "")
+                }
+                .toMap()
+        }.getOrDefault(emptyMap())
+
+        segments.indexOfFirst { it == "songDetail" || it == "song-detail" }
+            .takeIf { it >= 0 }
+            ?.let { index -> segments.getOrNull(index + 1) }
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return LibraryPlaylistLinkTarget.TencentSong(it) }
+
+        segments.indexOfFirst { it == "playlist" }
+            .takeIf { it >= 0 }
+            ?.let { index -> segments.getOrNull(index + 1) }
+            ?.takeIf { it.all(Char::isDigit) && it.isNotBlank() }
+            ?.let { return LibraryPlaylistLinkTarget.TencentPlaylist(it) }
+
+        (params["disstid"] ?: params["id"])
+            ?.takeIf { it.all(Char::isDigit) && it.isNotBlank() }
+            ?.let { return LibraryPlaylistLinkTarget.TencentPlaylist(it) }
+        return null
+    }
+
+    private fun isExpandableShortLink(input: String): Boolean {
+        if (recognizeExploreLink(input) is ExploreLinkTarget.NeteaseShortLink) return true
+        return isTencentShortLink(input)
+    }
+
+    private fun isTencentShortLink(input: String): Boolean {
+        val url = extractLibraryHttpUrl(input) ?: return false
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+        val host = uri.host?.lowercase() ?: return false
+        return host == "c6.y.qq.com" ||
+            (host.endsWith("y.qq.com") && uri.path.orEmpty().trim('/').startsWith("u"))
+    }
+
+    private fun extractLibraryHttpUrl(input: String): String? {
+        val trimmed = input.trim()
+        if (trimmed.isBlank()) return null
+        return LIBRARY_HTTP_URL_REGEX.find(trimmed)
+            ?.value
+            ?.trimEnd('。', '，', ',', '.', '）', ')', '】', ']', '}', '》', '>')
+            ?.takeIf { it.isNotBlank() }
+            ?: trimmed.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+    }
+
+    private fun uniquePlaylistName(base: String): String {
+        val app = getApplication<Application>()
+        val trimmed = base.trim().take(LocalPlaylistRepository.MAX_PLAYLIST_NAME_LENGTH)
+            .ifBlank { app.getString(R.string.library_create_playlist_default) }
+        val existingNames = localRepo.playlists.value
+            .map { it.name.lowercase() }
+            .toMutableSet()
+        if (trimmed.lowercase() !in existingNames) return trimmed
+        var index = 2
+        while (true) {
+            val suffix = " ($index)"
+            val candidate = trimmed
+                .take(LocalPlaylistRepository.MAX_PLAYLIST_NAME_LENGTH - suffix.length)
+                .trimEnd() + suffix
+            if (candidate.lowercase() !in existingNames) return candidate
+            index++
+        }
     }
 
     private fun launchPlaylistMutation(

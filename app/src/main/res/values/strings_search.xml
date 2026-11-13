@@ -70,4 +70,5 @@
     <string name="youtube_creator_choose_title">选择 YouTube 创作者</string>
     <string name="youtube_creator_not_available">这首歌没有可打开的 YouTube 创作者信息</string>
     <string name="youtube_creator_open_failed">无法打开 YouTube 创作者主页：%s</string>
+    <string name="qq_artist_open_failed">无法打开 QQ 音乐歌手主页：%s</string>
 </resources>

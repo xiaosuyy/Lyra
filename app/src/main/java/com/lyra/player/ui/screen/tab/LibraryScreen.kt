@@ -79,9 +79,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -145,6 +147,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
@@ -194,11 +197,16 @@ import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.component.playlist.showPlaylistDeleteResultGlobally
+import com.lyra.player.ui.feedback.AppFeedback
+import com.lyra.player.ui.screen.playlist.FavoritesChannelAccount
+import com.lyra.player.ui.screen.playlist.FavoritesChannelPickerDialog
 import com.lyra.player.ui.util.shouldAllowCollapsingTopAppBar
 import com.lyra.player.data.model.NeteaseArtistSummary
 import com.lyra.player.ui.viewmodel.tab.AlbumSummary
 import com.lyra.player.ui.viewmodel.tab.BiliPlaylist
 import com.lyra.player.ui.viewmodel.tab.BiliPlaylistKind
+import com.lyra.player.ui.viewmodel.tab.LibraryLinkedChannelAccount
+import com.lyra.player.ui.viewmodel.tab.LibraryPlaylistImportSummary
 import com.lyra.player.ui.viewmodel.tab.LibraryViewModel
 import com.lyra.player.ui.viewmodel.tab.PlaylistSummary
 import com.lyra.player.ui.viewmodel.tab.YouTubeMusicPlaylist
@@ -591,6 +599,9 @@ fun LibraryScreen(
                             onReorder = { order ->
                                 vm.reorderLocalPlaylists(order)
                             },
+                            onLoadLinkedAccounts = vm::loadLinkedChannelAccounts,
+                            onImportPlaylists = vm::importLinkedPlaylists,
+                            onParsePlaylistLink = vm::importPlaylistFromLink,
                             showHeader = false,
                             searchQuery = libraryQuery,
                             offlineMode = offlineMode
@@ -980,6 +991,31 @@ private fun LibraryInsetDivider(leading: Dp) {
         modifier = Modifier.padding(start = leading, end = 18.dp),
         thickness = 0.6.dp,
         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
+    )
+}
+
+@Composable
+private fun LibraryPlaylistProgressDialog(message: String) {
+    MiuixSettingsDialog(
+        onDismissRequest = {},
+        confirmButton = {},
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        ),
+        text = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+                Text(text = message, style = MeloxType.body)
+            }
+        }
     )
 }
 
@@ -1652,6 +1688,12 @@ private fun LocalPlaylistList(
     onRename: (Long, String) -> Unit = { _, _ -> },
     onDelete: (List<Long>) -> Unit = {},
     onReorder: (List<Long>) -> Unit = {},
+    onLoadLinkedAccounts: ((List<LibraryLinkedChannelAccount>) -> Unit) -> Unit = { cb -> cb(emptyList()) },
+    onImportPlaylists: (Set<String>, (List<LibraryPlaylistImportSummary>) -> Unit) -> Unit =
+        { _, cb -> cb(emptyList()) },
+    onParsePlaylistLink: (String, (Result<String>) -> Unit) -> Unit = { _, cb ->
+        cb(Result.failure(IllegalStateException()))
+    },
     showHeader: Boolean = true,
     searchQuery: String? = null,
     offlineMode: Boolean
@@ -1673,6 +1715,16 @@ private fun LocalPlaylistList(
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showDeleteSelectedConfirm by rememberSaveable { mutableStateOf(false) }
     var swipeRevealedPlaylistId by remember { mutableStateOf<Long?>(null) }
+    var createRowSwipeExpanded by remember { mutableStateOf(false) }
+    var showCreateRowMenu by remember { mutableStateOf(false) }
+    var showImportPicker by remember { mutableStateOf(false) }
+    var importAccountsLoading by remember { mutableStateOf(false) }
+    var importAccounts by remember { mutableStateOf<List<LibraryLinkedChannelAccount>>(emptyList()) }
+    var importSelectedChannels by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var importInProgress by remember { mutableStateOf(false) }
+    var showParseDialog by remember { mutableStateOf(false) }
+    var parseLinkText by remember { mutableStateOf("") }
+    var parseInProgress by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val defaultPlaylistName = composeResources.getString(R.string.library_create_playlist_default)
     val maxNameLength = LocalPlaylistRepository.MAX_PLAYLIST_NAME_LENGTH
@@ -1721,11 +1773,20 @@ private fun LocalPlaylistList(
     BackHandler(enabled = !selectionMode && swipeRevealedPlaylistId != null) {
         swipeRevealedPlaylistId = null
     }
+    BackHandler(enabled = !selectionMode && createRowSwipeExpanded) {
+        createRowSwipeExpanded = false
+    }
     LaunchedEffect(selectionMode) {
-        if (selectionMode) swipeRevealedPlaylistId = null
+        if (selectionMode) {
+            swipeRevealedPlaylistId = null
+            createRowSwipeExpanded = false
+        }
     }
     LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) swipeRevealedPlaylistId = null
+        if (listState.isScrollInProgress) {
+            swipeRevealedPlaylistId = null
+            createRowSwipeExpanded = false
+        }
     }
 
     LaunchedEffect(editablePlaylists) {
@@ -1760,6 +1821,99 @@ private fun LocalPlaylistList(
         newName = ""
         nameError = null
         return true
+    }
+
+    fun channelLabel(channelId: String): String = composeResources.getString(
+        if (channelId == MusicSourceIds.TENCENT) {
+            R.string.library_tab_qqmusic
+        } else {
+            R.string.library_tab_netease
+        }
+    )
+
+    fun openImportPicker() {
+        showCreateRowMenu = false
+        createRowSwipeExpanded = false
+        importAccounts = emptyList()
+        importSelectedChannels = emptySet()
+        importAccountsLoading = true
+        showImportPicker = true
+        onLoadLinkedAccounts { accounts ->
+            importAccounts = accounts
+            if (importSelectedChannels.isEmpty()) {
+                importSelectedChannels = accounts.map { it.channelId }.toSet()
+            }
+            importAccountsLoading = false
+        }
+    }
+
+    fun confirmImport() {
+        val channels = importSelectedChannels
+        if (channels.isEmpty() || importInProgress) return
+        showImportPicker = false
+        importInProgress = true
+        onImportPlaylists(channels) { results ->
+            importInProgress = false
+            createRowSwipeExpanded = false
+            val failures = results.filter { it.error != null }
+            val totalPlaylists = results.sumOf { it.importedPlaylists }
+            val totalSongs = results.sumOf { it.importedSongs }
+            val failureText = failures.joinToString("；") {
+                composeResources.getString(
+                    R.string.library_playlist_import_channel_failed,
+                    channelLabel(it.channelId),
+                    it.error.orEmpty()
+                )
+            }
+            val message = when {
+                totalPlaylists == 0 && failures.isNotEmpty() -> failureText
+                totalPlaylists == 0 ->
+                    composeResources.getString(R.string.library_playlist_import_nothing)
+
+                failures.isNotEmpty() -> composeResources.getString(
+                    R.string.library_playlist_import_done,
+                    totalPlaylists,
+                    totalSongs
+                ) + "；" + failureText
+
+                else -> composeResources.getString(
+                    R.string.library_playlist_import_done,
+                    totalPlaylists,
+                    totalSongs
+                )
+            }
+            AppFeedback.show(context, message)
+        }
+    }
+
+    fun confirmParse() {
+        if (parseInProgress) return
+        val link = parseLinkText.trim()
+        if (link.isBlank()) return
+        parseInProgress = true
+        onParsePlaylistLink(link) { result ->
+            parseInProgress = false
+            result.fold(
+                onSuccess = { name ->
+                    showParseDialog = false
+                    parseLinkText = ""
+                    createRowSwipeExpanded = false
+                    AppFeedback.show(
+                        context,
+                        composeResources.getString(R.string.library_playlist_parse_done, name)
+                    )
+                },
+                onFailure = { error ->
+                    AppFeedback.show(
+                        context,
+                        composeResources.getString(
+                            R.string.library_playlist_parse_failed,
+                            error.message ?: error.javaClass.simpleName
+                        )
+                    )
+                }
+            )
+        }
     }
 
     val miniPlayerHeight = LocalMiniPlayerHeight.current
@@ -1963,21 +2117,59 @@ private fun LocalPlaylistList(
         if (activeSearchQuery.isBlank()) {
             item(key = "local_playlist_create") {
             Column(Modifier.animateItem()) {
-                Row(
-                    modifier = Modifier
+                SwipeRevealMoreRow(
+                    expanded = createRowSwipeExpanded,
+                    onExpandedChange = { expanded ->
+                        createRowSwipeExpanded = expanded
+                        if (expanded) swipeRevealedPlaylistId = null
+                    },
+                    revealWidth = 60.dp,
+                    slideWidth = 60.dp,
+                    swipeEnabled = !selectionMode,
+                    rowModifier = Modifier
                         .fillMaxWidth()
-                        .height(58.dp)
+                        .height(66.dp)
                         .clickable(enabled = !selectionMode) { showDialog = true }
                         .padding(horizontal = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    onMoreClick = { showCreateRowMenu = true },
+                    moreTint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                    moreContentDescription = stringResource(R.string.common_more_actions),
+                    leading = {
+                        Box(
+                            modifier = Modifier.size(44.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Add,
+                                contentDescription = null,
+                                tint = MeloxSystemColors.HomeAccent,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(16.dp))
+                    },
+                    moreMenu = {
+                        SongActionsMenu(
+                            expanded = showCreateRowMenu,
+                            onDismissRequest = { showCreateRowMenu = false },
+                            actions = listOf(
+                                SongActionMenuItem(
+                                    label = stringResource(R.string.library_playlist_import),
+                                    icon = Icons.Outlined.CloudDownload
+                                ) { openImportPicker() },
+                                SongActionMenuItem(
+                                    label = stringResource(R.string.library_playlist_parse),
+                                    icon = Icons.Outlined.Link
+                                ) {
+                                    showCreateRowMenu = false
+                                    createRowSwipeExpanded = false
+                                    parseLinkText = ""
+                                    showParseDialog = true
+                                }
+                            )
+                        )
+                    }
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Add,
-                        contentDescription = null,
-                        tint = MeloxSystemColors.HomeAccent,
-                        modifier = Modifier.size(24.dp)
-                    )
                     Text(
                         text = stringResource(R.string.library_create_new),
                         fontSize = 17.sp,
@@ -2066,6 +2258,79 @@ private fun LocalPlaylistList(
                             onClick = { showDeleteSelectedConfirm = false }
                         ) { Text(stringResource(R.string.action_cancel)) }
                     }
+                )
+            }
+
+            if (showImportPicker) {
+                FavoritesChannelPickerDialog(
+                    title = stringResource(R.string.library_playlist_import_title),
+                    accounts = importAccounts.map { account ->
+                        FavoritesChannelAccount(
+                            channelId = account.channelId,
+                            channelLabel = channelLabel(account.channelId),
+                            displayName = account.displayName,
+                            avatarUrl = account.avatarUrl
+                        )
+                    },
+                    selectedChannels = importSelectedChannels,
+                    loading = importAccountsLoading,
+                    confirmEnabled = !importAccountsLoading &&
+                        importSelectedChannels.isNotEmpty() &&
+                        !importInProgress,
+                    onToggleChannel = { channelId ->
+                        importSelectedChannels =
+                            if (channelId in importSelectedChannels) {
+                                importSelectedChannels - channelId
+                            } else {
+                                importSelectedChannels + channelId
+                            }
+                    },
+                    onConfirm = { confirmImport() },
+                    onDismissRequest = { showImportPicker = false }
+                )
+            }
+
+            if (showParseDialog) {
+                MiuixSettingsDialog(
+                    onDismissRequest = { showParseDialog = false },
+                    title = { Text(stringResource(R.string.library_playlist_parse_title)) },
+                    text = {
+                        MiuixSettingsDialogContent(verticalSpacing = 12.dp) {
+                            MiuixSettingsTextField(
+                                value = parseLinkText,
+                                onValueChange = { parseLinkText = it },
+                                placeholder = {
+                                    Text(stringResource(R.string.library_playlist_parse_hint))
+                                },
+                                singleLine = true
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        MiuixSettingsButton(
+                            onClick = { confirmParse() },
+                            enabled = parseLinkText.isNotBlank() && !parseInProgress
+                        ) {
+                            Text(stringResource(R.string.library_playlist_parse_action))
+                        }
+                    },
+                    dismissButton = {
+                        MiuixSettingsTextButton(
+                            onClick = { showParseDialog = false }
+                        ) { Text(stringResource(R.string.action_cancel)) }
+                    }
+                )
+            }
+
+            if (importInProgress || parseInProgress) {
+                LibraryPlaylistProgressDialog(
+                    message = stringResource(
+                        if (importInProgress) {
+                            R.string.library_playlist_import_progress
+                        } else {
+                            R.string.library_playlist_parse_progress
+                        }
+                    )
                 )
             }
             }
@@ -2184,6 +2449,7 @@ private fun LocalPlaylistList(
                         swipeExpanded = swipeRevealedPlaylistId == pl.id,
                         onSwipeExpandedChange = { expanded ->
                             swipeRevealedPlaylistId = if (expanded) pl.id else null
+                            if (expanded) createRowSwipeExpanded = false
                         },
                         swipeEnabled = !selectionMode && !isSystemPlaylist,
                         moreActions = if (isSystemPlaylist) null else listOf(

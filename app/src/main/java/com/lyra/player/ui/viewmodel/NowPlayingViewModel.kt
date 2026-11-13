@@ -35,6 +35,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.lyra.player.core.api.bili.resolveBiliSong
+import com.lyra.player.core.api.search.CustomChannelArtist
+import com.lyra.player.core.api.search.CustomChannelSearchApi
 import com.lyra.player.core.api.search.MusicPlatform
 import com.lyra.player.core.api.search.SongSearchInfo
 import com.lyra.player.core.api.youtube.YouTubeMusicCreatorSummary
@@ -52,6 +54,7 @@ import com.lyra.player.core.logging.LyraLogger
 import com.lyra.player.R
 
 private const val YOUTUBE_MUSIC_CREATOR_SEARCH_LIMIT = 8
+private const val TENCENT_ARTIST_FALLBACK_LIMIT = 3
 
 private val YouTubeMusicArtistSeparator = Regex(
     pattern = """\s+(?:/|&|x|feat\.?|featuring|ft\.?)\s+|[、,，;；]\s*""",
@@ -85,6 +88,26 @@ private fun normalizeYouTubeMusicCreatorName(value: String): String {
         .trim()
         .replace(Regex("""\s+"""), " ")
         .lowercase()
+}
+
+private fun normalizeTencentArtistName(value: String): String =
+    value.trim().replace(Regex("""\s+"""), " ").lowercase()
+
+internal fun findTencentArtistMatches(
+    artistName: String,
+    candidates: List<CustomChannelArtist>
+): List<CustomChannelArtist> {
+    val normalizedArtistName = normalizeTencentArtistName(artistName)
+    if (normalizedArtistName.isBlank()) return emptyList()
+    val exactMatches = candidates.filter { candidate ->
+        normalizeTencentArtistName(candidate.name) == normalizedArtistName
+    }
+    if (exactMatches.isNotEmpty()) return exactMatches
+    // QQ 搜索的歌手名偶尔带英文名后缀（如「周杰伦 Jay Chou」），用包含关系兜底。
+    return candidates.filter { candidate ->
+        val candidateName = normalizeTencentArtistName(candidate.name)
+        candidateName.contains(normalizedArtistName) || normalizedArtistName.contains(candidateName)
+    }.take(TENCENT_ARTIST_FALLBACK_LIMIT)
 }
 
 data class ManualSearchState(
@@ -405,6 +428,36 @@ class NowPlayingViewModel : ViewModel() {
                 throw error
             } catch (error: Exception) {
                 LyraLogger.e("NowPlayingViewModel", "解析 YouTube 创作者失败", error)
+                onError(error)
+            }
+        }
+    }
+
+    fun resolveTencentArtists(
+        song: SongItem,
+        onResult: (List<CustomChannelArtist>) -> Unit,
+        onError: (Throwable) -> Unit = {}
+    ) {
+        val artistNames = splitYouTubeMusicArtistNames(song.artist)
+        if (artistNames.isEmpty()) {
+            onResult(emptyList())
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val artists = withContext(Dispatchers.IO) {
+                    val api = CustomChannelSearchApi(AppContainer.sharedOkHttpClient)
+                    artistNames.flatMap { artistName ->
+                        val candidates = api.searchTencentArtists(artistName)
+                        findTencentArtistMatches(artistName, candidates)
+                    }.distinctBy(CustomChannelArtist::id)
+                }
+                onResult(artists)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                LyraLogger.e("NowPlayingViewModel", "解析 QQ 音乐歌手失败", error)
                 onError(error)
             }
         }

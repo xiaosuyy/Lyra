@@ -70,4 +70,5 @@
     <string name="youtube_creator_choose_title">Choose YouTube creator</string>
     <string name="youtube_creator_not_available">No YouTube creator information is available for this song</string>
     <string name="youtube_creator_open_failed">Failed to open YouTube creator page: %s</string>
+    <string name="qq_artist_open_failed">Failed to open QQ Music artist page: %s</string>
 </resources>

@@ -25,6 +25,14 @@ internal data class QQMusicLikedPage(
     val total: Int
 )
 
+/** QQ 音乐账号下的歌单（导入到 Lyra 用）。 */
+internal data class QQMusicRemotePlaylist(
+    val dissId: Long,
+    val name: String,
+    val coverUrl: String?,
+    val songCount: Int
+)
+
 internal data class QQMusicFavoriteWriteResult(
     val added: Int,
     val failed: Int
@@ -83,6 +91,53 @@ internal class QQMusicFavoriteClient(
         )
         QQMusicLikedPage(songs = songs, total = total)
     }
+
+    /** 当前账号创建/收藏的歌单列表。 */
+    suspend fun fetchUserPlaylists(session: QQMusicSession): List<QQMusicRemotePlaylist> =
+        withContext(Dispatchers.IO) {
+            if (!session.isLoggedIn) throw IOException("请先登录 QQ音乐账号")
+            val param = JSONObject().put("uin", session.uin)
+            val data = runCatching {
+                musicu(
+                    session = session,
+                    module = "music.musicasset.PlaylistBaseRead",
+                    method = "GetPlaylistByUin",
+                    param = param,
+                    commStyle = MusicuCommStyle.ANDROID
+                )
+            }.getOrElse { androidError ->
+                runCatching {
+                    musicu(
+                        session = session,
+                        module = "music.musicasset.PlaylistBaseRead",
+                        method = "GetPlaylistByUin",
+                        param = param,
+                        commStyle = MusicuCommStyle.WEB
+                    )
+                }.getOrElse { throw androidError }
+            }
+            val array = findArray(data, "v_playlist", "playlist", "list")
+                ?: return@withContext emptyList()
+            buildList(array.length()) {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val basic = item.optJSONObject("basic") ?: item
+                    val dissId = firstLong(basic, "tid", "dissid", "disstid", "id")
+                        .takeIf { it > 0L } ?: continue
+                    val name = firstString(basic, "dissname", "title", "name", "dirName")
+                        .takeIf { it.isNotBlank() } ?: continue
+                    val cover = firstString(basic, "logo", "picurl", "picUrl", "coverUrl")
+                        .ifBlank {
+                            basic.optJSONObject("cover")?.optString("default_url").orEmpty()
+                        }
+                        .takeIf { it.isNotBlank() }
+                        ?.replaceFirst("http://", "https://")
+                    val songCount = firstInt(basic, "songnum", "songNum", "song_cnt")
+                        ?.coerceAtLeast(0) ?: 0
+                    add(QQMusicRemotePlaylist(dissId, name, cover, songCount))
+                }
+            }
+        }
 
     /** 批量收藏；只处理能解析出数字 songId 的 mid。 */
     suspend fun addFavorites(

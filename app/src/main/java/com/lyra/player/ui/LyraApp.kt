@@ -4906,6 +4906,7 @@ private fun LyraAppContent(
                                     onEnterArtist = ::navigateToNeteaseArtist,
                                     onEnterBiliUploader = ::navigateToBiliUploader,
                                     onEnterYouTubeCreator = ::navigateToYouTubeMusicCreator,
+                                    onEnterTencentArtist = ::navigateToTencentArtist,
                                     lyricBlurEnabled = lyricBlurEnabled,
                                     lyricBlurAmount = lyricBlurAmount,
                                     lyricFontScales = lyricFontScales,

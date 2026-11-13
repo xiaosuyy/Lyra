@@ -254,6 +254,7 @@ import com.lyra.player.core.api.lyrics.defaultEditableLyricMatchSources
 import com.lyra.player.core.api.lyrics.editableLyricMatchResultComparator
 import com.lyra.player.core.api.lyrics.hasCollapsedTimedLyricTimeline
 import com.lyra.player.core.api.lyrics.normalizeLyricMatchText
+import com.lyra.player.core.api.search.CustomChannelArtist
 import com.lyra.player.core.api.search.MusicPlatform
 import com.lyra.player.core.api.search.SongSearchInfo
 import com.lyra.player.core.api.youtube.YouTubeMusicCreatorSummary
@@ -2442,6 +2443,7 @@ fun NowPlayingScreen(
     onEnterArtist: (NeteaseArtistSummary) -> Unit = {},
     onEnterBiliUploader: (BiliUploaderSummary) -> Unit = {},
     onEnterYouTubeCreator: (YouTubeMusicCreatorSummary) -> Unit = {},
+    onEnterTencentArtist: (CustomChannelArtist) -> Unit = {},
     lyricBlurEnabled: Boolean,
     lyricBlurAmount: Float,
     lyricFontScales: LyricFontScales,
@@ -2805,9 +2807,13 @@ fun NowPlayingScreen(
     var youtubeCreatorPickerCandidates by remember {
         mutableStateOf<List<YouTubeMusicCreatorSummary>>(emptyList())
     }
+    var tencentArtistPickerCandidates by remember {
+        mutableStateOf<List<CustomChannelArtist>>(emptyList())
+    }
     var resolvingArtistNavigation by remember { mutableStateOf(false) }
     var resolvingBiliUploader by remember { mutableStateOf(false) }
     var resolvingYouTubeCreator by remember { mutableStateOf(false) }
+    var resolvingTencentArtist by remember { mutableStateOf(false) }
 
     fun openResolvedArtist(artist: NeteaseArtistSummary) {
         onEnterArtist(artist)
@@ -2821,6 +2827,11 @@ fun NowPlayingScreen(
 
     fun openResolvedYouTubeCreator(creator: YouTubeMusicCreatorSummary) {
         onEnterYouTubeCreator(creator)
+        onNavigateUp()
+    }
+
+    fun openResolvedTencentArtist(artist: CustomChannelArtist) {
+        onEnterTencentArtist(artist)
         onNavigateUp()
     }
 
@@ -2847,6 +2858,19 @@ fun NowPlayingScreen(
             }
             1 -> openResolvedYouTubeCreator(distinctCreators.first())
             else -> youtubeCreatorPickerCandidates = distinctCreators
+        }
+    }
+
+    fun openTencentArtistCandidates(artists: List<CustomChannelArtist>) {
+        val distinctArtists = artists
+            .filter { it.id.isNotBlank() && it.name.isNotBlank() }
+            .distinctBy(CustomChannelArtist::id)
+        when (distinctArtists.size) {
+            0 -> screenScope.launch {
+                snackbarHostState.showNeriSnackbar(composeResources.getString(R.string.artist_not_available))
+            }
+            1 -> openResolvedTencentArtist(distinctArtists.first())
+            else -> tencentArtistPickerCandidates = distinctArtists
         }
     }
 
@@ -2932,6 +2956,33 @@ fun NowPlayingScreen(
         }
     }
 
+    val openCurrentTencentArtist: () -> Unit = {
+        val song = currentSong
+        if (song != null && isTencentArtistNavigationSource(song) && !resolvingTencentArtist) {
+            resolvingTencentArtist = true
+            nowPlayingViewModel.resolveTencentArtists(
+                song = song,
+                onResult = { artists ->
+                    resolvingTencentArtist = false
+                    if (currentSong?.sameIdentityAs(song) == true) {
+                        openTencentArtistCandidates(artists)
+                    }
+                },
+                onError = { error ->
+                    resolvingTencentArtist = false
+                    screenScope.launch {
+                        snackbarHostState.showNeriSnackbar(
+                            composeResources.getString(
+                                R.string.qq_artist_open_failed,
+                                error.message ?: error.javaClass.simpleName
+                            )
+                        )
+                    }
+                }
+            )
+        }
+    }
+
     val openCurrentArtist: () -> Unit = {
         when {
             currentSong?.let(::isBiliUploaderNavigationSource) == true -> {
@@ -2939,6 +2990,9 @@ fun NowPlayingScreen(
             }
             currentSong?.let(::isYouTubeMusicArtistNavigationSource) == true -> {
                 openCurrentYouTubeCreator()
+            }
+            currentSong?.let(::isTencentArtistNavigationSource) == true -> {
+                openCurrentTencentArtist()
             }
             else -> {
                 openCurrentNeteaseArtist()
@@ -5061,6 +5115,17 @@ fun NowPlayingScreen(
                 )
             }
 
+            if (tencentArtistPickerCandidates.isNotEmpty()) {
+                TencentArtistPickerSheet(
+                    artists = tencentArtistPickerCandidates,
+                    onDismiss = { tencentArtistPickerCandidates = emptyList() },
+                    onSelect = { artist ->
+                        tencentArtistPickerCandidates = emptyList()
+                        openResolvedTencentArtist(artist)
+                    }
+                )
+            }
+
             if (showQualitySwitchDialog && currentPlaybackAudioInfo != null) {
                 NowPlayingQualityOptionsDialog(
                     title = stringResource(R.string.nowplaying_quality_switch_title),
@@ -5248,6 +5313,10 @@ internal fun isYouTubeMusicArtistNavigationSource(song: SongItem): Boolean {
         )
 }
 
+internal fun isTencentArtistNavigationSource(song: SongItem): Boolean {
+    return song.artist.isNotBlank() && song.channelId.equals("tencent", ignoreCase = true)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NeteaseArtistPickerSheet(
@@ -5275,6 +5344,53 @@ private fun NeteaseArtistPickerSheet(
             artists.forEach { artist ->
                 ListItem(
                     headlineContent = { Text(artist.name) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable { onSelect(artist) }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TencentArtistPickerSheet(
+    artists: List<CustomChannelArtist>,
+    onDismiss: () -> Unit,
+    onSelect: (CustomChannelArtist) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .bottomSheetScrollGuard()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(bottom = 16.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.artist_choose_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+            )
+            artists.forEach { artist ->
+                ListItem(
+                    headlineContent = { Text(artist.name) },
+                    leadingContent = artist.coverUrl?.takeIf(String::isNotBlank)?.let { cover ->
+                        {
+                            AsyncImage(
+                                model = cover,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                            )
+                        }
+                    },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { onSelect(artist) }
                 )

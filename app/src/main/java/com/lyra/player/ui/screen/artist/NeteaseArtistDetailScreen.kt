@@ -78,6 +78,7 @@ import com.lyra.player.R
 import com.lyra.player.data.local.media.displayAlbum
 import com.lyra.player.data.model.displayArtist
 import com.lyra.player.data.model.displayName
+import com.lyra.player.data.model.stableKey
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.melox.theme.MeloxShapes
 import com.lyra.player.ui.screen.playlist.PlaylistGlassMaskColor
@@ -318,6 +319,12 @@ private fun ArtistContent(
     val horizontalInset = if (isTabletLayout) 36.dp else 0.dp
     val normalizedQuery = searchQuery.trim()
     val isFiltering = searchActive && normalizedQuery.isNotEmpty()
+    var swipeExpandedSongKey by remember { mutableStateOf<String?>(null) }
+
+    BackHandler(enabled = swipeExpandedSongKey != null) { swipeExpandedSongKey = null }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) swipeExpandedSongKey = null
+    }
     val filteredSongs = remember(ui.songs, normalizedQuery, searchActive) {
         if (!isFiltering) {
             ui.songs
@@ -423,9 +430,14 @@ private fun ArtistContent(
                 }
             } else {
                 itemsIndexed(songs, key = { _, item -> item.id }) { index, song ->
-                    ArtistSongRow(
+                    val songKey = song.stableKey()
+                    ArtistSwipeSongRow(
                         song = song,
                         onClick = { onSongClick(songs, index) },
+                        expanded = swipeExpandedSongKey == songKey,
+                        onExpandedChange = { open ->
+                            swipeExpandedSongKey = if (open) songKey else null
+                        },
                         offlineMode = offlineMode
                     )
                 }

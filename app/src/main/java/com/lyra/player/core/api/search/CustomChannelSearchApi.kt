@@ -100,6 +100,12 @@ internal data class CustomChannelArtistPage<T>(
     val hasMore: Boolean
 )
 
+/** QQ 歌单详情（名称 + 歌曲）。 */
+internal data class TencentPlaylistDetail(
+    val name: String,
+    val songs: List<CustomChannelSong>
+)
+
 /** 渠道歌单搜索结果 */
 data class CustomChannelPlaylist(
     val id: String,
@@ -1028,7 +1034,12 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
     }
 
     suspend fun fetchTencentPlaylistSongs(dissId: String): List<CustomChannelSong> {
-        if (dissId.isBlank()) return emptyList()
+        return fetchTencentPlaylist(dissId)?.songs.orEmpty()
+    }
+
+    /** QQ 歌单详情：名称 + 歌曲（公开接口，无需登录）。 */
+    suspend fun fetchTencentPlaylist(dissId: String): TencentPlaylistDetail? {
+        if (dissId.isBlank()) return null
         val payload = JSONObject()
             .put("comm", JSONObject().put("ct", "24").put("cv", "0"))
             .put(
@@ -1051,22 +1062,42 @@ internal class CustomChannelSearchApi(private val okHttpClient: OkHttpClient) {
             .toString()
         val url = "https://u.y.qq.com/cgi-bin/musicu.fcg?format=json&data=" + encode(payload)
         val raw = get(url, referer = "https://y.qq.com/", userAgent = CustomChannelSearchConfig.DESKTOP_USER_AGENT)
-            ?: return emptyList()
+            ?: return null
         return runCatching {
-            val array = JSONObject(raw)
+            val data = JSONObject(raw)
                 .optJSONObject("req")
                 ?.optJSONObject("data")
-                ?.optJSONArray("songlist")
-                ?: JSONArray()
-            buildList(array.length()) {
+                ?: return@runCatching null
+            val array = data.optJSONArray("songlist") ?: JSONArray()
+            val songs = buildList(array.length()) {
                 for (index in 0 until array.length()) {
                     val song = array.optJSONObject(index)?.let(::tencentSongFromJson) ?: continue
                     add(song)
                 }
             }
+            val dirInfo = data.optJSONObject("dirinfo")
+            TencentPlaylistDetail(
+                name = dirInfo?.optString("dissname")?.takeIf { it.isNotBlank() }
+                    ?: dirInfo?.optString("title").orEmpty(),
+                songs = songs
+            )
         }.onFailure {
             LyraLogger.w(TAG, "QQ 歌单歌曲解析失败: ${it.message}")
-        }.getOrDefault(emptyList())
+        }.getOrNull()
+    }
+
+    /** QQ 单曲详情（公开接口，链接解析用）。 */
+    suspend fun fetchTencentSong(songMid: String): CustomChannelSong? {
+        val detail = tencentSongDetail(songMid) ?: return null
+        return CustomChannelSong(
+            platformId = songMid,
+            name = detail.name,
+            artist = detail.singer,
+            album = detail.albumName,
+            durationMs = detail.durationMs,
+            coverUrl = detail.albumMid?.let(::tencentAlbumCoverUrl),
+            albumId = detail.albumId
+        )
     }
 
     private fun miguSearchUrl(
