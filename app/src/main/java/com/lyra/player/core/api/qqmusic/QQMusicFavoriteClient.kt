@@ -20,6 +20,8 @@ import java.io.IOException
 /** 「我喜欢」在 QQ 音乐里的固定目录 id。 */
 internal const val QQ_LIKED_DIRECTORY_ID = 201
 
+private const val COLLECTED_PLAYLIST_PAGE_SIZE = 80
+
 internal data class QQMusicLikedPage(
     val songs: List<CustomChannelSong>,
     val total: Int
@@ -92,47 +94,46 @@ internal class QQMusicFavoriteClient(
         QQMusicLikedPage(songs = songs, total = total)
     }
 
-    /** 当前账号创建/收藏的歌单列表。 */
-    suspend fun fetchUserPlaylists(session: QQMusicSession): List<QQMusicRemotePlaylist> =
+    /** 当前账号收藏（订阅）的歌单列表，不含自建歌单与「我喜欢」。 */
+    suspend fun fetchCollectedPlaylists(session: QQMusicSession): List<QQMusicRemotePlaylist> =
         withContext(Dispatchers.IO) {
             if (!session.isLoggedIn) throw IOException("请先登录 QQ音乐账号")
-            val param = JSONObject().put("uin", session.uin)
-            val data = runCatching {
-                musicu(
-                    session = session,
-                    module = "music.musicasset.PlaylistBaseRead",
-                    method = "GetPlaylistByUin",
-                    param = param,
-                    commStyle = MusicuCommStyle.ANDROID
-                )
-            }.getOrElse { androidError ->
-                runCatching {
-                    musicu(
-                        session = session,
-                        module = "music.musicasset.PlaylistBaseRead",
-                        method = "GetPlaylistByUin",
-                        param = param,
-                        commStyle = MusicuCommStyle.WEB
-                    )
-                }.getOrElse { throw androidError }
-            }
-            val array = findArray(data, "v_playlist", "playlist", "list")
+            val url = "https://c.y.qq.com/fav/fcgi-bin/fcg_get_profile_order_asset.fcg"
+                .toHttpUrlOrNull()
+                ?.newBuilder()
+                ?.addQueryParameter("ct", "20")
+                ?.addQueryParameter("cid", "205360956")
+                ?.addQueryParameter("userid", session.uin)
+                ?.addQueryParameter("reqtype", "3")
+                ?.addQueryParameter("sin", "0")
+                ?.addQueryParameter("ein", COLLECTED_PLAYLIST_PAGE_SIZE.toString())
+                ?.build()
                 ?: return@withContext emptyList()
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", DESKTOP_USER_AGENT)
+                .header("Referer", "https://y.qq.com/portal/profile.html")
+                .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
+                .build()
+            val body = httpClient.newCall(request).awaitResponse { response ->
+                if (!response.isSuccessful) throw IOException("QQ音乐收藏歌单请求失败：HTTP ${response.code}")
+                response.body.string()
+            }
+            val json = runCatching { JSONObject(stripJsonp(body)) }
+                .getOrElse { throw IOException("QQ音乐收藏歌单响应无法解析", it) }
+            val data = json.optJSONObject("data") ?: return@withContext emptyList()
+            val array = data.optJSONArray("cdlist") ?: return@withContext emptyList()
             buildList(array.length()) {
                 for (index in 0 until array.length()) {
                     val item = array.optJSONObject(index) ?: continue
-                    val basic = item.optJSONObject("basic") ?: item
-                    val dissId = firstLong(basic, "tid", "dissid", "disstid", "id")
+                    val dissId = firstLong(item, "dissid", "tid", "dirid", "diss_id")
                         .takeIf { it > 0L } ?: continue
-                    val name = firstString(basic, "dissname", "title", "name", "dirName")
+                    val name = firstString(item, "diss_name", "dissname", "name", "title")
                         .takeIf { it.isNotBlank() } ?: continue
-                    val cover = firstString(basic, "logo", "picurl", "picUrl", "coverUrl")
-                        .ifBlank {
-                            basic.optJSONObject("cover")?.optString("default_url").orEmpty()
-                        }
+                    val cover = firstString(item, "diss_cover", "logo", "picurl", "picUrl")
                         .takeIf { it.isNotBlank() }
                         ?.replaceFirst("http://", "https://")
-                    val songCount = firstInt(basic, "songnum", "songNum", "song_cnt")
+                    val songCount = firstInt(item, "song_cnt", "songnum", "total_song_num")
                         ?.coerceAtLeast(0) ?: 0
                     add(QQMusicRemotePlaylist(dissId, name, cover, songCount))
                 }

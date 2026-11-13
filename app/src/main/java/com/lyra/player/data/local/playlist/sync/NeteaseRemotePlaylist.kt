@@ -29,12 +29,15 @@ import java.io.IOException
 data class NeteaseRemotePlaylist(
     val id: Long,
     val name: String,
-    val trackCount: Int
+    val trackCount: Int,
+    val isFavorites: Boolean = false,
+    val isCollected: Boolean = false
 )
 
 internal fun parseNeteaseRemotePlaylists(
     raw: String,
-    ownerUserId: Long? = null
+    ownerUserId: Long? = null,
+    onlyOwned: Boolean = true
 ): List<NeteaseRemotePlaylist> {
     if (raw.isBlank()) {
         throw IOException("NetEase playlist response is empty")
@@ -63,12 +66,15 @@ internal fun parseNeteaseRemotePlaylists(
         val id = playlist.optLong("id", 0L)
         val name = playlist.optString("name", "").trim()
         val creatorId = playlist.optJSONObject("creator")?.optLong("userId", 0L) ?: 0L
-        if (ownerUserId != null && creatorId != ownerUserId) continue
+        if (onlyOwned && ownerUserId != null && creatorId != ownerUserId) continue
         if (id <= 0L || name.isBlank() || !seenIds.add(id)) continue
         result += NeteaseRemotePlaylist(
             id = id,
             name = name,
-            trackCount = playlist.optInt("trackCount", 0)
+            trackCount = playlist.optInt("trackCount", 0),
+            isFavorites = playlist.optInt("specialType", 0) == 5,
+            isCollected = playlist.optBoolean("subscribed", false) ||
+                (ownerUserId != null && creatorId != 0L && creatorId != ownerUserId)
         )
     }
     return result

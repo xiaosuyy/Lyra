@@ -68,6 +68,50 @@ class NeteaseRemotePlaylistTest {
     }
 
     @Test
+    fun `parse remote playlists marks collected and favorites when including others`() {
+        val raw = """
+            {
+              "code": 200,
+              "playlist": [
+                {
+                  "id": 301,
+                  "name": "我喜欢的音乐",
+                  "trackCount": 5,
+                  "specialType": 5,
+                  "subscribed": false,
+                  "creator": { "userId": 7 }
+                },
+                {
+                  "id": 302,
+                  "name": "Self Made",
+                  "trackCount": 8,
+                  "subscribed": false,
+                  "creator": { "userId": 7 }
+                },
+                {
+                  "id": 303,
+                  "name": "Collected",
+                  "trackCount": 30,
+                  "subscribed": true,
+                  "creator": { "userId": 8 }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val playlists = parseNeteaseRemotePlaylists(raw, ownerUserId = 7L, onlyOwned = false)
+
+        assertEquals(
+            listOf(
+                NeteaseRemotePlaylist(301L, "我喜欢的音乐", 5, isFavorites = true, isCollected = false),
+                NeteaseRemotePlaylist(302L, "Self Made", 8),
+                NeteaseRemotePlaylist(303L, "Collected", 30, isCollected = true)
+            ),
+            playlists
+        )
+    }
+
+    @Test
     fun `parse remote playlists reports api errors`() {
         val error = assertThrows(IOException::class.java) {
             parseNeteaseRemotePlaylists(

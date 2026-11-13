@@ -2229,7 +2229,10 @@ class LocalPlaylistRepository private constructor(
         return prepareNeteaseLikeSyncPlan(client, songs).pendingSongs
     }
 
-    suspend fun fetchNeteaseRemotePlaylists(client: NeteaseClient): List<NeteaseRemotePlaylist> {
+    suspend fun fetchNeteaseRemotePlaylists(
+        client: NeteaseClient,
+        onlyOwned: Boolean = true
+    ): List<NeteaseRemotePlaylist> {
         return withContext(Dispatchers.IO) {
             if (!client.hasLogin()) {
                 throw IOException(context.getString(R.string.playback_login_required))
@@ -2240,7 +2243,8 @@ class LocalPlaylistRepository private constructor(
             val uid = client.getCurrentUserId()
             parseNeteaseRemotePlaylists(
                 raw = client.getUserPlaylists(uid, offset = 0, limit = 1000),
-                ownerUserId = uid
+                ownerUserId = uid,
+                onlyOwned = onlyOwned
             )
         }
     }

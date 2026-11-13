@@ -106,7 +106,19 @@ sealed interface LibraryPlaylistLinkTarget {
 private val LIBRARY_HTTP_URL_REGEX = Regex("""https?://[^\s]+""", RegexOption.IGNORE_CASE)
 
 /** 平台侧「我喜欢」歌单由收藏导入负责，导入歌单时跳过，避免生成重复歌单。 */
-private val LIBRARY_FAVORITES_PLAYLIST_NAMES = setOf("我喜欢的音乐", "喜欢的音乐", "我喜欢")
+private val LIBRARY_FAVORITES_PLAYLIST_NAMES = setOf(
+    "我喜欢的音乐",
+    "喜欢的音乐",
+    "我喜欢",
+    "我喜欢听的音乐"
+)
+
+private fun isPlatformFavoritesPlaylist(name: String): Boolean {
+    val normalized = name
+        .replace(Regex("""[\s\u3000]+"""), "")
+        .replace(Regex("""[（(]\d+[)）]$"""), "")
+    return normalized in LIBRARY_FAVORITES_PLAYLIST_NAMES
+}
 
 private fun ExploreLinkTarget?.toLibraryLinkTarget(): LibraryPlaylistLinkTarget? = when (this) {
     is ExploreLinkTarget.NeteasePlaylist -> LibraryPlaylistLinkTarget.NeteasePlaylist(id)
@@ -611,8 +623,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         runCatching { neteaseClient.ensureWeapiSession() }.onFailure {
             LyraLogger.w("LibraryViewModel", "ensureWeapiSession failed: ${it.message}")
         }
-        val remotePlaylists = localRepo.fetchNeteaseRemotePlaylists(neteaseClient)
-            .filterNot { it.name.trim() in LIBRARY_FAVORITES_PLAYLIST_NAMES }
+        val remotePlaylists = localRepo.fetchNeteaseRemotePlaylists(neteaseClient, onlyOwned = false)
+            .filter { it.isCollected && !it.isFavorites && !isPlatformFavoritesPlaylist(it.name) }
         var importedPlaylists = 0
         var importedSongs = 0
         remotePlaylists.forEach { remote ->
@@ -647,8 +659,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             )
         }
         val api = CustomChannelSearchApi(AppContainer.sharedOkHttpClient)
-        val remotePlaylists = AppContainer.qqMusicFavoriteClient.fetchUserPlaylists(session)
-            .filterNot { it.name.trim() in LIBRARY_FAVORITES_PLAYLIST_NAMES }
+        val remotePlaylists = AppContainer.qqMusicFavoriteClient.fetchCollectedPlaylists(session)
+            .filterNot { isPlatformFavoritesPlaylist(it.name) }
         var importedPlaylists = 0
         var importedSongs = 0
         remotePlaylists.forEach { remote ->
