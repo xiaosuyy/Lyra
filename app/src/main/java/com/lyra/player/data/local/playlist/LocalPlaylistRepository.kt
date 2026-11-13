@@ -2241,11 +2241,25 @@ class LocalPlaylistRepository private constructor(
                 LyraLogger.w("LocalPlaylistRepo", "ensureWeapiSession failed: ${it.message}")
             }
             val uid = client.getCurrentUserId()
-            parseNeteaseRemotePlaylists(
-                raw = client.getUserPlaylists(uid, offset = 0, limit = 1000),
-                ownerUserId = uid,
-                onlyOwned = onlyOwned
+            val playlists = mutableListOf<NeteaseRemotePlaylist>()
+            var offset = 0
+            var pages = 0
+            // 一次性拉 1000 条时服务端响应很慢，改成分页拉取。
+            do {
+                val page = parseNeteaseRemotePlaylists(
+                    raw = client.getUserPlaylists(uid, offset = offset, limit = NETEASE_PLAYLIST_PAGE_SIZE),
+                    ownerUserId = uid,
+                    onlyOwned = onlyOwned
+                )
+                playlists += page
+                offset += NETEASE_PLAYLIST_PAGE_SIZE
+                pages++
+            } while (page.size >= NETEASE_PLAYLIST_PAGE_SIZE && pages < NETEASE_PLAYLIST_MAX_PAGES)
+            LyraLogger.d(
+                "LocalPlaylistRepo",
+                "netease user/playlist pages=$pages total=${playlists.size}"
             )
+            playlists
         }
     }
 
@@ -3103,6 +3117,8 @@ class LocalPlaylistRepository private constructor(
 
     companion object {
         const val MAX_PLAYLIST_NAME_LENGTH = 10
+        private const val NETEASE_PLAYLIST_PAGE_SIZE = 100
+        private const val NETEASE_PLAYLIST_MAX_PAGES = 10
         private const val LOCAL_METADATA_REFRESH_BATCH_SIZE = 48
         private const val LOCAL_METADATA_REFRESH_PARALLELISM = 4
         private const val NETEASE_PLAYLIST_ADD_BATCH_SIZE = 50

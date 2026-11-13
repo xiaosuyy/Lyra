@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.lyra.player.R
 import com.lyra.player.core.api.bili.BiliClient
+import com.lyra.player.core.api.qqmusic.QQ_LIKED_DIRECTORY_ID
 import com.lyra.player.core.api.search.CustomChannelSearchApi
 import com.lyra.player.core.api.youtube.YouTubeMusicLibraryPlaylist
 import com.lyra.player.core.di.AppContainer
@@ -60,6 +61,7 @@ import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.LocalPlaylistDeleteResult
 import com.lyra.player.data.local.playlist.runLocalPlaylistMutationSafely
 import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
+import com.lyra.player.data.local.playlist.sync.NeteaseRemotePlaylist
 import com.lyra.player.data.model.SongItem
 import com.lyra.player.core.logging.LyraLogger
 import org.json.JSONObject
@@ -119,6 +121,10 @@ private fun isPlatformFavoritesPlaylist(name: String): Boolean {
         .replace(Regex("""[（(]\d+[)）]$"""), "")
     return normalized in LIBRARY_FAVORITES_PLAYLIST_NAMES
 }
+
+/** 导入歌单时保留自建与收藏两类，只跳过平台「我喜欢的音乐」。 */
+internal fun List<NeteaseRemotePlaylist>.importableLibraryPlaylists(): List<NeteaseRemotePlaylist> =
+    filterNot { it.isFavorites || isPlatformFavoritesPlaylist(it.name) }
 
 private fun ExploreLinkTarget?.toLibraryLinkTarget(): LibraryPlaylistLinkTarget? = when (this) {
     is ExploreLinkTarget.NeteasePlaylist -> LibraryPlaylistLinkTarget.NeteasePlaylist(id)
@@ -624,7 +630,12 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             LyraLogger.w("LibraryViewModel", "ensureWeapiSession failed: ${it.message}")
         }
         val remotePlaylists = localRepo.fetchNeteaseRemotePlaylists(neteaseClient, onlyOwned = false)
-            .filter { it.isCollected && !it.isFavorites && !isPlatformFavoritesPlaylist(it.name) }
+            .importableLibraryPlaylists()
+        LyraLogger.d(
+            "LibraryViewModel",
+            "netease import candidates: " +
+                remotePlaylists.joinToString { "${it.id}:${it.name}:${it.trackCount}" }
+        )
         var importedPlaylists = 0
         var importedSongs = 0
         remotePlaylists.forEach { remote ->
@@ -659,8 +670,25 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             )
         }
         val api = CustomChannelSearchApi(AppContainer.sharedOkHttpClient)
-        val remotePlaylists = AppContainer.qqMusicFavoriteClient.fetchCollectedPlaylists(session)
-            .filterNot { isPlatformFavoritesPlaylist(it.name) }
+        // 自建与收藏的歌单都导入；任一接口失败不影响另一类歌单。
+        val createdPlaylists = runCatching {
+            AppContainer.qqMusicFavoriteClient.fetchCreatedPlaylists(session)
+        }.onFailure { error ->
+            LyraLogger.w("LibraryViewModel", "qq created playlists load failed: ${error.message}")
+        }.getOrDefault(emptyList())
+        val collectedPlaylists = runCatching {
+            AppContainer.qqMusicFavoriteClient.fetchCollectedPlaylists(session)
+        }.onFailure { error ->
+            LyraLogger.w("LibraryViewModel", "qq collected playlists load failed: ${error.message}")
+        }.getOrDefault(emptyList())
+        val remotePlaylists = (createdPlaylists + collectedPlaylists)
+            .filterNot { it.dissId == QQ_LIKED_DIRECTORY_ID.toLong() || isPlatformFavoritesPlaylist(it.name) }
+            .distinctBy { it.dissId }
+        LyraLogger.d(
+            "LibraryViewModel",
+            "qq import created=${createdPlaylists.size} collected=${collectedPlaylists.size} " +
+                "candidates=" + remotePlaylists.joinToString { "${it.dissId}:${it.name}:${it.songCount}" }
+        )
         var importedPlaylists = 0
         var importedSongs = 0
         remotePlaylists.forEach { remote ->
@@ -671,13 +699,18 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 return@forEach
             } ?: return@forEach
             val songs = detail.songs.map { it.toSongItem(app, MusicSourceIds.TENCENT) }
-            if (songs.isEmpty()) return@forEach
-            localRepo.createPlaylistWithPreparedSongs(
-                uniquePlaylistName(detail.name.ifBlank { remote.name }.ifBlank {
-                    app.getString(R.string.library_create_playlist_default)
-                }),
-                songs
+            LyraLogger.d(
+                "LibraryViewModel",
+                "qq playlist ${remote.dissId} detailName='${detail.name}' songs=${songs.size}"
             )
+            if (songs.isEmpty()) return@forEach
+            val name = detail.name.ifBlank { remote.name }
+            if (name.isBlank()) {
+                // 公开详情接口不返回自建/私密歌单名，取不到名字时不生成无名歌单。
+                LyraLogger.w("LibraryViewModel", "qq playlist ${remote.dissId} has no name, skipped")
+                return@forEach
+            }
+            localRepo.createPlaylistWithPreparedSongs(uniquePlaylistName(name), songs)
             importedPlaylists++
             importedSongs += songs.size
         }
