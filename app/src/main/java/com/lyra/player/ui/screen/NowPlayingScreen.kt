@@ -278,6 +278,7 @@ import com.lyra.player.data.model.isSyncableRemoteSong
 import com.lyra.player.data.local.media.CustomSongCoverStorage
 import com.lyra.player.data.local.playlist.LocalPlaylistRepository
 import com.lyra.player.data.local.playlist.launchLocalPlaylistMutation
+import com.lyra.player.data.local.playlist.model.LocalPlaylist
 import com.lyra.player.data.local.playlist.system.FavoritesPlaylist
 import com.lyra.player.data.local.playlist.system.LocalFilesPlaylist
 import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
@@ -331,6 +332,9 @@ import com.lyra.player.ui.component.song.SongActionMenuItem
 import com.lyra.player.ui.component.song.SongActionsMenu
 import com.lyra.player.ui.component.playback.rememberDelayedPlaybackWaiting
 import com.lyra.player.ui.screen.nowplaying.NowPlayingAmbientBackground
+import com.lyra.player.ui.melox.components.MeloxIosGroupedList
+import com.lyra.player.ui.melox.components.MeloxIosListIcon
+import com.lyra.player.ui.melox.components.MeloxIosListRow
 import com.lyra.player.ui.melox.theme.MeloxShapes
 import com.lyra.player.ui.melox.theme.MeloxSystemColors
 import com.lyra.player.ui.melox.theme.MeloxType
@@ -4288,6 +4292,19 @@ fun NowPlayingScreen(
                                 onLyricFontScaleChange = onLyricFontScaleChange,
                                 currentPlaybackAudioInfo = currentPlaybackAudioInfo,
                                 onShowQualitySwitch = { showQualitySwitchDialog = true },
+                                onAddSongToPlaylist = { playlist ->
+                                    if (FavoritesPlaylist.isSystemPlaylist(playlist, context)) {
+                                        // 加入我喜欢的音乐等同于收藏，即使此前未收藏也会同步为已收藏。
+                                        PlayerManager.addCurrentToFavorites()
+                                    } else {
+                                        launchWithLocalSyncWarning(
+                                            song = currentSong,
+                                            actionLabel = composeResources.getString(R.string.playlist_add_to)
+                                        ) {
+                                            PlayerManager.addCurrentToPlaylist(playlist.id)
+                                        }
+                                    }
+                                },
                                 offlineMode = offlineMode
                             )
                         }
@@ -5439,6 +5456,7 @@ private fun YouTubeMusicCreatorPickerSheet(
 
 private enum class MoreOptionsPage {
     MAIN,
+    ADD_TO_PLAYLIST,
     SEARCH,
     LYRIC_BEHAVIOR,
     FONT_SIZE,
@@ -5466,6 +5484,7 @@ fun MoreOptionsSheet(
     onLyricFontScaleChange: (LyricFontScaleTarget, Float) -> Unit,
     currentPlaybackAudioInfo: PlaybackAudioInfo? = null,
     onShowQualitySwitch: () -> Unit = {},
+    onAddSongToPlaylist: (LocalPlaylist) -> Unit = {},
     offlineMode: Boolean = false
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -5540,6 +5559,7 @@ fun MoreOptionsSheet(
                         snackbarHostState = snackbarHostState,
                         onOpenSearch = { page = MoreOptionsPage.SEARCH },
                         onOpenEditInfo = { page = MoreOptionsPage.EDIT_INFO },
+                        onOpenAddToPlaylist = { page = MoreOptionsPage.ADD_TO_PLAYLIST },
                         onOpenPlaybackSound = { page = MoreOptionsPage.PLAYBACK_SOUND },
                         onOpenLyricBehavior = { page = MoreOptionsPage.LYRIC_BEHAVIOR },
                         onOpenFontSize = { page = MoreOptionsPage.FONT_SIZE },
@@ -5590,6 +5610,15 @@ fun MoreOptionsSheet(
                             PlayerManager.seekTo(positionMs)
                         },
                         onDismiss = { page = MoreOptionsPage.MAIN }
+                    )
+                }
+
+                MoreOptionsPage.ADD_TO_PLAYLIST -> {
+                    AddToPlaylistSheetContent(
+                        onSelectPlaylist = { playlist ->
+                            onAddSongToPlaylist(playlist)
+                            dismissSheet()
+                        }
                     )
                 }
 
@@ -6154,6 +6183,64 @@ fun LyricBehaviorSheet(
         Spacer(Modifier.height(16.dp))
         HapticTextButton(onClick = onDismiss) {
             Text(stringResource(R.string.action_done))
+        }
+    }
+}
+
+@Composable
+private fun AddToPlaylistSheetContent(
+    onSelectPlaylist: (LocalPlaylist) -> Unit
+) {
+    val context = LocalContext.current
+    val playlists by PlayerManager.playlistsFlow.collectAsStateWithLifecycle()
+    val selectablePlaylists = remember(playlists, context) {
+        playlists
+            .filterNot { LocalFilesPlaylist.isSystemPlaylist(it, context) }
+            .sortedBy { if (FavoritesPlaylist.isSystemPlaylist(it, context)) 0 else 1 }
+    }
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bottomSheetScrollGuard { scrollState.value == 0 }
+            .verticalScroll(scrollState)
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                stringResource(R.string.playlist_add_to),
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+        MeloxIosGroupedList {
+            selectablePlaylists.forEachIndexed { index, playlist ->
+                MeloxIosListRow(
+                    title = playlist.name,
+                    detail = pluralStringResource(
+                        R.plurals.nowplaying_song_count_format,
+                        playlist.songs.size,
+                        playlist.songs.size
+                    ),
+                    leading = {
+                        MeloxIosListIcon(
+                            if (FavoritesPlaylist.isSystemPlaylist(playlist, context)) {
+                                Icons.Outlined.FavoriteBorder
+                            } else {
+                                Icons.AutoMirrored.Outlined.PlaylistPlay
+                            }
+                        )
+                    },
+                    showTopSeparator = index != 0,
+                    onClick = { onSelectPlaylist(playlist) }
+                )
+            }
         }
     }
 }

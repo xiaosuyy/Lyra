@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
@@ -101,6 +102,7 @@ internal fun MoreOptionsMainContent(
     snackbarHostState: SnackbarHostState,
     onOpenSearch: () -> Unit,
     onOpenEditInfo: () -> Unit,
+    onOpenAddToPlaylist: () -> Unit,
     onOpenPlaybackSound: () -> Unit,
     onOpenLyricBehavior: () -> Unit,
     onOpenFontSize: () -> Unit,
@@ -132,6 +134,14 @@ internal fun MoreOptionsMainContent(
             isLocalSong = isLocalSong,
             onShowSongDetails = onShowSongDetails
         )
+        MeloxIosGroupedList {
+            MeloxIosListRow(
+                title = stringResource(R.string.playlist_add_to),
+                leading = { MeloxIosListIcon(Icons.AutoMirrored.Outlined.PlaylistAdd) },
+                showTopSeparator = false,
+                onClick = onOpenAddToPlaylist
+            )
+        }
         LyricsAndAlbumActions(
             song = originalSong,
             lyricFontScale = lyricFontScale,
