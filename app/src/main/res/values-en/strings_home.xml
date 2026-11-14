@@ -40,6 +40,8 @@
     <string name="home_unfavorite_playlist">Unfavorite</string>
     <string name="home_favorite_playlist">Favorite Playlist</string>
     <string name="home_unfavorited">Unfavorited</string>
+    <string name="home_collect_added">Favorited. Find it under Library playlists</string>
+    <string name="home_collect_failed">Failed to favorite playlist</string>
     <string name="continue_playing_remove">Remove</string>
     <string name="home_title_brand_loud">Lyra!</string>
     <string name="home_title_brand_wave">Lyra~</string>

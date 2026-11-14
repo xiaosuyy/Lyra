@@ -25,6 +25,7 @@ package com.lyra.player.ui.screen.playlist
 
 import android.app.Application
 import android.content.ClipData
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -128,6 +129,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil.compose.AsyncImage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.lyra.player.R
@@ -305,7 +307,9 @@ fun NeteaseSongCollectionDetailScreen(
     coverUrl: String? = null,
     onBack: () -> Unit = {},
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
-    offlineMode: Boolean = false
+    offlineMode: Boolean = false,
+    favoritePlaylistId: Long? = null,
+    favoritePlaylistSource: String = "neteaseAdhoc"
 ) {
     val resolvedCoverUrl = coverUrl?.takeIf { it.isNotBlank() }
         ?: songs.firstNotNullOfOrNull { song ->
@@ -313,10 +317,10 @@ fun NeteaseSongCollectionDetailScreen(
                 ?: song.coverUrl?.takeIf { it.isNotBlank() }
                 ?: song.originalCoverUrl?.takeIf { it.isNotBlank() }
         }.orEmpty()
-    val collectionKey = remember(title, songs.size) {
-        -1_000_000L - (title.hashCode().toLong() and 0x7FFFFFFFL)
+    val collectionKey = remember(title, songs.size, favoritePlaylistId) {
+        favoritePlaylistId ?: (-1_000_000L - (title.hashCode().toLong() and 0x7FFFFFFFL))
     }
-    val ui = remember(title, subtitle, songs, resolvedCoverUrl) {
+    val ui = remember(title, subtitle, songs, resolvedCoverUrl, collectionKey) {
         NeteaseCollectionDetailUiState(
             loading = false,
             header = NeteaseCollectionHeader(
@@ -339,16 +343,31 @@ fun NeteaseSongCollectionDetailScreen(
         DetailScreen(
             ui = ui,
             playlistId = collectionKey,
-            playlistSource = "neteaseAdhoc",
+            playlistSource = favoritePlaylistSource,
             initialCoverUrl = resolvedCoverUrl,
             onRetry = {},
             onBack = onBack,
             onSongClick = onSongClick,
             offlineMode = offlineMode,
             heroSubtitleOverride = subtitle,
-            enableFavorite = false
+            enableFavorite = favoritePlaylistId != null
         )
     }
+}
+
+private suspend fun materializeLibraryPlaylist(
+    context: Context,
+    repo: LocalPlaylistRepository,
+    baseName: String,
+    songs: List<SongItem>
+) {
+    if (songs.isEmpty()) return
+    repo.awaitInitialized()
+    val name = baseName.trim()
+        .take(LocalPlaylistRepository.MAX_PLAYLIST_NAME_LENGTH)
+        .ifBlank { context.getString(R.string.library_create_playlist_default) }
+    if (repo.playlists.value.any { it.name.equals(name, ignoreCase = true) }) return
+    repo.createPlaylistWithPreparedSongs(name, songs)
 }
 
 @Composable
@@ -456,6 +475,9 @@ fun DetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val favoriteAddedText = stringResource(R.string.favorite_added)
     val favoriteRemovedText = stringResource(R.string.favorite_removed)
+    val favoritePlaylistText = stringResource(R.string.home_collect_added)
+    val favoritePlaylistFailedText = stringResource(R.string.home_collect_failed)
+    val unfavoritePlaylistText = stringResource(R.string.home_unfavorited)
     fun toggleSongFavorite(song: SongItem, isFavoriteSong: Boolean) {
         val message = if (isFavoriteSong) favoriteRemovedText else favoriteAddedText
         scope.launchLocalPlaylistMutation(
@@ -641,8 +663,10 @@ fun DetailScreen(
                                         scope.launch {
                                             if (isFavorite) {
                                                 favoriteRepo.removeFavorite(playlistId, playlistSource)
+                                                snackbarHostState.showNeriSnackbar(unfavoritePlaylistText)
                                             } else {
-                                                ui.header?.let { header ->
+                                                val header = ui.header ?: return@launch
+                                                try {
                                                     favoriteRepo.addFavorite(
                                                         id = playlistId,
                                                         name = header.name,
@@ -651,6 +675,16 @@ fun DetailScreen(
                                                         source = playlistSource,
                                                         songs = ui.tracks
                                                     )
+                                                    materializeLibraryPlaylist(context, repo, header.name, ui.tracks)
+                                                    snackbarHostState.showNeriSnackbar(favoritePlaylistText)
+                                                } catch (error: CancellationException) {
+                                                    throw error
+                                                } catch (error: Exception) {
+                                                    LyraLogger.d(
+                                                        "NeteaseCollectionDetail",
+                                                        "favorite playlist failed: ${error.message}"
+                                                    )
+                                                    snackbarHostState.showNeriSnackbar(favoritePlaylistFailedText)
                                                 }
                                             }
                                         }

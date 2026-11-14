@@ -205,7 +205,6 @@ import com.lyra.player.data.model.sameFavoriteSongAs
 import com.lyra.player.data.model.sameIdentityAs
 import com.lyra.player.data.model.stableKey
 import com.lyra.player.data.model.NeteaseArtistSummary
-import com.lyra.player.data.playlist.favorite.FavoritePlaylistRepository
 import com.lyra.player.ui.LocalMiniPlayerHeight
 import com.lyra.player.ui.component.playlist.PlaylistExportSheet
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedResult
@@ -559,11 +558,6 @@ fun ExploreScreen(
         FavoriteSongEquivalenceIndex(
             FavoritesPlaylist.firstOrNull(allLocalPlaylists, context)?.songs.orEmpty()
         )
-    }
-    val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
-    val favorites by favoriteRepo.favorites.collectAsStateWithLifecycle()
-    val favoriteKeys = remember(favorites) {
-        favorites.mapTo(mutableSetOf()) { "${it.source}:${it.id}" }
     }
 
     var showPartsSheet by remember { mutableStateOf(false) }
@@ -2233,7 +2227,6 @@ private fun NeteaseDefaultContent(
     ui: ExploreUiState,
     tagKeys: List<String>,
     tagLabels: List<String>,
-    favoriteKeys: Set<String>,
     vm: ExploreViewModel,
     onPlay: (PlaylistSummary) -> Unit,
     tagChipSelectedAlpha: Float,
@@ -2307,7 +2300,6 @@ private fun NeteaseDefaultContent(
             items(items = ui.playlists, key = { it.id }) { playlist ->
                 PlaylistCard(
                     playlist = playlist,
-                    isFavorite = favoriteKeys.contains("netease:${playlist.id}"),
                     onClick = { onPlay(playlist) }
                 )
             }

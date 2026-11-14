@@ -3116,7 +3116,7 @@ class LocalPlaylistRepository private constructor(
     }
 
     companion object {
-        const val MAX_PLAYLIST_NAME_LENGTH = 10
+        const val MAX_PLAYLIST_NAME_LENGTH = 20
         private const val NETEASE_PLAYLIST_PAGE_SIZE = 100
         private const val NETEASE_PLAYLIST_MAX_PAGES = 10
         private const val LOCAL_METADATA_REFRESH_BATCH_SIZE = 48

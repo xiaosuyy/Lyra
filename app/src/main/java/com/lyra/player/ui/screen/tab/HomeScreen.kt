@@ -342,14 +342,9 @@ fun HomeScreen(
             localPlaylistsReady = true
         }
     }
-    val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
-    val favorites by favoriteRepo.favorites.collectAsStateWithLifecycle()
     val downloadedSongs by GlobalDownloadManager.downloadedSongs.collectAsStateWithLifecycle()
     val downloadedPlaybackCoverCandidates = remember(downloadedSongs) {
         downloadedSongs.map { it.toPlaybackSongItem() }
-    }
-    val favoriteKeys = remember(favorites) {
-        favorites.mapTo(mutableSetOf()) { "${it.source}:${it.id}" }
     }
     val favoriteSongs = remember(localPlaylists, context) {
         localPlaylists
@@ -665,7 +660,8 @@ fun HomeScreen(
                         subtitle = "",
                         icon = Icons.Outlined.MusicNote,
                         colors = listOf(Color(0xFF5B8DEF), Color(0xFF8C52FF)),
-                        songs = songs
+                        songs = songs,
+                        playlist = playlist
                     )
                 }
             } catch (error: kotlinx.coroutines.CancellationException) {
@@ -942,11 +938,8 @@ fun HomeScreen(
                                             Box(Modifier.width(148.dp)) {
                                                 PlaylistCard(
                                                     playlist = playlist,
-                                                    isFavorite = favoriteKeys.contains("netease:${playlist.id}"),
                                                     onClick = { openPlaylist(playlist) },
-                                                    onShowSnackbar = showHomeSnackbar,
-                                                    offlineMode = offlineMode,
-                                                    allowFavorite = !isQqHome
+                                                    offlineMode = offlineMode
                                                 )
                                             }
                                         }
@@ -975,10 +968,8 @@ fun HomeScreen(
                                     RadarPlaylistStrip(
                                         playlists = playlists.items
                                             .take(HOME_SECTION_DISPLAY_LIMIT),
-                                        favoriteKeys = favoriteKeys,
                                         listState = radarPlaylistListState,
                                         onClick = onItemClick,
-                                        onShowSnackbar = showHomeSnackbar,
                                         offlineMode = offlineMode
                                     )
                                 }
@@ -1041,12 +1032,9 @@ fun HomeScreen(
                                     ) {
                                         PlaylistCard(
                                             playlist = playlist,
-                                            isFavorite = favoriteKeys.contains("netease:${playlist.id}"),
                                             onClick = { openPlaylist(playlist) },
-                                            onShowSnackbar = showHomeSnackbar,
                                             offlineMode = offlineMode,
-                                            large = true,
-                                            allowFavorite = !isQqHome
+                                            large = true
                                         )
                                     }
                                 }
@@ -1386,7 +1374,9 @@ fun HomeScreen(
                 coverUrl = action.songs.firstOrNull()?.coverUrl,
                 onBack = { quickActionDetail = null },
                 onSongClick = onSongClick,
-                offlineMode = offlineMode
+                offlineMode = offlineMode,
+                favoritePlaylistId = action.playlist?.id,
+                favoritePlaylistSource = MusicSourceIds.TENCENT
             )
         }
 
@@ -1979,10 +1969,8 @@ private fun SongRowMini(
 @Composable
 private fun RadarPlaylistStrip(
     playlists: List<PlaylistSummary>,
-    favoriteKeys: Set<String>,
     listState: LazyListState,
     onClick: (PlaylistSummary) -> Unit,
-    onShowSnackbar: (String) -> Unit,
     offlineMode: Boolean
 ) {
     val cardWidth = if (currentWindowWidthDp() >= 600.dp) 172.dp else 148.dp
@@ -1996,9 +1984,7 @@ private fun RadarPlaylistStrip(
             item(key = homeNeteaseRadarPlaylistScrollKey(playlist.id)) {
                 RadarPlaylistCard(
                     playlist = playlist,
-                    isFavorite = favoriteKeys.contains("netease:${playlist.id}"),
                     onClick = { onClick(playlist) },
-                    onShowSnackbar = onShowSnackbar,
                     offlineMode = offlineMode,
                     modifier = Modifier.width(cardWidth)
                 )
@@ -2007,30 +1993,19 @@ private fun RadarPlaylistStrip(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RadarPlaylistCard(
     playlist: PlaylistSummary,
-    isFavorite: Boolean,
     onClick: () -> Unit,
-    onShowSnackbar: (String) -> Unit,
     offlineMode: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
-    var showMenu by remember { mutableStateOf(false) }
-    val unfavoritedText = stringResource(R.string.home_unfavorited)
-    val favoriteSuccessText = stringResource(R.string.favorite_success)
 
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = { showMenu = true }
-            )
+            .clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier
@@ -2094,82 +2069,23 @@ private fun RadarPlaylistCard(
                 overflow = TextOverflow.Clip
             )
         }
-
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false }
-        ) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        if (isFavorite) {
-                            stringResource(R.string.home_unfavorite_playlist)
-                        } else {
-                            stringResource(R.string.home_favorite_playlist)
-                        }
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = if (isFavorite) {
-                            Icons.Filled.Favorite
-                        } else {
-                            Icons.Outlined.FavoriteBorder
-                        },
-                        contentDescription = null
-                    )
-                },
-                onClick = {
-                    showMenu = false
-                    scope.launch {
-                        if (isFavorite) {
-                            favoriteRepo.removeFavorite(playlist.id, "netease")
-                            onShowSnackbar(unfavoritedText)
-                        } else {
-                            favoriteRepo.addFavorite(
-                                id = playlist.id,
-                                name = playlist.name,
-                                coverUrl = playlist.picUrl,
-                                trackCount = playlist.trackCount,
-                                source = "netease",
-                                songs = emptyList()
-                            )
-                            onShowSnackbar(favoriteSuccessText)
-                        }
-                    }
-                }
-            )
-        }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlaylistCard(
     playlist: PlaylistSummary,
-    isFavorite: Boolean,
     onClick: () -> Unit,
-    onShowSnackbar: (String) -> Unit = {},
     offlineMode: Boolean = false,
-    large: Boolean = false,
-    allowFavorite: Boolean = true
+    large: Boolean = false
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
-    var showMenu by remember { mutableStateOf(false) }
     val cardShape = RoundedCornerShape(if (large) 16.dp else 8.dp)
-
-    val unfavoritedText = stringResource(R.string.home_unfavorited)
-    val favoriteSuccessText = stringResource(R.string.favorite_success)
 
     Column(
         modifier = Modifier
             .then(if (large) Modifier.fillMaxHeight() else Modifier)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = if (allowFavorite) ({ showMenu = true }) else null
-            )
+            .clickable(onClick = onClick)
             .padding(if (large) 8.dp else 0.dp)
     ) {
         AsyncImage(
@@ -2239,54 +2155,6 @@ fun PlaylistCard(
                 overflow = TextOverflow.Clip,
                 modifier = if (large) Modifier.padding(top = 3.dp) else Modifier
             )
-        }
-
-        if (allowFavorite) {
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (isFavorite) {
-                                stringResource(R.string.home_unfavorite_playlist)
-                            } else {
-                                stringResource(R.string.home_favorite_playlist)
-                            }
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isFavorite) {
-                                Icons.Filled.Favorite
-                            } else {
-                                Icons.Outlined.FavoriteBorder
-                            },
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        showMenu = false
-                        scope.launch {
-                            if (isFavorite) {
-                                favoriteRepo.removeFavorite(playlist.id, "netease")
-                                onShowSnackbar(unfavoritedText)
-                            } else {
-                                favoriteRepo.addFavorite(
-                                    id = playlist.id,
-                                    name = playlist.name,
-                                    coverUrl = playlist.picUrl,
-                                    trackCount = playlist.trackCount,
-                                    source = "netease",
-                                    songs = emptyList()
-                                )
-                                onShowSnackbar(favoriteSuccessText)
-                            }
-                        }
-                    }
-                )
-            }
         }
     }
 }
