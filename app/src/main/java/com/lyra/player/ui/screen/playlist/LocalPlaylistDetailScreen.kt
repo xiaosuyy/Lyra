@@ -79,7 +79,6 @@ import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Search
@@ -182,7 +181,6 @@ import com.lyra.player.data.local.playlist.LocalPlaylistSongDeleteResult
 import com.lyra.player.data.local.playlist.launchLocalPlaylistMutation
 import com.lyra.player.data.local.playlist.sync.NeteaseLikeSyncResult
 import com.lyra.player.data.local.playlist.sync.NeteaseRemotePlaylist
-import com.lyra.player.data.local.playlist.system.SystemLocalPlaylists
 import com.lyra.player.data.local.media.displayAlbum
 import com.lyra.player.data.model.FavoriteSongEquivalenceIndex
 import com.lyra.player.data.model.displayArtist
@@ -203,7 +201,6 @@ import com.lyra.player.ui.component.playlist.showPlaylistBatchExportAddedSongs
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedPlaylist
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportCreatedResult
 import com.lyra.player.ui.component.playlist.showPlaylistBatchExportFailure
-import com.lyra.player.ui.component.playlist.showPlaylistDeleteResultGlobally
 import com.lyra.player.ui.component.playlist.showPlaylistSongDeleteResult
 import com.lyra.player.ui.component.local.LocalSongDetailsDialog
 import com.lyra.player.ui.component.local.LocalSongSyncConfirmDialog
@@ -233,11 +230,6 @@ import com.lyra.player.util.media.offlineCachedImageRequest
 import com.lyra.player.util.search.playlistSearchValues
 import com.lyra.player.util.search.SearchTextMatcher
 import com.lyra.player.ui.haptic.performHapticFeedback
-import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsButton
-import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsDialog
-import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsDialogContent
-import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsTextButton
-import com.lyra.player.ui.screen.tab.settings.miuix.MiuixSettingsTextField
 import org.burnoutcrew.reorderable.ItemPosition
 import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.detectReorder
@@ -256,14 +248,6 @@ internal fun mergedLocalFilesSongs(
 }
 
 private const val BLANK_COVER_MODEL = "about:blank"
-
-private fun playlistNameFieldValue(text: String, maxLength: Int): TextFieldValue {
-    val limited = text.take(maxLength)
-    return TextFieldValue(
-        text = limited,
-        selection = TextRange(limited.length)
-    )
-}
 
 private fun limitedPlaylistNameFieldValue(value: TextFieldValue, maxLength: Int): TextFieldValue {
     val limited = value.text.take(maxLength)
@@ -514,7 +498,6 @@ fun LocalPlaylistDetailScreen(
             val clipboard = LocalClipboard.current
             val isFavorites = FavoritesPlaylist.isSystemPlaylist(playlist, context)
             val isLocalFilesPlaylist = LocalFilesPlaylist.isSystemPlaylist(playlist, context)
-            val isSystemPlaylist = isFavorites || isLocalFilesPlaylist
             val isPlaying by PlayerManager.isPlayingFlow.collectAsState()
             val shuffleEnabled by PlayerManager.shuffleModeFlow.collectAsState()
             val repeatMode by PlayerManager.repeatModeFlow.collectAsState()
@@ -541,7 +524,7 @@ fun LocalPlaylistDetailScreen(
             var pendingNeteaseRemoteSyncConfirm by remember {
                 mutableStateOf<PendingNeteaseRemotePlaylistSync?>(null)
             }
-            var showFavoritesMoreMenu by remember { mutableStateOf(false) }
+            var showTopBarMoreMenu by remember { mutableStateOf(false) }
             var showFavoritesChannelPicker by remember { mutableStateOf(false) }
             var favoritesPickerMode by remember {
                 mutableStateOf(FavoritesChannelPickerMode.IMPORT)
@@ -554,7 +537,6 @@ fun LocalPlaylistDetailScreen(
 
 
 
-            var showDeletePlaylistConfirm by remember { mutableStateOf(false) }
             var showDeleteMultiConfirm by remember { mutableStateOf(false) }
             var showExportSheet by remember { mutableStateOf(false) }
             var showExportAllSheet by remember { mutableStateOf(false) }
@@ -1011,18 +993,41 @@ fun LocalPlaylistDetailScreen(
                 }
             }
 
-            val favoritesMoreActions = listOf(
-                SongActionMenuItem(
-                    label = composeResources.getString(R.string.local_playlist_channel_import),
-                    icon = Icons.Outlined.CloudDownload,
-                    onClick = { openFavoritesChannelPicker(FavoritesChannelPickerMode.IMPORT) }
-                ),
-                SongActionMenuItem(
-                    label = composeResources.getString(R.string.local_playlist_channel_sync),
-                    icon = Icons.Outlined.CloudUpload,
-                    onClick = { openFavoritesChannelPicker(FavoritesChannelPickerMode.SYNC) }
+            val topBarMoreActions = buildList {
+                add(
+                    SongActionMenuItem(
+                        label = composeResources.getString(R.string.playlist_add_to),
+                        icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
+                        onClick = { showExportAllSheet = true }
+                    )
                 )
-            )
+                if (isFavorites) {
+                    add(
+                        SongActionMenuItem(
+                            label = composeResources.getString(R.string.local_playlist_channel_import),
+                            icon = Icons.Outlined.CloudDownload,
+                            onClick = { openFavoritesChannelPicker(FavoritesChannelPickerMode.IMPORT) }
+                        )
+                    )
+                    add(
+                        SongActionMenuItem(
+                            label = composeResources.getString(R.string.local_playlist_channel_sync),
+                            icon = Icons.Outlined.CloudUpload,
+                            onClick = { openFavoritesChannelPicker(FavoritesChannelPickerMode.SYNC) }
+                        )
+                    )
+                }
+                if (isLocalFilesPlaylist) {
+                    add(
+                        SongActionMenuItem(
+                            label = composeResources.getString(R.string.download_scan_local),
+                            icon = Icons.Outlined.LibraryMusic,
+                            enabled = !scanPreviewState.isScanning,
+                            onClick = { showLocalScanModeDialog = true }
+                        )
+                    )
+                }
+            }
             val pickerAccounts = favoritesLinkedAccounts.map { account ->
                 FavoritesChannelAccount(
                     channelId = account.channelId,
@@ -1043,93 +1048,6 @@ fun LocalPlaylistDetailScreen(
             val autoShowKeyboard by AppContainer.settingsRepo.autoShowKeyboardFlow.collectAsState(initial = false)
             val backgroundImageUri by AppContainer.settingsRepo.backgroundImageUriFlow.collectAsState(initial = null)
             val hasCustomBackground = backgroundImageUri != null
-
-            // 重命名
-            var showRename by remember { mutableStateOf(false) }
-            val maxNameLength = LocalPlaylistRepository.MAX_PLAYLIST_NAME_LENGTH
-            var renameText by remember {
-                mutableStateOf(playlistNameFieldValue(playlist.name, maxNameLength))
-            }
-            var renameError by remember { mutableStateOf<String?>(null) }
-            fun normalizedRenameName(input: String): String = input.trim().take(maxNameLength)
-            fun isSameRenameName(input: String): Boolean {
-                return normalizedRenameName(input).equals(
-                    normalizedRenameName(playlist.name),
-                    ignoreCase = true
-                )
-            }
-
-            fun validateRename(input: String): String? {
-                val name = normalizedRenameName(input)
-                if (isSameRenameName(input)) return null
-                if (name.isEmpty()) return composeResources.getString(R.string.playlist_name_empty)
-                if (SystemLocalPlaylists.matchesReservedName(name, context)) {
-                    val reservedName = SystemLocalPlaylists.resolve(
-                        playlistId = 0L,
-                        playlistName = name,
-                        context = context
-                    )?.currentName ?: name
-                    return composeResources.getString(R.string.library_name_reserved, reservedName)
-                }
-                if (allPlaylists.any {
-                        it.id != playlist.id && it.name.equals(
-                            name,
-                            ignoreCase = true
-                        )
-                    }) {
-                    return composeResources.getString(R.string.library_name_exists)
-                }
-                return null
-            }
-
-            if (showRename) {
-                MiuixSettingsDialog(
-                    onDismissRequest = { showRename = false },
-                    confirmButton = {
-                        val trimmed = normalizedRenameName(renameText.text)
-                        val disabled = renameError != null || isSameRenameName(renameText.text)
-                        MiuixSettingsButton(
-                            onClick = {
-                                val error = validateRename(renameText.text)
-                                if (error != null) {
-                                    renameError = error
-                                } else if (!disabled) {
-                                    vm.rename(trimmed)
-                                    showRename = false
-                                }
-                            },
-                            enabled = !disabled
-                        ) { Text(stringResource(R.string.action_confirm)) }
-                    },
-                    dismissButton = {
-                        MiuixSettingsTextButton(onClick = {
-                            showRename = false
-                        }) { Text(stringResource(R.string.action_cancel)) }
-                    },
-                    text = {
-                        MiuixSettingsDialogContent(verticalSpacing = 12.dp) {
-                            MiuixSettingsTextField(
-                                value = renameText.text,
-                                onValueChange = {
-                                    val limitedValue = playlistNameFieldValue(it, maxNameLength)
-                                    renameText = limitedValue
-                                    renameError = validateRename(limitedValue.text)
-                                },
-                                placeholder = { Text(playlist.name) },
-                                singleLine = true
-                            )
-                            renameError?.let { error ->
-                                Text(
-                                    text = error,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    },
-                    title = { Text(stringResource(R.string.local_playlist_rename)) }
-                )
-            }
 
             val headerKey = LOCAL_PLAYLIST_HEADER_KEY
             val metadataProcessingVisible = visibleMetadataProcessingState.isProcessing
@@ -1669,44 +1587,35 @@ fun LocalPlaylistDetailScreen(
                                 }
                             },
                             actions = {
-                                if (isFavorites) {
-                                    PlaylistModernTopBarPill {
-                                        PlaylistModernPillIconButton(onClick = { toggleSearch() }) {
-                                            Icon(
-                                                Icons.Filled.Search,
-                                                contentDescription = stringResource(R.string.cd_search_songs)
-                                            )
-                                        }
-                                        Box {
-                                            PlaylistModernPillIconButton(
-                                                onClick = { showFavoritesMoreMenu = true },
-                                                enabled = !syncInProgress
-                                            ) {
-                                                if (syncInProgress) {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(16.dp),
-                                                        strokeWidth = 2.dp
-                                                    )
-                                                } else {
-                                                    Icon(
-                                                        Icons.Filled.MoreHoriz,
-                                                        contentDescription = stringResource(R.string.action_more)
-                                                    )
-                                                }
-                                            }
-                                            SongActionsMenu(
-                                                expanded = showFavoritesMoreMenu,
-                                                actions = favoritesMoreActions,
-                                                onDismissRequest = { showFavoritesMoreMenu = false },
-                                                opaque = true
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    PlaylistModernTopBarCircleButton(onClick = { toggleSearch() }) {
+                                PlaylistModernTopBarPill {
+                                    PlaylistModernPillIconButton(onClick = { toggleSearch() }) {
                                         Icon(
                                             Icons.Filled.Search,
                                             contentDescription = stringResource(R.string.cd_search_songs)
+                                        )
+                                    }
+                                    Box {
+                                        PlaylistModernPillIconButton(
+                                            onClick = { showTopBarMoreMenu = true },
+                                            enabled = !syncInProgress
+                                        ) {
+                                            if (syncInProgress) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                            } else {
+                                                Icon(
+                                                    Icons.Filled.MoreHoriz,
+                                                    contentDescription = stringResource(R.string.action_more)
+                                                )
+                                            }
+                                        }
+                                        SongActionsMenu(
+                                            expanded = showTopBarMoreMenu,
+                                            actions = topBarMoreActions,
+                                            onDismissRequest = { showTopBarMoreMenu = false },
+                                            opaque = true
                                         )
                                     }
                                 }
@@ -1719,38 +1628,6 @@ fun LocalPlaylistDetailScreen(
                                         Icon(
                                             Icons.Outlined.Download,
                                             contentDescription = stringResource(R.string.cd_download_manager)
-                                        )
-                                    }
-                                }
-                                
-                                if (isLocalFilesPlaylist) {
-                                    Spacer(Modifier.width(8.dp))
-                                    PlaylistModernTopBarCircleButton(onClick = {
-                                        showLocalScanModeDialog = true
-                                    }, enabled = !scanPreviewState.isScanning) {
-                                        Icon(
-                                            Icons.Outlined.LibraryMusic,
-                                            contentDescription = stringResource(R.string.download_scan_local)
-                                        )
-                                    }
-                                }
-                                
-                                if (!isSystemPlaylist) {
-                                    Spacer(Modifier.width(8.dp))
-                                    PlaylistModernTopBarCircleButton(onClick = {
-                                        renameText = playlistNameFieldValue(playlist.name, maxNameLength)
-                                        renameError = null
-                                        showRename = true
-                                    }) {
-                                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.local_playlist_rename))
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    PlaylistModernTopBarCircleButton(onClick = {
-                                        showDeletePlaylistConfirm = true
-                                    }) {
-                                        Icon(
-                                            Icons.Filled.Delete,
-                                            contentDescription = stringResource(R.string.local_playlist_delete)
                                         )
                                     }
                                 }
@@ -2057,14 +1934,7 @@ fun LocalPlaylistDetailScreen(
                                                             if (pos >= 0) onSongClick(tabSongs, pos)
                                                         }
                                                     },
-                                                    onLongClick = {
-                                                        if (!selectionMode) {
-                                                            selectionMode = true
-                                                            selectedKeysState.value = setOf(song.stableKey())
-                                                        } else {
-                                                            toggleSelect(song)
-                                                        }
-                                                    }
+                                                    onLongClick = {}
                                                 )
                                                 .padding(
                                                     start = 20.dp,
@@ -2290,35 +2160,6 @@ fun LocalPlaylistDetailScreen(
                         }
 
                     }
-                }
-
-                // 删除歌单二次确认
-                if (showDeletePlaylistConfirm) {
-                    AlertDialog(
-                        onDismissRequest = { showDeletePlaylistConfirm = false },
-                        title = { Text(stringResource(R.string.local_playlist_delete)) },
-                        text = { Text(stringResource(R.string.local_playlist_delete_confirm)) },
-                        confirmButton = {
-                            HapticTextButton(onClick = {
-                                showDeletePlaylistConfirm = false
-                                vm.delete { result ->
-                                    showPlaylistDeleteResultGlobally(
-                                        context = context,
-                                        repository = repo,
-                                        result = result
-                                    )
-                                    if (result.getOrNull().orEmpty().isNotEmpty()) {
-                                        navigateAfterPlaylistDeleted()
-                                    }
-                                }
-                            }) { Text(stringResource(R.string.action_delete)) }
-                        },
-                        dismissButton = {
-                            HapticTextButton(onClick = {
-                                showDeletePlaylistConfirm = false
-                            }) { Text(stringResource(R.string.action_cancel)) }
-                        }
-                    )
                 }
 
                 // 多选删除确认
