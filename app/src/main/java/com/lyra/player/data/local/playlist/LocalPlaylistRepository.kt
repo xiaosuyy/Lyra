@@ -2180,36 +2180,38 @@ class LocalPlaylistRepository private constructor(
     }
 
     private fun mergeExternalPlaylists(playlists: List<LocalPlaylist>): MutableList<LocalPlaylist> {
-        val preservedLocalFiles = LocalFilesPlaylist.firstOrNull(_playlists.value, context)
-        return playlists
+        val current = _playlists.value
+        val preservedLocalFiles = LocalFilesPlaylist.firstOrNull(current, context)
+        val merged = playlists
             .filterNot { LocalFilesPlaylist.isSystemPlaylist(it, context) }
             .toMutableList()
-            .apply { preservedLocalFiles?.let(::add) }
+        // 本地歌曲是设备本地的系统歌单，同步数据里没有它；按本地当前次序放回，保留用户排序
+        preservedLocalFiles?.let { localFiles ->
+            val localIndex = current.indexOfFirst { it.id == localFiles.id }
+            val insertAt = if (localIndex >= 0) localIndex.coerceAtMost(merged.size) else merged.size
+            merged.add(insertAt, localFiles)
+        }
+        return merged
     }
 
     suspend fun reorderPlaylists(newOrder: List<Long>) {
         withContext(Dispatchers.IO) {
             commitPlaylistMutation {
                 val current = _playlists.value
-                val system = current.filter { SystemLocalPlaylists.isSystemPlaylist(it, context) }
-                val others = current.filterNot { SystemLocalPlaylists.isSystemPlaylist(it, context) }
-                if (others.size <= 1) return@commitPlaylistMutation
+                if (current.size <= 1) return@commitPlaylistMutation
 
-                val byId = others.associateBy { it.id }
+                val byId = current.associateBy(LocalPlaylist::id)
                 val ordered = newOrder.mapNotNull { byId[it] }.toMutableList()
-                others.forEach { playlist ->
+                current.forEach { playlist ->
                     if (ordered.none { it.id == playlist.id }) ordered += playlist
                 }
-                if (ordered.map(LocalPlaylist::id) == others.map(LocalPlaylist::id)) {
+                if (ordered.map(LocalPlaylist::id) == current.map(LocalPlaylist::id)) {
                     return@commitPlaylistMutation
                 }
 
                 val modifiedAt = System.currentTimeMillis()
-                val reordered = ordered.map { playlist ->
-                    // 歌单顺序属于全局状态，重排后统一刷新 modifiedAt，便于同步层感知顺序变化
-                    playlist.copy(modifiedAt = modifiedAt)
-                }
-                publishLocked(reordered + system)
+                // 歌单顺序属于全局状态，重排后统一刷新 modifiedAt，便于同步层感知顺序变化
+                publishLocked(ordered.map { it.copy(modifiedAt = modifiedAt) })
             }
         }
     }

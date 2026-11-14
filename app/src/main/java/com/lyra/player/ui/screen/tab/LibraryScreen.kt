@@ -25,15 +25,21 @@ package com.lyra.player.ui.screen.tab
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.SystemClock
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -120,7 +126,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -129,6 +137,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -137,9 +146,15 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -147,14 +162,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -1029,12 +1047,11 @@ private fun LibraryInlinePlaylistRow(
     containerColor: Color = Color.Transparent,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
-    selectionControl: (@Composable () -> Unit)? = null,
+    dragModifier: Modifier = Modifier,
     swipeExpanded: Boolean = false,
     onSwipeExpandedChange: ((Boolean) -> Unit)? = null,
     swipeEnabled: Boolean = false,
-    moreActions: List<SongActionMenuItem>? = null,
-    trailing: (@Composable () -> Unit)? = null
+    moreActions: List<SongActionMenuItem>? = null
 ) {
     val context = LocalContext.current
     val cover = rememberPlaylistDisplayCoverUrl(
@@ -1065,6 +1082,7 @@ private fun LibraryInlinePlaylistRow(
                 .fillMaxWidth()
                 .height(66.dp)
                 .background(containerColor)
+                .then(dragModifier)
                 .then(clickModifier)
                 .padding(horizontal = 18.dp),
             onMoreClick = { showMoreMenu = true },
@@ -1083,7 +1101,6 @@ private fun LibraryInlinePlaylistRow(
             }
         ) {
             PlaylistRowText(title = title, subtitle = subtitle)
-            trailing?.invoke()
         }
         return
     }
@@ -1093,15 +1110,14 @@ private fun LibraryInlinePlaylistRow(
             .fillMaxWidth()
             .height(66.dp)
             .background(containerColor)
+            .then(dragModifier)
             .then(clickModifier)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        selectionControl?.invoke()
         PlaylistRowCover(context = context, cover = cover, offlineMode = offlineMode)
         PlaylistRowText(title = title, subtitle = subtitle)
-        trailing?.invoke()
     }
 }
 
@@ -1678,6 +1694,14 @@ private fun LibraryCloudContent(
     }
 }
 
+private class PlaylistDragSession {
+    var startIndex = 0
+    var startOrder: List<Long> = emptyList()
+    var pitchPx = 1f
+    var displacement = 0f
+    var fingerY = 0f
+}
+
 @Composable
 private fun LocalPlaylistList(
     playlists: List<LocalPlaylist>,
@@ -1711,9 +1735,6 @@ private fun LocalPlaylistList(
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var newName by rememberSaveable { mutableStateOf("") }
     var nameError by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectionMode by rememberSaveable { mutableStateOf(false) }
-    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var showDeleteSelectedConfirm by rememberSaveable { mutableStateOf(false) }
     var swipeRevealedPlaylistId by remember { mutableStateOf<Long?>(null) }
     var createRowSwipeExpanded by remember { mutableStateOf(false) }
     var showCreateRowMenu by remember { mutableStateOf(false) }
@@ -1740,12 +1761,10 @@ private fun LocalPlaylistList(
     val displayedLocalArtists = remember(filteredLocalArtists, localArtistSortMode) {
         sortLocalArtists(filteredLocalArtists, localArtistSortMode)
     }
-    val editablePlaylists = remember(playlists, context) {
-        playlists.filterNot { SystemLocalPlaylists.isSystemPlaylist(it, context) }
-    }
-    val reorderablePlaylists = remember(editablePlaylists) {
+    // Kept across repository emissions so a drag is never reset mid-gesture or right after a drop.
+    val reorderablePlaylists = remember {
         mutableStateListOf<LocalPlaylist>().apply {
-            addAll(editablePlaylists)
+            addAll(playlists)
         }
     }
 
@@ -1753,47 +1772,16 @@ private fun LocalPlaylistList(
         if (showDialog && autoShowKeyboard) focusRequester.requestFocus()
     }
 
-    fun exitSelection() {
-        selectionMode = false
-        selectedIds = emptySet()
-        showDeleteSelectedConfirm = false
-    }
-
-    fun toggleSelection(playlistId: Long) {
-        selectedIds =
-            if (selectedIds.contains(playlistId)) selectedIds - playlistId else selectedIds + playlistId
-    }
-
-    fun deleteSelected() {
-        if (selectedIds.isEmpty()) return
-        showDeleteSelectedConfirm = true
-    }
-
-    BackHandler(enabled = selectionMode) { exitSelection() }
-    BackHandler(enabled = !selectionMode && swipeRevealedPlaylistId != null) {
+    BackHandler(enabled = swipeRevealedPlaylistId != null) {
         swipeRevealedPlaylistId = null
     }
-    BackHandler(enabled = !selectionMode && createRowSwipeExpanded) {
+    BackHandler(enabled = createRowSwipeExpanded) {
         createRowSwipeExpanded = false
-    }
-    LaunchedEffect(selectionMode) {
-        if (selectionMode) {
-            swipeRevealedPlaylistId = null
-            createRowSwipeExpanded = false
-        }
     }
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
             swipeRevealedPlaylistId = null
             createRowSwipeExpanded = false
-        }
-    }
-
-    LaunchedEffect(editablePlaylists) {
-        val validIds = editablePlaylists.map { it.id }.toSet()
-        selectedIds = selectedIds.intersect(validIds)
-        if (selectionMode && editablePlaylists.isEmpty()) {
-            exitSelection()
         }
     }
 
@@ -1917,40 +1905,143 @@ private fun LocalPlaylistList(
     }
 
     val miniPlayerHeight = LocalMiniPlayerHeight.current
-    val favoritesPlaylist = playlists.firstOrNull { FavoritesPlaylist.isSystemPlaylist(it, context) }
-    val localFilesPlaylist = playlists.firstOrNull { LocalFilesPlaylist.isSystemPlaylist(it, context) }
-    val reorderState = rememberReorderableLazyListState(
-        listState = listState,
-        onMove = { from: ItemPosition, to: ItemPosition ->
-            if (!selectionMode) return@rememberReorderableLazyListState
-            val fromId = from.key as? Long ?: return@rememberReorderableLazyListState
-            val toId = to.key as? Long ?: return@rememberReorderableLazyListState
-            val fromIdx = reorderablePlaylists.indexOfFirst { it.id == fromId }
-            val toIdx = reorderablePlaylists.indexOfFirst { it.id == toId }
-            if (fromIdx != -1 && toIdx != -1 && fromIdx != toIdx) {
-                reorderablePlaylists.add(toIdx, reorderablePlaylists.removeAt(fromIdx))
+    val canReorder = activeSearchQuery.isBlank()
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val playlistShiftSpec = remember {
+        tween<IntOffset>(durationMillis = 160, easing = FastOutSlowInEasing)
+    }
+    val dragSession = remember { PlaylistDragSession() }
+    var draggingPlaylistId by remember { mutableStateOf<Long?>(null) }
+    var dragShiftPx by remember { mutableFloatStateOf(0f) }
+    var dragSettling by remember { mutableStateOf(false) }
+    var settleJob by remember { mutableStateOf<Job?>(null) }
+    val settleScope = rememberCoroutineScope()
+    var suppressClickUntil by remember { mutableLongStateOf(0L) }
+    var pendingReorderOrder by remember { mutableStateOf<List<Long>?>(null) }
+    var pendingReorderAt by remember { mutableLongStateOf(0L) }
+
+    // Reconcile with the repository only while idle; a drag owns the local order until it settles.
+    LaunchedEffect(playlists, draggingPlaylistId) {
+        if (draggingPlaylistId != null) return@LaunchedEffect
+        val incomingIds = playlists.map { it.id }
+        // The repository may still publish the pre-drag order right after a drop; keep the order
+        // the user just committed instead of snapping back until the new order arrives.
+        val pending = pendingReorderOrder
+        if (pending != null &&
+            incomingIds != pending &&
+            incomingIds.toSet() == pending.toSet() &&
+            SystemClock.uptimeMillis() - pendingReorderAt < 2000L
+        ) {
+            playlists.forEach { playlist ->
+                val index = reorderablePlaylists.indexOfFirst { it.id == playlist.id }
+                if (index >= 0 && reorderablePlaylists[index] !== playlist) {
+                    reorderablePlaylists[index] = playlist
+                }
             }
-        },
-        canDragOver = { _, over ->
-            selectionMode && over.key is Long
-        },
-        onDragEnd = { _, _ ->
-            if (selectionMode) {
-                onReorder(reorderablePlaylists.map { it.id })
+            return@LaunchedEffect
+        }
+        if (pending != null && incomingIds == pending) pendingReorderOrder = null
+        val currentIds = reorderablePlaylists.map { it.id }
+        if (currentIds != incomingIds) {
+            reorderablePlaylists.clear()
+            reorderablePlaylists.addAll(playlists)
+        } else {
+            playlists.forEachIndexed { index, playlist ->
+                if (reorderablePlaylists[index] !== playlist) {
+                    reorderablePlaylists[index] = playlist
+                }
             }
         }
-    )
+    }
 
-    val displayedFavoritesPlaylist = favoritesPlaylist
-        ?.takeIf { playlist -> playlist.matchesLocalPlaylistSearch(activeSearchQuery, context) }
-    val displayedLocalFilesPlaylist = localFilesPlaylist
-        ?.takeIf { playlist -> playlist.matchesLocalPlaylistSearch(activeSearchQuery, context) }
+    fun measurePlaylistPitch(): Float {
+        val offsets = listState.layoutInfo.visibleItemsInfo
+            .filter { it.key is Long }
+            .map { it.offset }
+            .sorted()
+        for (index in 0 until offsets.size - 1) {
+            val step = offsets[index + 1] - offsets[index]
+            if (step > 0) return step.toFloat()
+        }
+        return with(density) { 71.dp.toPx() }
+    }
+
+    // The dragged row keeps a constant position under the finger: its translation compensates for
+    // every slot it has been moved across, plus whatever the list scrolled underneath it.
+    fun applyDrag(id: Long) {
+        val count = reorderablePlaylists.size
+        if (count == 0) return
+        val target = (
+            dragSession.startIndex +
+                (dragSession.displacement / dragSession.pitchPx).roundToInt()
+            ).coerceIn(0, count - 1)
+        val current = reorderablePlaylists.indexOfFirst { it.id == id }
+        if (current == -1) return
+        if (current != target) {
+            reorderablePlaylists.add(target, reorderablePlaylists.removeAt(current))
+        }
+        val settled = reorderablePlaylists.indexOfFirst { it.id == id }
+        dragShiftPx =
+            dragSession.displacement - (settled - dragSession.startIndex) * dragSession.pitchPx
+    }
+
+    fun finishDrag(id: Long) {
+        if (draggingPlaylistId != id || dragSettling) return
+        val currentOrder = reorderablePlaylists.map { it.id }
+        suppressClickUntil = SystemClock.uptimeMillis() + 250
+        if (canReorder && currentOrder != dragSession.startOrder) {
+            pendingReorderOrder = currentOrder
+            pendingReorderAt = SystemClock.uptimeMillis()
+            onReorder(currentOrder)
+        }
+        // One animation source: the row's slot is final, only its residual offset is left to
+        // travel. Animating this same value avoids the one-frame snap a second animatable caused.
+        dragSettling = true
+        val residual = dragShiftPx
+        settleJob?.cancel()
+        settleJob = settleScope.launch {
+            if (residual != 0f) {
+                animate(
+                    initialValue = residual,
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 110, easing = LinearOutSlowInEasing)
+                ) { value, _ -> dragShiftPx = value }
+            }
+            dragShiftPx = 0f
+            dragSettling = false
+            draggingPlaylistId = null
+            settleJob = null
+        }
+    }
+
+    LaunchedEffect(draggingPlaylistId) {
+        val id = draggingPlaylistId ?: return@LaunchedEffect
+        val edgePx = with(density) { 72.dp.toPx() }
+        val maxStepPx = with(density) { 12.dp.toPx() }
+        while (true) {
+            withFrameNanos { }
+            if (dragSettling) continue
+            val viewportHeight = listState.layoutInfo.viewportSize.height.toFloat()
+            if (viewportHeight <= 0f) continue
+            val fingerY = dragSession.fingerY
+            val overflow = when {
+                fingerY < edgePx -> -(edgePx - fingerY) / edgePx
+                fingerY > viewportHeight - edgePx -> (fingerY - (viewportHeight - edgePx)) / edgePx
+                else -> 0f
+            }
+            if (overflow == 0f) continue
+            val scrolled = listState.scrollBy(overflow.coerceIn(-1f, 1f) * maxStepPx)
+            if (scrolled != 0f) {
+                dragSession.displacement += scrolled
+                applyDrag(id)
+            }
+        }
+    }
+
     val displayedPlaylists = reorderablePlaylists
         .filter { playlist -> playlist.matchesLocalPlaylistSearch(activeSearchQuery, context) }
-    val hasPlaylistSearchMatches =
-        displayedFavoritesPlaylist != null ||
-            displayedPlaylists.isNotEmpty() ||
-            displayedLocalFilesPlaylist != null
+    val hasPlaylistSearchMatches = displayedPlaylists.isNotEmpty()
     val windowWidthDp = currentWindowWidthDp()
     val localArtistColumnCount = remember(windowWidthDp) {
         ((windowWidthDp.value - 16f + 10f) / 130f).toInt().coerceAtLeast(1)
@@ -1960,7 +2051,7 @@ private fun LocalPlaylistList(
     }
 
     LazyColumn(
-        state = reorderState.listState,
+        state = listState,
         contentPadding = PaddingValues(
             start = 0.dp,
             end = 0.dp,
@@ -1970,14 +2061,23 @@ private fun LocalPlaylistList(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxSize()
-            .reorderable(reorderState)
+            // Tracks the finger without consuming anything; the drag itself is handled by the row.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        event.changes.firstOrNull()?.let { change ->
+                            if (change.pressed) dragSession.fingerY = change.position.y
+                        }
+                    }
+                }
+            }
     ) {
         val cardShape = RoundedCornerShape(LyraRadius.Medium)
         if (showHeader) {
             item(key = "local_library_header") {
                 LocalLibraryHeaderContent(
                     selectedLocalCategory = selectedLocalCategory,
-                    selectionMode = selectionMode,
                     searchQuery = activeSearchQuery,
                     onSearchQueryChange = { localSearchQuery = it },
                     artistSortMode = localArtistSortMode,
@@ -1987,13 +2087,11 @@ private fun LocalPlaylistList(
                     },
                     onPlaylistSelected = {
                         if (selectedLocalCategory != LOCAL_CATEGORY_PLAYLIST) {
-                            exitSelection()
                             selectedLocalCategory = LOCAL_CATEGORY_PLAYLIST
                         }
                     },
                     onArtistSelected = {
                         if (selectedLocalCategory != LOCAL_CATEGORY_ARTIST) {
-                            exitSelection()
                             selectedLocalCategory = LOCAL_CATEGORY_ARTIST
                         }
                     }
@@ -2045,75 +2143,6 @@ private fun LocalPlaylistList(
                 }
             }
         } else {
-                if (selectionMode) {
-                    item(key = "local_playlist_selection_header") {
-                        val allSelected =
-                            selectedIds.size == displayedPlaylists.size && displayedPlaylists.isNotEmpty()
-                Card(
-                    shape = cardShape,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    modifier = Modifier
-                        .padding(horizontal = LyraSpacing.SM, vertical = LyraSpacing.XS)
-                        .clip(cardShape)
-                ) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                pluralStringResource(
-                                    R.plurals.common_selected_count,
-                                    selectedIds.size,
-                                    selectedIds.size
-                                )
-                            )
-                        },
-                        colors = ListItemDefaults.colors(
-                            containerColor = Color.Transparent
-                        ),
-                        leadingContent = {
-                            HapticIconButton(onClick = { exitSelection() }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Close,
-                                    contentDescription = stringResource(R.string.action_exit_multi_select)
-                                )
-                            }
-                        },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                HapticTextButton(
-                                    onClick = {
-                                        selectedIds = if (allSelected) {
-                                            emptySet()
-                                        } else {
-                                            displayedPlaylists.map { it.id }.toSet()
-                                        }
-                                    }
-                                ) {
-                                    Text(
-                                        if (allSelected) {
-                                            stringResource(R.string.action_deselect_all)
-                                        } else {
-                                            stringResource(R.string.action_select_all)
-                                        }
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                HapticTextButton(
-                                    enabled = selectedIds.isNotEmpty(),
-                                    onClick = { deleteSelected() }
-                                ) {
-                                    Text(stringResource(R.string.common_delete_selected))
-                                }
-                            }
-                        }
-                    )
-                }
-            }
-        }
         if (activeSearchQuery.isBlank()) {
             item(key = "local_playlist_create") {
             Column(Modifier.animateItem()) {
@@ -2125,11 +2154,11 @@ private fun LocalPlaylistList(
                     },
                     revealWidth = 60.dp,
                     slideWidth = 60.dp,
-                    swipeEnabled = !selectionMode,
+                    swipeEnabled = true,
                     rowModifier = Modifier
                         .fillMaxWidth()
                         .height(66.dp)
-                        .clickable(enabled = !selectionMode) { showDialog = true }
+                        .clickable { showDialog = true }
                         .padding(horizontal = 18.dp),
                     onMoreClick = { showCreateRowMenu = true },
                     moreTint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
@@ -2231,36 +2260,6 @@ private fun LocalPlaylistList(
                 )
             }
 
-            if (showDeleteSelectedConfirm) {
-                MiuixSettingsDialog(
-                    onDismissRequest = { showDeleteSelectedConfirm = false },
-                    title = { Text(stringResource(R.string.dialog_confirm_delete)) },
-                    text = {
-                        Text(
-                            pluralStringResource(
-                                R.plurals.library_delete_selected_confirm,
-                                selectedIds.size,
-                                selectedIds.size
-                            )
-                        )
-                    },
-                    confirmButton = {
-                        MiuixSettingsButton(
-                            onClick = {
-                                val idsToDelete = selectedIds.toList()
-                                exitSelection()
-                                onDelete(idsToDelete)
-                            }
-                        ) { Text(stringResource(R.string.action_delete)) }
-                    },
-                    dismissButton = {
-                        MiuixSettingsTextButton(
-                            onClick = { showDeleteSelectedConfirm = false }
-                        ) { Text(stringResource(R.string.action_cancel)) }
-                    }
-                )
-            }
-
             if (showImportPicker) {
                 FavoritesChannelPickerDialog(
                     title = stringResource(R.string.library_playlist_import_title),
@@ -2346,72 +2345,41 @@ private fun LocalPlaylistList(
             }
         }
 
-        displayedFavoritesPlaylist?.let { system ->
-            item(key = "local_playlist_favorites") {
-                val displayName = SystemLocalPlaylists.resolve(system.id, system.name, context)?.currentName ?: system.name
-                Column(modifier = Modifier.animateItem()) {
-                    LibraryInlinePlaylistRow(
-                        playlist = system,
-                        title = displayName,
-                        subtitle = pluralStringResource(
-                            R.plurals.library_song_count,
-                            system.songs.size,
-                            system.songs.size
-                        ),
-                        offlineMode = offlineMode,
-                        onClick = if (selectionMode) null else ({ onClick(system) }),
-                        selectionControl = if (selectionMode) {
-                            { Spacer(modifier = Modifier.size(24.dp)) }
-                        } else null
-                    )
-                    LibraryInsetDivider(leading = 68.dp)
-                }
-            }
-        }
-
-        displayedLocalFilesPlaylist?.let { system ->
-            item(key = "local_playlist_local_files") {
-                val displayName = SystemLocalPlaylists.resolve(system.id, system.name, context)?.currentName ?: system.name
-                Column(modifier = Modifier.animateItem()) {
-                    LibraryInlinePlaylistRow(
-                        playlist = system,
-                        title = displayName,
-                        subtitle = pluralStringResource(
-                            R.plurals.library_song_count,
-                            system.songs.size,
-                            system.songs.size
-                        ),
-                        offlineMode = offlineMode,
-                        onClick = if (selectionMode) null else ({ onClick(system) }),
-                        selectionControl = if (selectionMode) {
-                            { Spacer(modifier = Modifier.size(24.dp)) }
-                        } else null
-                    )
-                    LibraryInsetDivider(leading = 68.dp)
-                }
-            }
-        }
-
             items(
                 items = displayedPlaylists,
                 key = { it.id }
             ) { pl ->
-            ReorderableItem(state = reorderState, key = pl.id) { _ ->
                 val systemPlaylist = SystemLocalPlaylists.resolve(pl.id, pl.name, context)
                 val displayName = systemPlaylist?.currentName ?: pl.name
                 val isSystemPlaylist = systemPlaylist != null
-                val isSelected = selectionMode && selectedIds.contains(pl.id)
-                val rowContainerColor = if (isSelected) {
-                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
-                } else {
-                    Color.Transparent
-                }
+                val isDragging = draggingPlaylistId == pl.id
 
                 var showRenameDialog by remember { mutableStateOf(false) }
                 var showDeleteDialog by remember { mutableStateOf(false) }
                 var renameText by remember { mutableStateOf(pl.name.take(maxNameLength)) }
 
-                Column(modifier = Modifier.animateItem()) {
+                Column(
+                    modifier = Modifier
+                        .animateItem(
+                            fadeInSpec = null,
+                            fadeOutSpec = null,
+                            placementSpec = if (isDragging) null else playlistShiftSpec
+                        )
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .graphicsLayer {
+                            if (isDragging) {
+                                translationY = dragShiftPx
+                            }
+                        }
+                        .then(
+                            // Rows are transparent, so the lifted row needs its own backdrop.
+                            if (isDragging) {
+                                Modifier.background(MaterialTheme.colorScheme.background)
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
                     LibraryInlinePlaylistRow(
                         playlist = pl,
                         title = displayName,
@@ -2421,37 +2389,51 @@ private fun LocalPlaylistList(
                             pl.songs.size
                         ),
                         offlineMode = offlineMode,
-                        containerColor = rowContainerColor,
-                        onClick = {
-                            if (selectionMode) {
-                                if (!isSystemPlaylist) toggleSelection(pl.id)
-                            } else {
-                                onClick(pl)
-                            }
-                        },
-                        onLongClick = {
-                            if (!selectionMode && !isSystemPlaylist) {
-                                selectionMode = true
-                                selectedIds = setOf(pl.id)
-                            }
-                        },
-                        selectionControl = if (selectionMode) {
-                            {
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = {
-                                        if (!isSystemPlaylist) toggleSelection(pl.id)
+                        dragModifier = if (canReorder) {
+                            Modifier.pointerInput(pl.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        val index =
+                                            reorderablePlaylists.indexOfFirst { it.id == pl.id }
+                                        if (index >= 0) {
+                                            settleJob?.cancel()
+                                            settleJob = null
+                                            swipeRevealedPlaylistId = null
+                                            createRowSwipeExpanded = false
+                                            dragSession.startIndex = index
+                                            dragSession.startOrder =
+                                                reorderablePlaylists.map { it.id }
+                                            dragSession.pitchPx = measurePlaylistPitch()
+                                            dragSession.displacement = 0f
+                                            dragSettling = false
+                                            dragShiftPx = 0f
+                                            draggingPlaylistId = pl.id
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        }
                                     },
-                                    enabled = !isSystemPlaylist
+                                    onDrag = { change, amount ->
+                                        if (draggingPlaylistId == pl.id) {
+                                            change.consume()
+                                            dragSession.displacement += amount.y
+                                            applyDrag(pl.id)
+                                        }
+                                    },
+                                    onDragEnd = { finishDrag(pl.id) },
+                                    onDragCancel = { finishDrag(pl.id) }
                                 )
                             }
-                        } else null,
+                        } else {
+                            Modifier
+                        },
+                        onClick = {
+                            if (SystemClock.uptimeMillis() >= suppressClickUntil) onClick(pl)
+                        },
                         swipeExpanded = swipeRevealedPlaylistId == pl.id,
                         onSwipeExpandedChange = { expanded ->
                             swipeRevealedPlaylistId = if (expanded) pl.id else null
                             if (expanded) createRowSwipeExpanded = false
                         },
-                        swipeEnabled = !selectionMode && !isSystemPlaylist,
+                        swipeEnabled = !isSystemPlaylist,
                         moreActions = if (isSystemPlaylist) null else listOf(
                             SongActionMenuItem(
                                 label = stringResource(R.string.action_rename),
@@ -2467,23 +2449,7 @@ private fun LocalPlaylistList(
                             ) {
                                 showDeleteDialog = true
                             }
-                        ),
-                        trailing = {
-                            if (selectionMode && !isSystemPlaylist) {
-                                Box(
-                                    modifier = Modifier
-                                        .detectReorder(reorderState)
-                                        .padding(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.DragHandle,
-                                        contentDescription = stringResource(R.string.common_drag_handle),
-                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.46f),
-                                        modifier = Modifier.size(LyraIconSize.Large)
-                                    )
-                                }
-                            }
-                        }
+                        )
                     )
                     LibraryInsetDivider(leading = 68.dp)
                 }
@@ -2546,7 +2512,6 @@ private fun LocalPlaylistList(
                     )
                 }
             }
-        }
 
     }
     }
@@ -2555,7 +2520,6 @@ private fun LocalPlaylistList(
 @Composable
 private fun LocalLibraryHeaderContent(
     selectedLocalCategory: Int,
-    selectionMode: Boolean,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     artistSortMode: LocalArtistSortMode,
@@ -2569,21 +2533,19 @@ private fun LocalLibraryHeaderContent(
             onPlaylistSelected = onPlaylistSelected,
             onArtistSelected = onArtistSelected
         )
-        if (!selectionMode) {
-            if (selectedLocalCategory == LOCAL_CATEGORY_ARTIST) {
-                LocalArtistSearchAndSortRow(
-                    query = searchQuery,
-                    onQueryChange = onSearchQueryChange,
-                    sortMode = artistSortMode,
-                    onSortModeChange = onArtistSortModeChange
-                )
-            } else {
-                LibraryInlineSearchField(
-                    query = searchQuery,
-                    onQueryChange = onSearchQueryChange,
-                    placeholderResId = R.string.library_local_playlist_search_hint
-                )
-            }
+        if (selectedLocalCategory == LOCAL_CATEGORY_ARTIST) {
+            LocalArtistSearchAndSortRow(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                sortMode = artistSortMode,
+                onSortModeChange = onArtistSortModeChange
+            )
+        } else {
+            LibraryInlineSearchField(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                placeholderResId = R.string.library_local_playlist_search_hint
+            )
         }
     }
 }

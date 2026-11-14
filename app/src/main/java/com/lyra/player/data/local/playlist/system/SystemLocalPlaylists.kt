@@ -65,12 +65,20 @@ object SystemLocalPlaylists {
             playlists.filter { LocalFilesPlaylist.isSystemPlaylist(it, context) },
             context
         )
-        val others = playlists.filterNot { isSystemPlaylist(it, context) }
 
-        return buildList {
-            add(favorites)
-            addAll(others)
-            add(localFiles)
+        // 保留用户调整过的顺序（含系统歌单），仅补上缺失的系统歌单
+        val ordered = mutableListOf<LocalPlaylist>()
+        val seenIds = mutableSetOf<Long>()
+        playlists.forEach { playlist ->
+            val item = when (resolve(playlist.id, playlist.name, context)?.id) {
+                FavoritesPlaylist.SYSTEM_ID -> favorites
+                LocalFilesPlaylist.SYSTEM_ID -> localFiles
+                else -> playlist
+            }
+            if (seenIds.add(item.id)) ordered += item
         }
+        if (FavoritesPlaylist.SYSTEM_ID !in seenIds) ordered.add(0, favorites)
+        if (LocalFilesPlaylist.SYSTEM_ID !in seenIds) ordered += localFiles
+        return ordered
     }
 }
